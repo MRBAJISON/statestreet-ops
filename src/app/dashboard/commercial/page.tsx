@@ -8,6 +8,19 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import ProgressBar from '@/components/ui/ProgressBar';
 import ScoreGauge from '@/components/ui/ScoreGauge';
 import { SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
+import { useMetrics } from '@/lib/api';
+
+interface CommercialLive {
+  groupSales: number;
+  atv: number;
+  upt: number;
+  convRate: number;
+  grossMargin: number;
+  sellThrough: number;
+  activeSku: number;
+  categorySales: { name: string; value: number }[];
+  sellThroughByCategory: { name: string; value: number }[];
+}
 
 const fmt = (n: number) => 'GHS ' + n.toLocaleString();
 const pct = (v: number, t: number) => ((v / t) * 100).toFixed(1);
@@ -16,11 +29,6 @@ const ppDiff = (v: number, t: number) => (v - t).toFixed(1);
 
 const d = commercialData;
 
-/* Derived values */
-const groupSalesPct = parseFloat(pct(d.groupSales.mtd, d.groupSales.target));
-const ytdSales = 3245781;
-const ytdPct = 64.9;
-
 /* Stock aging breakdown for Merchandise Productivity */
 const stockAging = [
   { name: '0-30d', value: 18.6 },
@@ -28,16 +36,6 @@ const stockAging = [
   { name: '61-90d', value: 21.3 },
   { name: '91-180d', value: 26.0 },
   { name: '180+d', value: 11.9 },
-];
-
-/* Sell-through by category for donut */
-const sellThroughByCategory = [
-  { name: 'Suits', value: 71.2 },
-  { name: 'Shoes', value: 72.5 },
-  { name: 'Shirts', value: 66.1 },
-  { name: 'Blazers', value: 58.0 },
-  { name: 'Bags', value: 70.3 },
-  { name: 'Others', value: 64.6 },
 ];
 
 /* Deployment by store compliance */
@@ -87,6 +85,17 @@ const topStore = sortedStores[0].name;
 const bottomStore = sortedStores[sortedStores.length - 1].name;
 
 export default function CommercialPage() {
+  const { data: m } = useMetrics<CommercialLive>('commercial');
+  const groupSales = m?.groupSales ?? 0;
+  const grossMargin = m?.grossMargin ?? 0;
+  const atv = m?.atv ?? 0;
+  const upt = m?.upt ?? 0;
+  const convRate = m?.convRate ?? 0;
+  const sellThrough = m?.sellThrough ?? 0;
+  const activeSku = m?.activeSku ?? 0;
+  const categorySales = m?.categorySales ?? [];
+  const sellThroughCat = m?.sellThroughByCategory ?? [];
+  const gsPct = d.groupSales.target ? (groupSales / d.groupSales.target) * 100 : 0;
   return (
     <div className="bg-[#0a0a0a] min-h-screen text-white">
       <DashboardHeader
@@ -101,71 +110,67 @@ export default function CommercialPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
           <KPICard
             label="Group Sales MTD"
-            value={fmt(d.groupSales.mtd)}
+            value={fmt(groupSales)}
             target={fmt(d.groupSales.target)}
-            change={groupSalesPct - 100}
+            change={parseFloat((gsPct - 100).toFixed(1))}
             changeLabel="%"
-            status={groupSalesPct >= 80 ? 'green' : groupSalesPct >= 60 ? 'yellow' : 'red'}
+            status={gsPct >= 80 ? 'green' : gsPct >= 60 ? 'yellow' : 'red'}
             small
           />
           <KPICard
             label="Group Sales YTD"
-            value={fmt(ytdSales)}
-            change={ytdPct - 100}
-            changeLabel="%"
-            status={ytdPct >= 80 ? 'green' : ytdPct >= 60 ? 'yellow' : 'red'}
+            value={fmt(groupSales)}
+            status="green"
             small
           />
           <KPICard
             label="Gross Margin %"
-            value={`${d.grossMargin.pct}%`}
+            value={`${grossMargin}%`}
             target={`${d.grossMargin.target}%`}
-            change={parseFloat(ppDiff(d.grossMargin.pct, d.grossMargin.target))}
+            change={parseFloat(ppDiff(grossMargin, d.grossMargin.target))}
             changeLabel="pp"
-            status={d.grossMargin.pct >= d.grossMargin.target ? 'green' : d.grossMargin.pct >= d.grossMargin.target - 1 ? 'yellow' : 'red'}
+            status={grossMargin >= d.grossMargin.target ? 'green' : grossMargin >= d.grossMargin.target - 1 ? 'yellow' : 'red'}
             small
           />
           <KPICard
             label="ATV"
-            value={fmt(d.atv.value)}
+            value={fmt(atv)}
             target={fmt(d.atv.target)}
-            change={parseFloat(((d.atv.value - d.atv.target) / d.atv.target * 100).toFixed(1))}
+            change={atv ? parseFloat(((atv - d.atv.target) / d.atv.target * 100).toFixed(1)) : undefined}
             changeLabel="%"
-            status={d.atv.value >= d.atv.target ? 'green' : d.atv.value >= d.atv.target * 0.95 ? 'yellow' : 'red'}
+            status={atv >= d.atv.target ? 'green' : atv >= d.atv.target * 0.95 ? 'yellow' : 'red'}
             small
           />
           <KPICard
             label="UPT"
-            value={d.upt.value}
+            value={upt}
             target={d.upt.target}
-            change={parseFloat(((d.upt.value - d.upt.target) / d.upt.target * 100).toFixed(1))}
+            change={upt ? parseFloat(((upt - d.upt.target) / d.upt.target * 100).toFixed(1)) : undefined}
             changeLabel="%"
-            status={d.upt.value >= d.upt.target ? 'green' : 'red'}
+            status={upt >= d.upt.target ? 'green' : 'red'}
             small
           />
           <KPICard
             label="Conversion Rate"
-            value={`${d.conversionRate.pct}%`}
+            value={`${convRate}%`}
             target={`${d.conversionRate.target}%`}
-            change={parseFloat(ppDiff(d.conversionRate.pct, d.conversionRate.target))}
+            change={parseFloat(ppDiff(convRate, d.conversionRate.target))}
             changeLabel="pp"
-            status={d.conversionRate.pct >= d.conversionRate.target ? 'green' : d.conversionRate.pct >= d.conversionRate.target - 3 ? 'yellow' : 'red'}
+            status={convRate >= d.conversionRate.target ? 'green' : convRate >= d.conversionRate.target - 3 ? 'yellow' : 'red'}
             small
           />
           <KPICard
             label="Sell Through %"
-            value={`${d.sellThrough.pct}%`}
+            value={`${sellThrough}%`}
             target={`${d.sellThrough.target}%`}
-            change={parseFloat(ppDiff(d.sellThrough.pct, d.sellThrough.target))}
+            change={parseFloat(ppDiff(sellThrough, d.sellThrough.target))}
             changeLabel="pp"
-            status={d.sellThrough.pct >= d.sellThrough.target ? 'green' : d.sellThrough.pct >= d.sellThrough.target - 5 ? 'yellow' : 'red'}
+            status={sellThrough >= d.sellThrough.target ? 'green' : sellThrough >= d.sellThrough.target - 5 ? 'yellow' : 'red'}
             small
           />
           <KPICard
             label="Active SKU"
-            value={d.activeSku.toLocaleString()}
-            change={5.4}
-            changeLabel="%"
+            value={activeSku.toLocaleString()}
             status="green"
             small
           />
@@ -288,7 +293,7 @@ export default function CommercialPage() {
             <div>
               <h4 className="text-xs text-gray-400 mb-2 uppercase tracking-wider">Category Sales Mix</h4>
               <SimpleBarChart
-                data={d.categories.map(c => ({ name: c.name, value: c.sales }))}
+                data={categorySales}
                 height={220}
                 color="#c8a951"
                 prefix="GHS "
@@ -326,7 +331,7 @@ export default function CommercialPage() {
             <div>
               <h4 className="text-xs text-gray-400 mb-2 uppercase tracking-wider">Sell Through by Category</h4>
               <SimpleDonutChart
-                data={sellThroughByCategory}
+                data={sellThroughCat}
                 height={180}
                 innerRadius={40}
                 outerRadius={60}
@@ -334,7 +339,7 @@ export default function CommercialPage() {
                 centerLabel="Avg ST%"
               />
               <div className="grid grid-cols-2 gap-1 mt-2">
-                {sellThroughByCategory.map((item, i) => (
+                {sellThroughCat.map((item, i) => (
                   <div key={item.name} className="flex items-center gap-1 text-[0.6rem]">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: ['#c8a951', '#22c55e', '#3b82f6', '#ef4444', '#eab308', '#8b5cf6'][i] }} />
                     <span className="text-gray-400">{item.name}</span>
