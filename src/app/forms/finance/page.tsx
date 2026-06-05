@@ -1,12 +1,30 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
+import { addRevenueEntry, addRevenueEntries, type RevenueEntry } from '@/lib/store';
+
+// Normalize a free-text brand (from Excel or a select) to the canonical form value.
+function normalizeBrand(raw: string): string {
+  const b = (raw || '').toString().trim().toLowerCase();
+  if (!b) return '';
+  if (b.includes('boulevard') && b.includes('women')) return 'boulevard-women';
+  if (b.includes('boulevard')) return 'boulevard-men';
+  if (b.includes('angelo')) return 'dangelo';
+  if (b.includes('woodpecker')) return 'woodpeckers';
+  if (b.includes('carbon')) return 'carbon-shoes';
+  return b;
+}
+
+const num = (v: FormDataEntryValue | null | undefined | string | number) =>
+  Number(String(v ?? '').replace(/[, ]/g, '')) || 0;
 
 export default function FinanceFormsPage() {
   const [activeForm, setActiveForm] = useState<string>('revenue');
   const [submitted, setSubmitted] = useState(false);
+  const [message, setMessage] = useState('');
+  const [uploadStatus, setUploadStatus] = useState<{ ok: boolean; text: string } | null>(null);
 
   const forms = [
     { id: 'revenue', label: 'Daily Revenue Entry' },
@@ -16,10 +34,110 @@ export default function FinanceFormsPage() {
     { id: 'forecast', label: 'Forecast Update' },
   ];
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const form = e.currentTarget;
+
+    if (activeForm === 'revenue') {
+      const fd = new FormData(form);
+      const entry: RevenueEntry = {
+        date: String(fd.get('date') || ''),
+        store: String(fd.get('store') || ''),
+        brand: normalizeBrand(String(fd.get('brand') || '')),
+        grossRevenue: num(fd.get('grossRevenue')),
+        discounts: num(fd.get('discounts')),
+        netRevenue: num(fd.get('netRevenue')),
+        transactions: num(fd.get('transactions')),
+        footfall: num(fd.get('footfall')),
+        itemsSold: num(fd.get('itemsSold')),
+      };
+      addRevenueEntry(entry);
+      setMessage(
+        `Revenue of GHS ${entry.grossRevenue.toLocaleString()} added. The Finance & Executive dashboards updated live.`
+      );
+      form.reset();
+    } else {
+      setMessage('Data submitted successfully! Dashboard will update shortly.');
+    }
+
     setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 3000);
+    setTimeout(() => setSubmitted(false), 4000);
+  }
+
+  async function handleExcelUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadStatus({ ok: true, text: `Reading ${file.name}…` });
+    try {
+      const XLSX = await import('xlsx');
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+
+      // Case-insensitive column lookup helper.
+      const pick = (row: Record<string, unknown>, ...keys: string[]) => {
+        const map: Record<string, unknown> = {};
+        for (const k of Object.keys(row)) map[k.toLowerCase().replace(/[\s_]/g, '')] = row[k];
+        for (const k of keys) {
+          const v = map[k.toLowerCase().replace(/[\s_]/g, '')];
+          if (v !== undefined && v !== '') return v;
+        }
+        return '';
+      };
+
+      const entries: RevenueEntry[] = rows
+        .map((r) => ({
+          date: String(pick(r, 'date') || ''),
+          store: String(pick(r, 'store') || ''),
+          brand: normalizeBrand(String(pick(r, 'brand') || '')),
+          grossRevenue: num(pick(r, 'grossrevenue', 'gross', 'revenue') as string),
+          discounts: num(pick(r, 'discounts', 'discount') as string),
+          netRevenue: num(pick(r, 'netrevenue', 'net') as string),
+          transactions: num(pick(r, 'transactions', 'txns') as string),
+          footfall: num(pick(r, 'footfall', 'traffic') as string),
+          itemsSold: num(pick(r, 'itemssold', 'items', 'units') as string),
+        }))
+        .filter((entry) => entry.grossRevenue > 0);
+
+      if (!entries.length) {
+        setUploadStatus({
+          ok: false,
+          text: 'No valid rows found. Need at least a "Gross Revenue" column with values.',
+        });
+      } else {
+        addRevenueEntries(entries);
+        const total = entries.reduce((s, x) => s + x.grossRevenue, 0);
+        setUploadStatus({
+          ok: true,
+          text: `Imported ${entries.length} row(s) — GHS ${total.toLocaleString()} added live to the dashboards.`,
+        });
+      }
+    } catch (err) {
+      setUploadStatus({ ok: false, text: `Could not read file: ${(err as Error).message}` });
+    } finally {
+      e.target.value = '';
+    }
+  }
+
+  async function downloadTemplate() {
+    const XLSX = await import('xlsx');
+    const ws = XLSX.utils.json_to_sheet([
+      {
+        Date: '2026-06-05',
+        Store: 'Labone Men',
+        Brand: 'Boulevard Men',
+        GrossRevenue: 18500,
+        Discounts: 500,
+        NetRevenue: 18000,
+        Transactions: 42,
+        Footfall: 130,
+        ItemsSold: 88,
+      },
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Revenue');
+    XLSX.writeFile(wb, 'revenue-template.xlsx');
   }
 
   return (
@@ -40,7 +158,50 @@ export default function FinanceFormsPage() {
 
       {submitted && (
         <div className="bg-green-500/10 border border-green-500/30 text-green-400 p-3 rounded-lg mb-4 text-sm">
-          Data submitted successfully! Dashboard will update shortly.
+          {message}
+        </div>
+      )}
+
+      {activeForm === 'revenue' && (
+        <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-4 mb-4 max-w-4xl">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <div className="text-sm font-semibold text-white">Bulk import from Excel</div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                Upload an .xlsx/.csv with columns: Date, Store, Brand, Gross Revenue, Discounts, Net
+                Revenue, Transactions, Footfall, Items Sold.
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={downloadTemplate}
+                className="text-xs text-[#c8a951] hover:underline whitespace-nowrap"
+              >
+                Download template
+              </button>
+              <label className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-4 py-2 rounded-lg text-sm cursor-pointer whitespace-nowrap">
+                Upload Excel
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleExcelUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          </div>
+          {uploadStatus && (
+            <div
+              className={`mt-3 text-xs p-2 rounded-lg border ${
+                uploadStatus.ok
+                  ? 'border-green-500/30 bg-green-500/10 text-green-400'
+                  : 'border-red-500/30 bg-red-500/10 text-red-400'
+              }`}
+            >
+              {uploadStatus.text}
+            </div>
+          )}
         </div>
       )}
 
@@ -52,8 +213,8 @@ export default function FinanceFormsPage() {
               <FormField label="Store" name="store" type="select" required options={[
                 { label: 'Dzorwulu Men', value: 'dzorwulu-men' },
                 { label: 'East Legon Men', value: 'east-legon-men' },
-                { label: 'Labore Men', value: 'labore-men' },
-                { label: 'Boulevard Women Labore', value: 'bw-labore' },
+                { label: 'Labone Men', value: 'labone-men' },
+                { label: 'Boulevard Women Labone', value: 'bw-labone' },
                 { label: 'Boulevard Women Dzorwulu', value: 'bw-dzorwulu' },
                 { label: "D'Angelo Palace", value: 'dangelo' },
                 { label: 'Woodpeckers', value: 'woodpeckers' },
@@ -93,8 +254,8 @@ export default function FinanceFormsPage() {
                 { label: 'Head Office', value: 'hq' },
                 { label: 'Dzorwulu Men', value: 'dzorwulu-men' },
                 { label: 'East Legon Men', value: 'east-legon-men' },
-                { label: 'Labore Men', value: 'labore-men' },
-                { label: 'Boulevard Women Labore', value: 'bw-labore' },
+                { label: 'Labone Men', value: 'labone-men' },
+                { label: 'Boulevard Women Labone', value: 'bw-labone' },
                 { label: 'Boulevard Women Dzorwulu', value: 'bw-dzorwulu' },
                 { label: "D'Angelo Palace", value: 'dangelo' },
                 { label: 'Woodpeckers', value: 'woodpeckers' },

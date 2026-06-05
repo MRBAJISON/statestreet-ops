@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
@@ -132,7 +132,7 @@ export default function MarketingFormsPage() {
               <FormField label="Estimated Revenue from Activity" name="estRevenue" type="number" prefix="GHS" step={0.01} />
               <FormField label="Store" name="store" type="select" options={[
                 { label: 'Dzorwulu Men', value: 'dzorwulu-men' }, { label: 'East Legon Men', value: 'east-legon-men' },
-                { label: 'Labore Men', value: 'labore-men' }, { label: "D'Angelo Palace", value: 'dangelo' },
+                { label: 'Labone Men', value: 'labone-men' }, { label: "D'Angelo Palace", value: 'dangelo' },
               ]} />
               <FormField label="Notes" name="notes" type="textarea" placeholder="Key takeaways" />
             </div>

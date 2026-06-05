@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
@@ -6,7 +6,7 @@ import FormSection from '@/components/forms/FormSection';
 
 const STORES = [
   { label: 'Dzorwulu Men', value: 'dzorwulu-men' }, { label: 'East Legon Men', value: 'east-legon-men' },
-  { label: 'Labore Men', value: 'labore-men' }, { label: 'Boulevard Women Labore', value: 'bw-labore' },
+  { label: 'Labone Men', value: 'labone-men' }, { label: 'Boulevard Women Labone', value: 'bw-labone' },
   { label: 'Boulevard Women Dzorwulu', value: 'bw-dzorwulu' }, { label: "D'Angelo Palace", value: 'dangelo' },
   { label: 'Woodpeckers', value: 'woodpeckers' },
 ];

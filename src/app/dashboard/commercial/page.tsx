@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { commercialData } from '@/lib/data';
 import DashboardHeader from '@/components/layout/DashboardHeader';
@@ -44,8 +44,8 @@ const sellThroughByCategory = [
 const deploymentCompliance = [
   { name: 'Dzorwulu Men', value: 95 },
   { name: 'East Legon Men', value: 88 },
-  { name: 'Labore Men', value: 86 },
-  { name: 'Blvd W Labore', value: 82 },
+  { name: 'Labone Men', value: 86 },
+  { name: 'Blvd W Labone', value: 82 },
   { name: 'Blvd W Dzorwulu', value: 78 },
   { name: "D'Angelo", value: 71 },
   { name: 'Woodpeckers', value: 68 },
@@ -97,7 +97,7 @@ export default function CommercialPage() {
       />
 
       <div className="p-4 space-y-4">
-        {/* ─── TOP KPI BAR ─── */}
+        {/* â”€â”€â”€ TOP KPI BAR â”€â”€â”€ */}
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
           <KPICard
             label="Group Sales MTD"
@@ -171,7 +171,7 @@ export default function CommercialPage() {
           />
         </div>
 
-        {/* ─── 1. STORE BATTLEFIELD ─── */}
+        {/* â”€â”€â”€ 1. STORE BATTLEFIELD â”€â”€â”€ */}
         <Section number={1} title="Store Battlefield" subtitle="Performance by Location">
           <div className="flex gap-2 mb-3">
             <span className="bg-green-500/20 text-green-400 text-[0.65rem] px-2 py-0.5 rounded-full font-medium">
@@ -214,8 +214,8 @@ export default function CommercialPage() {
                       <td className="py-2 pr-2 text-gray-500">{store.rank}</td>
                       <td className="py-2 pr-4 font-medium">
                         {store.name}
-                        {isTop && <span className="ml-2 text-green-400 text-[0.6rem]">★</span>}
-                        {isBottom && <span className="ml-2 text-red-400 text-[0.6rem]">⚠</span>}
+                        {isTop && <span className="ml-2 text-green-400 text-[0.6rem]">â˜…</span>}
+                        {isBottom && <span className="ml-2 text-red-400 text-[0.6rem]">âš </span>}
                       </td>
                       <td className="py-2 pr-4 text-right font-medium">{fmt(store.sales)}</td>
                       <td className="py-2 pr-4 text-right text-gray-500">{fmt(store.target)}</td>
@@ -240,7 +240,7 @@ export default function CommercialPage() {
           </div>
         </Section>
 
-        {/* ─── 2. CATEGORY COMMAND ─── */}
+        {/* â”€â”€â”€ 2. CATEGORY COMMAND â”€â”€â”€ */}
         <Section number={2} title="Category Command" subtitle="Sales by Category">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="overflow-x-auto">
@@ -297,7 +297,7 @@ export default function CommercialPage() {
           </div>
         </Section>
 
-        {/* ─── 3. MERCHANDISE PRODUCTIVITY ─── */}
+        {/* â”€â”€â”€ 3. MERCHANDISE PRODUCTIVITY â”€â”€â”€ */}
         <Section number={3} title="Merchandise Productivity" subtitle="Inventory Efficiency">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             <div className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-3 text-center">
@@ -368,7 +368,7 @@ export default function CommercialPage() {
           </div>
         </Section>
 
-        {/* ─── 4. SKU PERFORMANCE ─── */}
+        {/* â”€â”€â”€ 4. SKU PERFORMANCE â”€â”€â”€ */}
         <Section number={4} title="SKU Performance" subtitle="Product-Level Detail">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Top Selling */}
@@ -450,7 +450,7 @@ export default function CommercialPage() {
           </div>
         </Section>
 
-        {/* ─── 5. NEW ARRIVALS & DEPLOYMENT ─── */}
+        {/* â”€â”€â”€ 5. NEW ARRIVALS & DEPLOYMENT â”€â”€â”€ */}
         <Section number={5} title="New Arrivals & Deployment" subtitle="Latest Stock">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
@@ -493,7 +493,7 @@ export default function CommercialPage() {
           </div>
         </Section>
 
-        {/* ─── 6. COMMERCIAL ACTION CENTER ─── */}
+        {/* â”€â”€â”€ 6. COMMERCIAL ACTION CENTER â”€â”€â”€ */}
         <Section number={6} title="Commercial Action Center" subtitle="Focus & Promos">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
@@ -556,7 +556,7 @@ export default function CommercialPage() {
           </div>
         </Section>
 
-        {/* ─── 7. ACCOUNTABILITY BOARD ─── */}
+        {/* â”€â”€â”€ 7. ACCOUNTABILITY BOARD â”€â”€â”€ */}
         <Section number={7} title="Accountability Board" subtitle="Team Performance">
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -597,7 +597,7 @@ export default function CommercialPage() {
           </div>
         </Section>
 
-        {/* ─── 8. COMMERCIAL INSIGHTS ─── */}
+        {/* â”€â”€â”€ 8. COMMERCIAL INSIGHTS â”€â”€â”€ */}
         <Section number={8} title="Commercial Insights" subtitle="Analysis & Actions">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div>

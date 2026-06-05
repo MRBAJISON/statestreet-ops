@@ -1,6 +1,7 @@
 'use client';
 
 import { financeData } from '@/lib/data';
+import { useFinanceLive } from '@/lib/store';
 import DashboardHeader from '@/components/layout/DashboardHeader';
 import KPICard from '@/components/ui/KPICard';
 import Section from '@/components/ui/Section';
@@ -18,12 +19,13 @@ const fmtFull = (n: number) => `GHS ${n.toLocaleString()}`;
 
 export default function FinancePage() {
   const d = financeData;
+  const live = useFinanceLive();
 
-  // Prepare chart data
-  const dailyRevenueData = d.revenue.daily.map((v, i) => ({
-    name: d.revenue.labels[i],
+  // Prepare chart data (revenue series is live — driven by the Daily Revenue Entry form)
+  const dailyRevenueData = live.daily.map((v, i) => ({
+    name: live.labels[i],
     value: v,
-    value2: Math.round(d.revenue.target / d.revenue.labels.length),
+    value2: Math.round(live.revenueTarget / live.labels.length),
   }));
 
   const cashFlowTrendData = d.cashFlow.trend.map((v, i) => ({
@@ -72,8 +74,9 @@ export default function FinancePage() {
     { area: 'Cash Flow', status: d.healthCheck.cashFlow, detail: 'Net positive cash flow' },
   ];
 
-  const dailyAvg = Math.round(d.revenue.mtd / d.revenue.labels.length);
+  const dailyAvg = Math.round(live.revenueMtd / live.labels.length);
   const weeklyAvg = dailyAvg * 7;
+  const revenueVsTarget = Math.round(((live.revenueMtd - live.revenueTarget) / live.revenueTarget) * 1000) / 10;
 
   return (
     <div className="bg-[#0a0a0a] min-h-screen text-white">
@@ -89,11 +92,11 @@ export default function FinancePage() {
         <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-3">
           <KPICard
             label="Revenue MTD"
-            value="650,482"
+            value={Math.round(live.revenueMtd).toLocaleString()}
             prefix="GHS "
-            target="600K"
-            change={8.4}
-            status="green"
+            target={fmt(live.revenueTarget, '').replace('GHS ', '')}
+            change={revenueVsTarget}
+            status={live.revenueMtd >= live.revenueTarget ? 'green' : 'yellow'}
             small
           />
           <KPICard
@@ -195,15 +198,15 @@ export default function FinancePage() {
               <div>
                 <div className="text-xs text-gray-400 mb-2">Revenue Breakdown by Brand</div>
                 <SimpleDonutChart
-                  data={d.revenueByBrand}
+                  data={live.revenueByBrand}
                   height={180}
                   innerRadius={45}
                   outerRadius={65}
                   centerLabel="Total Revenue"
-                  centerValue={fmt(d.revenue.mtd)}
+                  centerValue={fmt(live.revenueMtd)}
                 />
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
-                  {d.revenueByBrand.map((b, i) => (
+                  {live.revenueByBrand.map((b, i) => (
                     <div key={b.name} className="flex items-center gap-1.5 text-[0.65rem]">
                       <span
                         className="w-2 h-2 rounded-full flex-shrink-0"

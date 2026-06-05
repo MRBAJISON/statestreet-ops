@@ -2,6 +2,7 @@ import { financeData, commercialData, marketingData, operationsData, inventoryDa
 import DashboardHeader from '@/components/layout/DashboardHeader';
 import Section from '@/components/ui/Section';
 import ExecutiveCharts from './ExecutiveCharts';
+import ExecutiveRevenueDonut from './ExecutiveRevenueDonut';
 
 export const metadata = {
   title: 'Executive Command Center | StateStreet Retail Group',
@@ -79,9 +80,6 @@ export default function ExecutiveCommandCenter() {
     name: financeData.revenue.labels[i],
     value: v,
   }));
-
-  /* revenue by brand donut */
-  const revenueByBrand = financeData.revenueByBrand;
 
   /* GP % trend (simulated monthly) */
   const gpTrendData = [
@@ -307,13 +305,7 @@ export default function ExecutiveCommandCenter() {
             </div>
             <div className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-3">
               <div className="text-[0.65rem] text-gray-400 uppercase mb-2">Revenue by Brand</div>
-              <ExecutiveCharts
-                type="donut"
-                data={revenueByBrand}
-                height={160}
-                centerLabel="Total"
-                centerValue="GHS 650K"
-              />
+              <ExecutiveRevenueDonut height={160} />
             </div>
             <div className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-3">
               <div className="text-[0.65rem] text-gray-400 uppercase mb-2">Gross Profit % Trend</div>

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import DashboardHeader from '@/components/layout/DashboardHeader';
 import KPICard from '@/components/ui/KPICard';
@@ -274,7 +274,7 @@ export default function OperationsPage() {
                 {[
                   { task: 'HVAC Filter Replacement', due: 'Jun 7', stores: 'All Stores', status: 'Planned' },
                   { task: 'Fire Extinguisher Inspection', due: 'Jun 10', stores: 'All Stores', status: 'Planned' },
-                  { task: 'Electrical Panel Check', due: 'Jun 14', stores: 'Dzorwulu, Labore', status: 'Planned' },
+                  { task: 'Electrical Panel Check', due: 'Jun 14', stores: 'Dzorwulu, Labone', status: 'Planned' },
                   { task: 'Pest Control', due: 'Jun 15', stores: 'All Stores', status: 'Planned' },
                 ].map((m, i) => (
                   <div key={i} className="flex items-center justify-between bg-[#0a0a0a] border border-[#1a1a1a] rounded p-2">
@@ -490,7 +490,7 @@ export default function OperationsPage() {
                     { store: 'East Legon Men', area: 'Cash Handling', score: 88, status: 'On Track' },
                     { store: 'D\'Angelo Palace', area: 'Loss Prevention', score: 72, status: 'At Risk' },
                     { store: 'Woodpeckers', area: 'Customer Service', score: 68, status: 'Off Track' },
-                    { store: 'Boulevard Women Labore', area: 'Closing Procedures', score: 78, status: 'At Risk' },
+                    { store: 'Boulevard Women Labone', area: 'Closing Procedures', score: 78, status: 'At Risk' },
                   ].map((a, i) => (
                     <tr key={i} className="border-b border-[#1a1a1a]">
                       <td className="py-2 pr-2">{a.store}</td>
@@ -563,7 +563,7 @@ export default function OperationsPage() {
                 {[
                   { risk: 'AC failure at Woodpeckers affecting customer comfort', level: 'High' },
                   { risk: 'Safe malfunction at D\'Angelo Palace - cash security risk', level: 'High' },
-                  { risk: 'Electrical panel aging at Labore Men', level: 'High' },
+                  { risk: 'Electrical panel aging at Labone Men', level: 'High' },
                   { risk: 'Fire extinguisher inspection overdue - 3 stores', level: 'Medium' },
                   { risk: 'CCTV blind spots identified at 2 stores', level: 'Medium' },
                 ].map((r, i) => (

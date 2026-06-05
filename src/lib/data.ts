@@ -1,4 +1,4 @@
-import type { FinanceData, CommercialData, MarketingData, OperationsData, InventoryData, BrandData } from './types';
+﻿import type { FinanceData, CommercialData, MarketingData, OperationsData, InventoryData, BrandData } from './types';
 
 export const financeData: FinanceData = {
   revenue: { mtd: 650482, target: 600000, daily: [18500, 19200, 21000, 22500, 20800, 21693, 23100, 19800, 22400, 21200, 20500, 23800, 22100, 21344, 19600, 22800, 21500, 23200, 20100, 22700, 21800, 20900, 23500, 22300, 21600, 19900, 23100, 22400, 21700, 20300, 21693], labels: ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27','28','29','30','31'] },
@@ -60,8 +60,8 @@ export const commercialData: CommercialData = {
   stores: [
     { rank: 1, name: 'Dzorwulu Men', sales: 118420, target: 100000, achievement: 74, vsLastMonth: -18.2 },
     { rank: 2, name: 'East Legon Men', sales: 102330, target: 100000, achievement: 74.8, vsLastMonth: 5.2 },
-    { rank: 3, name: 'Labore Men', sales: 95860, target: 100000, achievement: 60.5, vsLastMonth: -1.3 },
-    { rank: 4, name: 'Boulevard Women Labore', sales: 52810, target: 80000, achievement: 51.2, vsLastMonth: -12.2 },
+    { rank: 3, name: 'Labone Men', sales: 95860, target: 100000, achievement: 60.5, vsLastMonth: -1.3 },
+    { rank: 4, name: 'Boulevard Women Labone', sales: 52810, target: 80000, achievement: 51.2, vsLastMonth: -12.2 },
     { rank: 5, name: 'Boulevard Women Dzorwulu', sales: 29630, target: 40000, achievement: 42, vsLastMonth: -8.5 },
     { rank: 6, name: 'D\'Angelo Palace', sales: 91250, target: 100000, achievement: 68.9, vsLastMonth: 11.5 },
     { rank: 7, name: 'Woodpeckers', sales: 116250, target: 180000, achievement: 64.5, vsLastMonth: 24.3 },
@@ -178,8 +178,8 @@ export const operationsData: OperationsData = {
   storeOverview: [
     { rank: 1, name: 'Dzorwulu Men', opsScore: 92, vmScore: 90, readiness: 95, cxScore: 91 },
     { rank: 2, name: 'East Legon Men', opsScore: 89, vmScore: 87, readiness: 92, cxScore: 88 },
-    { rank: 3, name: 'Labore Men', opsScore: 87, vmScore: 84, readiness: 88, cxScore: 86 },
-    { rank: 4, name: 'Boulevard Women Labore', opsScore: 85, vmScore: 82, readiness: 87, cxScore: 84 },
+    { rank: 3, name: 'Labone Men', opsScore: 87, vmScore: 84, readiness: 88, cxScore: 86 },
+    { rank: 4, name: 'Boulevard Women Labone', opsScore: 85, vmScore: 82, readiness: 87, cxScore: 84 },
     { rank: 5, name: 'Boulevard Women Dzorwulu', opsScore: 82, vmScore: 78, readiness: 85, cxScore: 80 },
     { rank: 6, name: 'D\'Angelo Palace', opsScore: 76, vmScore: 71, readiness: 80, cxScore: 78 },
     { rank: 7, name: 'Woodpeckers', opsScore: 75, vmScore: 68, readiness: 77, cxScore: 74 },
@@ -187,7 +187,7 @@ export const operationsData: OperationsData = {
   vmByStore: [
     { store: 'Dzorwulu Men', compliance: 95 },
     { store: 'East Legon Men', compliance: 88 },
-    { store: 'Labore Men', compliance: 86 },
+    { store: 'Labone Men', compliance: 86 },
     { store: 'Boulevard Women Dzorwulu', compliance: 78 },
     { store: 'Woodpeckers', compliance: 68 },
   ],
@@ -204,8 +204,8 @@ export const operationsData: OperationsData = {
   readinessIssues: [
     { store: 'D\'Angelo Palace', issue: 'Cashier Shortage', impact: 'High', status: 'In Progress' },
     { store: 'D\'Angelo Palace', issue: 'Safe Not Working', impact: 'High', status: 'In Progress' },
-    { store: 'Boulevard Women Labore', issue: 'Opening Delay', impact: 'Medium', status: 'In Progress' },
-    { store: 'Labore Men', issue: 'Staff Training Pending', impact: 'Medium', status: 'Planned' },
+    { store: 'Boulevard Women Labone', issue: 'Opening Delay', impact: 'Medium', status: 'In Progress' },
+    { store: 'Labone Men', issue: 'Staff Training Pending', impact: 'Medium', status: 'Planned' },
   ],
   cxFeedbackThemes: [
     { theme: 'Store Cleanliness', count: 142 },
@@ -292,8 +292,8 @@ export const inventoryData: InventoryData = {
   storeAccuracy: [
     { store: 'Dzorwulu Men', accuracy: 98.6 },
     { store: 'East Legon Men', accuracy: 98.1 },
-    { store: 'Labore Men', accuracy: 97.6 },
-    { store: 'Boulevard Women Labore', accuracy: 98.4 },
+    { store: 'Labone Men', accuracy: 97.6 },
+    { store: 'Boulevard Women Labone', accuracy: 98.4 },
     { store: 'Boulevard Women Dzorwulu', accuracy: 97.9 },
     { store: 'D\'Angelo Palace', accuracy: 98.3 },
     { store: 'Woodpeckers', accuracy: 98.0 },
