@@ -1,7 +1,7 @@
 'use client';
 
 import { financeData } from '@/lib/data';
-import { useFinanceLive } from '@/lib/store';
+import { useMetrics } from '@/lib/api';
 import DashboardHeader from '@/components/layout/DashboardHeader';
 import KPICard from '@/components/ui/KPICard';
 import Section from '@/components/ui/Section';
@@ -17,9 +17,23 @@ const fmt = (n: number, prefix = 'GHS ') => {
 
 const fmtFull = (n: number) => `GHS ${n.toLocaleString()}`;
 
+interface FinanceMetricsData {
+  revenueMtd: number;
+  revenueByBrand: { name: string; value: number }[];
+  daily: number[];
+  labels: string[];
+}
+
 export default function FinancePage() {
   const d = financeData;
-  const live = useFinanceLive();
+  const { data: m } = useMetrics<FinanceMetricsData>('finance');
+  const live = {
+    revenueMtd: m?.revenueMtd ?? 0,
+    revenueByBrand: m?.revenueByBrand ?? [],
+    daily: m?.daily ?? new Array(31).fill(0),
+    labels: m?.labels ?? Array.from({ length: 31 }, (_, i) => String(i + 1)),
+    revenueTarget: financeData.revenue.target,
+  };
 
   // Prepare chart data (revenue series is live — driven by the Daily Revenue Entry form)
   const dailyRevenueData = live.daily.map((v, i) => ({

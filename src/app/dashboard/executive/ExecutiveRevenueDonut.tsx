@@ -1,7 +1,7 @@
 'use client';
 
 import { SimpleDonutChart } from '@/components/charts/Charts';
-import { useFinanceLive } from '@/lib/store';
+import { useMetrics } from '@/lib/api';
 
 const fmt = (n: number) =>
   n >= 1_000_000
@@ -10,16 +10,21 @@ const fmt = (n: number) =>
     ? `GHS ${(n / 1_000).toFixed(0)}K`
     : `GHS ${Math.round(n).toLocaleString()}`;
 
-// Revenue-by-brand donut for the Executive dashboard, driven live by the Finance
-// Daily Revenue Entry form (via the shared client store).
+interface FinanceMetricsData {
+  revenueMtd: number;
+  revenueByBrand: { name: string; value: number }[];
+}
+
+// Revenue-by-brand donut for the Executive dashboard, driven live by the
+// Finance revenue entries in the database.
 export default function ExecutiveRevenueDonut({ height = 160 }: { height?: number }) {
-  const live = useFinanceLive();
+  const { data } = useMetrics<FinanceMetricsData>('finance');
   return (
     <SimpleDonutChart
-      data={live.revenueByBrand}
+      data={data?.revenueByBrand ?? []}
       height={height}
       centerLabel="Total"
-      centerValue={fmt(live.revenueMtd)}
+      centerValue={fmt(data?.revenueMtd ?? 0)}
     />
   );
 }

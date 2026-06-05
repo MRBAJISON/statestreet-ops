@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
-import { addRevenueEntry, addRevenueEntries, type RevenueEntry } from '@/lib/store';
+import { submitEntry, postEntries } from '@/lib/api';
 
 // Normalize a free-text brand (from Excel or a select) to the canonical form value.
 function normalizeBrand(raw: string): string {
@@ -34,32 +34,16 @@ export default function FinanceFormsPage() {
     { id: 'forecast', label: 'Forecast Update' },
   ];
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
-
-    if (activeForm === 'revenue') {
-      const fd = new FormData(form);
-      const entry: RevenueEntry = {
-        date: String(fd.get('date') || ''),
-        store: String(fd.get('store') || ''),
-        brand: normalizeBrand(String(fd.get('brand') || '')),
-        grossRevenue: num(fd.get('grossRevenue')),
-        discounts: num(fd.get('discounts')),
-        netRevenue: num(fd.get('netRevenue')),
-        transactions: num(fd.get('transactions')),
-        footfall: num(fd.get('footfall')),
-        itemsSold: num(fd.get('itemsSold')),
-      };
-      addRevenueEntry(entry);
-      setMessage(
-        `Revenue of GHS ${entry.grossRevenue.toLocaleString()} added. The Finance & Executive dashboards updated live.`
-      );
+    try {
+      await submitEntry('finance', activeForm, form);
+      setMessage('Saved to the live database. The Finance & Executive dashboards reflect it now.');
       form.reset();
-    } else {
-      setMessage('Data submitted successfully! Dashboard will update shortly.');
+    } catch (err) {
+      setMessage('Could not save: ' + (err as Error).message);
     }
-
     setSubmitted(true);
     setTimeout(() => setSubmitted(false), 4000);
   }
@@ -86,7 +70,7 @@ export default function FinanceFormsPage() {
         return '';
       };
 
-      const entries: RevenueEntry[] = rows
+      const payloads = rows
         .map((r) => ({
           date: String(pick(r, 'date') || ''),
           store: String(pick(r, 'store') || ''),
@@ -98,19 +82,19 @@ export default function FinanceFormsPage() {
           footfall: num(pick(r, 'footfall', 'traffic') as string),
           itemsSold: num(pick(r, 'itemssold', 'items', 'units') as string),
         }))
-        .filter((entry) => entry.grossRevenue > 0);
+        .filter((p) => p.grossRevenue > 0);
 
-      if (!entries.length) {
+      if (!payloads.length) {
         setUploadStatus({
           ok: false,
           text: 'No valid rows found. Need at least a "Gross Revenue" column with values.',
         });
       } else {
-        addRevenueEntries(entries);
-        const total = entries.reduce((s, x) => s + x.grossRevenue, 0);
+        await postEntries('finance', 'revenue', payloads);
+        const total = payloads.reduce((s, x) => s + x.grossRevenue, 0);
         setUploadStatus({
           ok: true,
-          text: `Imported ${entries.length} row(s) — GHS ${total.toLocaleString()} added live to the dashboards.`,
+          text: `Imported ${payloads.length} row(s) — GHS ${total.toLocaleString()} saved live to the database.`,
         });
       }
     } catch (err) {

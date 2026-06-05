@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
+import { submitEntry } from '@/lib/api';
 
 export default function BrandFormsPage() {
   const [activeForm, setActiveForm] = useState('brand-score');
   const [submitted, setSubmitted] = useState(false);
+  const [message, setMessage] = useState('');
 
   const forms = [
     { id: 'brand-score', label: 'Brand Health Score' },
@@ -29,10 +31,18 @@ export default function BrandFormsPage() {
     { label: 'Cucinera Fiorentina', value: 'cucinera' }, { label: 'Zecca Milano', value: 'zecca' },
   ];
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const form = e.currentTarget;
+    try {
+      await submitEntry('brand', activeForm, form);
+      setMessage('Saved to the live database. The dashboard reflects it now.');
+      form.reset();
+    } catch (err) {
+      setMessage('Could not save: ' + (err as Error).message);
+    }
     setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 3000);
+    setTimeout(() => setSubmitted(false), 4000);
   }
 
   return (
@@ -53,7 +63,7 @@ export default function BrandFormsPage() {
 
       {submitted && (
         <div className="bg-green-500/10 border border-green-500/30 text-green-400 p-3 rounded-lg mb-4 text-sm">
-          Data submitted successfully! Dashboard will update shortly.
+          {message}
         </div>
       )}
 

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
+import { submitEntry } from '@/lib/api';
 
 const STORES = [
   { label: 'Dzorwulu Men', value: 'dzorwulu-men' },
@@ -25,6 +26,7 @@ const CATEGORIES = [
 export default function CommercialFormsPage() {
   const [activeForm, setActiveForm] = useState('store-sales');
   const [submitted, setSubmitted] = useState(false);
+  const [message, setMessage] = useState('');
 
   const forms = [
     { id: 'store-sales', label: 'Daily Store Sales' },
@@ -34,10 +36,18 @@ export default function CommercialFormsPage() {
     { id: 'accountability', label: 'Accountability Update' },
   ];
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const form = e.currentTarget;
+    try {
+      await submitEntry('commercial', activeForm, form);
+      setMessage('Saved to the live database. The dashboard reflects it now.');
+      form.reset();
+    } catch (err) {
+      setMessage('Could not save: ' + (err as Error).message);
+    }
     setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 3000);
+    setTimeout(() => setSubmitted(false), 4000);
   }
 
   return (
@@ -58,7 +68,7 @@ export default function CommercialFormsPage() {
 
       {submitted && (
         <div className="bg-green-500/10 border border-green-500/30 text-green-400 p-3 rounded-lg mb-4 text-sm">
-          Data submitted successfully! Dashboard will update shortly.
+          {message}
         </div>
       )}
 

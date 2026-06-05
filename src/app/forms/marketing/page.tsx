@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
+import { submitEntry } from '@/lib/api';
 
 export default function MarketingFormsPage() {
   const [activeForm, setActiveForm] = useState('campaign');
   const [submitted, setSubmitted] = useState(false);
+  const [message, setMessage] = useState('');
 
   const forms = [
     { id: 'campaign', label: 'Campaign Performance' },
@@ -17,10 +19,18 @@ export default function MarketingFormsPage() {
     { id: 'priorities', label: 'Action Tracker' },
   ];
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const form = e.currentTarget;
+    try {
+      await submitEntry('marketing', activeForm, form);
+      setMessage('Saved to the live database. The dashboard reflects it now.');
+      form.reset();
+    } catch (err) {
+      setMessage('Could not save: ' + (err as Error).message);
+    }
     setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 3000);
+    setTimeout(() => setSubmitted(false), 4000);
   }
 
   return (
@@ -41,7 +51,7 @@ export default function MarketingFormsPage() {
 
       {submitted && (
         <div className="bg-green-500/10 border border-green-500/30 text-green-400 p-3 rounded-lg mb-4 text-sm">
-          Data submitted successfully! Dashboard will update shortly.
+          {message}
         </div>
       )}
 
