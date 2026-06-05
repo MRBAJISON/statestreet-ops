@@ -1,36 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# StateStreet Retail Group — Operations Command Center
+
+A full operational system with role-based dashboards and department intake forms. Each department enters its own data; data is analyzed and visualized on command-center dashboards. The owner sees everything across all departments plus an Executive Command Center, and can drill into any single department.
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 — you'll be redirected to the login page.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Demo Logins
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Role | Email | Password | Sees |
+|------|-------|----------|------|
+| Owner / CEO | owner@statestreet.com | owner123 | Everything + Executive Command Center |
+| Finance Manager | finance@statestreet.com | finance123 | Finance only |
+| Commercial Director | commercial@statestreet.com | commercial123 | Commercial only |
+| Marketing Director | marketing@statestreet.com | marketing123 | Marketing + Brand Health |
+| Operations Manager | operations@statestreet.com | operations123 | Operations only |
+| Inventory Manager | inventory@statestreet.com | inventory123 | Inventory only |
+| Brand Manager | brand@statestreet.com | brand123 | Brand Health only |
 
-## Learn More
+Use the **Quick Login** buttons on the login screen to fill credentials instantly.
 
-To learn more about Next.js, take a look at the following resources:
+## Structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+  app/
+    login/                 Login page
+    api/auth/              Authentication endpoint
+    dashboard/
+      executive/           Executive Command Center (owner only)
+      finance/             Finance Command Center
+      commercial/          Commercial Command Center
+      marketing/           Marketing Command Center
+      operations/          Business Operations Command Center
+      inventory/           Inventory Command Center
+      brand-health/        Brand Health Command Center
+    forms/
+      finance/ commercial/ marketing/ operations/ inventory/ brand-health/
+                           Department data-entry forms (multi-tab)
+  components/
+    layout/                Sidebar, DashboardHeader
+    ui/                    KPICard, Section, StatusBadge, ScoreGauge, ProgressBar
+    charts/                Recharts wrappers (line, bar, donut, sparkline)
+    forms/                 FormField, FormSection
+  lib/
+    auth.ts                Users, roles, department access control
+    data.ts                Demo data for all dashboards
+    types.ts               TypeScript interfaces
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## How Access Control Works
 
-## Deploy on Vercel
+`src/lib/auth.ts` maps each role to the departments it can access. The sidebar and dashboards
+only render departments in that list. The owner role maps to all departments plus `executive`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Dashboards
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. **Executive** — group-wide KPIs summarizing all six departments
+2. **Finance** — revenue, profitability, cash flow, working capital, expenses, forecast
+3. **Commercial** — store sales, categories, SKU performance, new arrivals, accountability
+4. **Marketing** — campaigns, customer acquisition, clienteling, customer intelligence
+5. **Operations** — store ops, VM compliance, maintenance, CX, SOP, incidents
+6. **Inventory** — stock value, aging, dead stock, accuracy, replenishment
+7. **Brand Health** — brand equity, sentiment, market position, digital reputation
+
+## Data Entry
+
+Each department has a **Forms** section in the sidebar with multi-tab intake forms.
+Currently the forms validate and show a success confirmation (demo). To persist data,
+wire the form `onSubmit` handlers to API routes that write to your database of choice.
+
+## Tech Stack
+
+- Next.js (App Router) + TypeScript
+- Tailwind CSS v4 (dark command-center theme)
+- Recharts for visualizations
+- Cookie-based session auth (demo-grade — replace with a real auth provider for production)

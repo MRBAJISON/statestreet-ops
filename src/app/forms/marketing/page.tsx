@@ -1,0 +1,191 @@
+'use client';
+
+import { useState } from 'react';
+import FormField from '@/components/forms/FormField';
+import FormSection from '@/components/forms/FormSection';
+
+export default function MarketingFormsPage() {
+  const [activeForm, setActiveForm] = useState('campaign');
+  const [submitted, setSubmitted] = useState(false);
+
+  const forms = [
+    { id: 'campaign', label: 'Campaign Performance' },
+    { id: 'leads', label: 'Lead Entry' },
+    { id: 'social', label: 'Social Media Metrics' },
+    { id: 'clienteling', label: 'Clienteling Activity' },
+    { id: 'customer-intel', label: 'Customer Intelligence' },
+    { id: 'priorities', label: 'Action Tracker' },
+  ];
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitted(true);
+    setTimeout(() => setSubmitted(false), 3000);
+  }
+
+  return (
+    <div className="p-6">
+      <div className="mb-6">
+        <h1 className="text-xl font-bold">Marketing Data Entry</h1>
+        <p className="text-sm text-gray-500 mt-1">Enter marketing data to update the Marketing Command Center dashboard</p>
+      </div>
+
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {forms.map(f => (
+          <button key={f.id} onClick={() => setActiveForm(f.id)}
+            className={`px-4 py-2 rounded-lg text-sm transition-colors ${activeForm === f.id ? 'bg-[#c8a951] text-black font-semibold' : 'bg-[#111] border border-[#2a2a2a] text-gray-400 hover:text-white'}`}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {submitted && (
+        <div className="bg-green-500/10 border border-green-500/30 text-green-400 p-3 rounded-lg mb-4 text-sm">
+          Data submitted successfully! Dashboard will update shortly.
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4 max-w-4xl">
+        {activeForm === 'campaign' && (
+          <FormSection title="Campaign Performance" description="Record campaign metrics">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
+              <FormField label="Campaign Name" name="name" required />
+              <FormField label="Brand" name="brand" type="select" required options={[
+                { label: 'Boulevard Men', value: 'boulevard-men' }, { label: 'Boulevard Women', value: 'boulevard-women' },
+                { label: "D'Angelo", value: 'dangelo' }, { label: 'Woodpeckers', value: 'woodpeckers' },
+                { label: 'Carbon Shoes', value: 'carbon-shoes' }, { label: 'Arbiter', value: 'arbiter' },
+              ]} />
+              <FormField label="Date" name="date" type="date" required />
+              <FormField label="Total Reach" name="reach" type="number" required />
+              <FormField label="Engagement" name="engagement" type="number" required />
+              <FormField label="Leads Generated" name="leads" type="number" />
+              <FormField label="Store Visits Attributed" name="storeVisits" type="number" />
+              <FormField label="Revenue Influenced" name="revenue" type="number" prefix="GHS" step={0.01} />
+              <FormField label="Campaign Spend" name="spend" type="number" prefix="GHS" step={0.01} />
+              <FormField label="Platform" name="platform" type="select" options={[
+                { label: 'Instagram', value: 'instagram' }, { label: 'WhatsApp', value: 'whatsapp' },
+                { label: 'Facebook', value: 'facebook' }, { label: 'TikTok', value: 'tiktok' },
+                { label: 'Google', value: 'google' }, { label: 'Email', value: 'email' },
+                { label: 'In-Store', value: 'in-store' },
+              ]} />
+              <FormField label="Status" name="status" type="select" options={[
+                { label: 'Active', value: 'active' }, { label: 'Paused', value: 'paused' },
+                { label: 'Completed', value: 'completed' }, { label: 'Planned', value: 'planned' },
+              ]} />
+            </div>
+          </FormSection>
+        )}
+
+        {activeForm === 'leads' && (
+          <FormSection title="Lead Entry" description="Record new customer leads">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
+              <FormField label="Date" name="date" type="date" required />
+              <FormField label="Channel" name="channel" type="select" required options={[
+                { label: 'WhatsApp', value: 'whatsapp' }, { label: 'Instagram', value: 'instagram' },
+                { label: 'Website', value: 'website' }, { label: 'Walk-In', value: 'walkin' },
+                { label: 'Corporate', value: 'corporate' }, { label: 'Referral', value: 'referral' },
+              ]} />
+              <FormField label="Number of Leads" name="count" type="number" required />
+              <FormField label="Qualified Leads" name="qualified" type="number" />
+              <FormField label="Converted to Customer" name="converted" type="number" />
+              <FormField label="Average Lead Value" name="avgValue" type="number" prefix="GHS" step={0.01} />
+              <FormField label="Campaign Source" name="campaignSource" placeholder="Which campaign drove these?" />
+              <FormField label="Notes" name="notes" type="textarea" placeholder="Lead quality notes" />
+            </div>
+          </FormSection>
+        )}
+
+        {activeForm === 'social' && (
+          <FormSection title="Social Media Metrics" description="Daily social media performance">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
+              <FormField label="Date" name="date" type="date" required />
+              <FormField label="Platform" name="platform" type="select" required options={[
+                { label: 'Instagram', value: 'instagram' }, { label: 'Facebook', value: 'facebook' },
+                { label: 'TikTok', value: 'tiktok' }, { label: 'Twitter/X', value: 'twitter' },
+                { label: 'YouTube', value: 'youtube' },
+              ]} />
+              <FormField label="Followers / Subscribers" name="followers" type="number" />
+              <FormField label="Posts Published" name="posts" type="number" />
+              <FormField label="Reach" name="reach" type="number" />
+              <FormField label="Impressions" name="impressions" type="number" />
+              <FormField label="Engagement (Likes + Comments + Shares)" name="engagement" type="number" />
+              <FormField label="Link Clicks" name="clicks" type="number" />
+              <FormField label="Website Visits from Social" name="webVisits" type="number" />
+              <FormField label="Reels / Videos Created" name="reels" type="number" />
+              <FormField label="Stories Published" name="stories" type="number" />
+            </div>
+          </FormSection>
+        )}
+
+        {activeForm === 'clienteling' && (
+          <FormSection title="Clienteling Activity" description="VIP engagement and client outreach">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
+              <FormField label="Date" name="date" type="date" required />
+              <FormField label="Activity Type" name="type" type="select" required options={[
+                { label: 'VIP Event', value: 'vip-event' }, { label: 'Lookbook Sent', value: 'lookbook' },
+                { label: 'WhatsApp Broadcast', value: 'broadcast' }, { label: 'Personal Invitation', value: 'invitation' },
+                { label: 'Appointment Booking', value: 'appointment' }, { label: 'Follow-Up Call', value: 'followup' },
+              ]} />
+              <FormField label="Number of Clients Contacted" name="contacted" type="number" required />
+              <FormField label="Responses / RSVPs" name="responses" type="number" />
+              <FormField label="Appointments Booked" name="appointments" type="number" />
+              <FormField label="Estimated Revenue from Activity" name="estRevenue" type="number" prefix="GHS" step={0.01} />
+              <FormField label="Store" name="store" type="select" options={[
+                { label: 'Dzorwulu Men', value: 'dzorwulu-men' }, { label: 'East Legon Men', value: 'east-legon-men' },
+                { label: 'Labore Men', value: 'labore-men' }, { label: "D'Angelo Palace", value: 'dangelo' },
+              ]} />
+              <FormField label="Notes" name="notes" type="textarea" placeholder="Key takeaways" />
+            </div>
+          </FormSection>
+        )}
+
+        {activeForm === 'customer-intel' && (
+          <FormSection title="Customer Intelligence" description="Record customer feedback and objections">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
+              <FormField label="Date" name="date" type="date" required />
+              <FormField label="Type" name="type" type="select" required options={[
+                { label: 'Customer Objection', value: 'objection' }, { label: 'Competitor Mention', value: 'competitor' },
+                { label: 'Product Request', value: 'request' }, { label: 'Compliment', value: 'compliment' },
+                { label: 'Complaint', value: 'complaint' },
+              ]} />
+              <FormField label="Detail" name="detail" required placeholder="What did the customer say?" />
+              <FormField label="Store" name="store" type="select" options={[
+                { label: 'Dzorwulu Men', value: 'dzorwulu-men' }, { label: 'East Legon Men', value: 'east-legon-men' },
+                { label: 'All Stores', value: 'all' },
+              ]} />
+              <FormField label="Frequency (How often heard)" name="frequency" type="select" options={[
+                { label: 'Very Frequent', value: 'very-frequent' }, { label: 'Frequent', value: 'frequent' },
+                { label: 'Occasional', value: 'occasional' }, { label: 'Rare', value: 'rare' },
+              ]} />
+              <FormField label="Action Needed" name="action" type="textarea" placeholder="Suggested action" />
+            </div>
+          </FormSection>
+        )}
+
+        {activeForm === 'priorities' && (
+          <FormSection title="Marketing Action Tracker" description="Update marketing priority tasks">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
+              <FormField label="Task" name="task" required placeholder="Task description" />
+              <FormField label="Key Action" name="keyAction" required placeholder="Primary action" />
+              <FormField label="Owner" name="owner" required />
+              <FormField label="Deadline" name="deadline" type="date" required />
+              <FormField label="Status" name="status" type="select" required options={[
+                { label: 'Not Started', value: 'not-started' }, { label: 'In Progress', value: 'in-progress' },
+                { label: 'Completed', value: 'completed' }, { label: 'Blocked', value: 'blocked' },
+              ]} />
+              <FormField label="Priority" name="priority" type="select" options={[
+                { label: 'High', value: 'high' }, { label: 'Medium', value: 'medium' }, { label: 'Low', value: 'low' },
+              ]} />
+              <FormField label="Notes" name="notes" type="textarea" placeholder="Progress notes" />
+            </div>
+          </FormSection>
+        )}
+
+        <div className="flex gap-3 pt-2">
+          <button type="submit" className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg transition-colors text-sm">Submit Entry</button>
+          <button type="reset" className="bg-[#1a1a1a] border border-[#333] text-gray-400 hover:text-white px-6 py-2.5 rounded-lg transition-colors text-sm">Clear Form</button>
+        </div>
+      </form>
+    </div>
+  );
+}

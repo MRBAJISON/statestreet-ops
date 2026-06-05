@@ -32,8 +32,8 @@ export function SimpleLineChart({ data, height = 200, color = '#c8a951', color2,
       <Chart data={data}>
         {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />}
         {showAxis && <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />}
-        {showAxis && <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => prefix + (v >= 1000000 ? (v / 1000000).toFixed(1) + 'M' : v >= 1000 ? (v / 1000).toFixed(0) + 'K' : v)} />}
-        <Tooltip {...tooltipStyle} formatter={(v: number) => prefix + v.toLocaleString()} />
+        {showAxis && <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => { const n = Number(v); return prefix + (n >= 1000000 ? (n / 1000000).toFixed(1) + 'M' : n >= 1000 ? (n / 1000).toFixed(0) + 'K' : n); }} />}
+        <Tooltip {...tooltipStyle} formatter={(v) => prefix + Number(v).toLocaleString()} />
         {area ? (
           <>
             <defs>
@@ -71,16 +71,16 @@ export function SimpleBarChart({ data, height = 200, color = '#c8a951', color2, 
         <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
         {horizontal ? (
           <>
-            <XAxis type="number" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => prefix + (v >= 1000 ? (v / 1000).toFixed(0) + 'K' : v)} />
+            <XAxis type="number" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => { const n = Number(v); return prefix + (n >= 1000 ? (n / 1000).toFixed(0) + 'K' : n); }} />
             <YAxis dataKey="name" type="category" tick={{ fill: '#6b7280', fontSize: 9 }} axisLine={false} tickLine={false} width={100} />
           </>
         ) : (
           <>
             <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 9 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => prefix + (v >= 1000 ? (v / 1000).toFixed(0) + 'K' : v)} />
+            <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => { const n = Number(v); return prefix + (n >= 1000 ? (n / 1000).toFixed(0) + 'K' : n); }} />
           </>
         )}
-        <Tooltip {...tooltipStyle} formatter={(v: number) => prefix + v.toLocaleString()} />
+        <Tooltip {...tooltipStyle} formatter={(v) => prefix + Number(v).toLocaleString()} />
         <Bar dataKey="value" fill={color} radius={[4, 4, 0, 0]} stackId={stacked ? 'a' : undefined} />
         {color2 && <Bar dataKey="value2" fill={color2} radius={[4, 4, 0, 0]} stackId={stacked ? 'a' : undefined} />}
       </BarChart>

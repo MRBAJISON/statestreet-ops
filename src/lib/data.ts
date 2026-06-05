@@ -365,7 +365,7 @@ export const brandData: BrandData = {
   merchandiseBrandHealth: [
     { brand: 'Arbiter', awareness: 88, consideration: 82, preference: 85, satisfaction: 78, momentum: 84, score: 84 },
     { brand: 'Gianfranco Butteri', awareness: 82, consideration: 78, preference: 80, satisfaction: 82, momentum: 76, score: 80 },
-    { brand: 'Oliver Scotts', awareness: 75, consideration: 72, preference: 74, satisfaction: 76, satisfaction2: 70, momentum: 73, score: 73 },
+    { brand: 'Oliver Scotts', awareness: 75, consideration: 72, preference: 74, satisfaction: 76, momentum: 73, score: 73 },
     { brand: 'Gianni Gallucci', awareness: 70, consideration: 68, preference: 69, satisfaction: 72, momentum: 65, score: 69 },
     { brand: 'Cucinera Fiorentina', awareness: 78, consideration: 74, preference: 76, satisfaction: 79, momentum: 72, score: 76 },
     { brand: 'Zecca Milano', awareness: 78, consideration: 71, preference: 72, satisfaction: 75, momentum: 68, score: 72 },
