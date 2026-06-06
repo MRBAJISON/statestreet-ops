@@ -74,10 +74,15 @@ function financeMetrics(rows: Entry[]) {
     .filter((p) => String(p.type) === 'outflow')
     .reduce((s, p) => s + num(p.amount), 0);
 
-  // Expenses (expenses form) — actual + budget per category
+  // Expenses (expenses form) — actual + budget per category.
+  // 'tax' and 'interest' are below-the-line items, excluded from operating expenses.
   const exp = payloads(rows, 'expenses');
   const expensesTotal = exp.reduce((s, p) => s + num(p.amount), 0);
   const expenseBudgetTotal = exp.reduce((s, p) => s + num(p.budget), 0);
+  const taxTotal = exp.filter((p) => String(p.category) === 'tax').reduce((s, p) => s + num(p.amount), 0);
+  const interestTotal = exp.filter((p) => String(p.category) === 'interest').reduce((s, p) => s + num(p.amount), 0);
+  const belowLine = taxTotal + interestTotal;
+  const operatingExpenses = expensesTotal - belowLine;
   const expCatMap = new Map<string, { actual: number; budget: number }>();
   for (const p of exp) {
     const cat = String(p.category ?? 'other');
@@ -92,13 +97,29 @@ function financeMetrics(rows: Entry[]) {
     budget: v.budget,
   }));
 
-  // Profit & loss (now that COGS is captured)
+  // Profit & loss — auto-calculated
   const grossProfit = revenueMtd - cogsTotal;
   const grossMargin = revenueMtd ? round1((grossProfit / revenueMtd) * 100) : 0;
-  const operatingProfit = grossProfit - expensesTotal;
+  const operatingProfit = grossProfit - operatingExpenses;
   const operatingMargin = revenueMtd ? round1((operatingProfit / revenueMtd) * 100) : 0;
-  const netProfit = operatingProfit; // before tax/interest (not captured)
+  const netProfit = operatingProfit - belowLine; // less tax & interest
   const netMargin = revenueMtd ? round1((netProfit / revenueMtd) * 100) : 0;
+
+  // Weekly cash-flow trend (net per ISO week) + position/runway
+  const weekMap = new Map<string, number>();
+  for (const p of cf) {
+    const dt = p.date ? new Date(String(p.date)) : null;
+    if (!dt || isNaN(dt.getTime())) continue;
+    const onejan = new Date(dt.getFullYear(), 0, 1);
+    const week = Math.ceil((((dt.getTime() - onejan.getTime()) / 86400000) + onejan.getDay() + 1) / 7);
+    const key = `${dt.getFullYear()}-W${String(week).padStart(2, '0')}`;
+    weekMap.set(key, (weekMap.get(key) ?? 0) + (String(p.type) === 'inflow' ? num(p.amount) : -num(p.amount)));
+  }
+  const cashTrend = [...weekMap.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, value], i) => ({ name: `W${i + 1}`, value }));
+  const cashPosition = cashInflow - cashOutflow; // closing position from recorded flows
+  const runwayDays = operatingExpenses > 0 ? Math.max(0, Math.round((cashPosition / operatingExpenses) * 30)) : 0;
 
   // Forecast (latest forecast entry)
   const fc = payloads(rows, 'forecast');
@@ -116,6 +137,9 @@ function financeMetrics(rows: Entry[]) {
     expensesByCategory,
     expensesTotal,
     expenseBudgetTotal,
+    operatingExpenses,
+    tax: taxTotal,
+    interest: interestTotal,
     grossProfit,
     grossMargin,
     operatingProfit,
@@ -127,6 +151,9 @@ function financeMetrics(rows: Entry[]) {
     cashInflow,
     cashOutflow,
     cashNet: cashInflow - cashOutflow,
+    cashTrend,
+    cashPosition,
+    runwayDays,
     operatingResult: operatingProfit,
     forecast: {
       revenue: num(lastFc.revenueForecast),
@@ -144,9 +171,49 @@ function commercialMetrics(rows: Entry[]) {
   const cp = payloads(rows, 'category-perf');
   const sku = payloads(rows, 'sku-entry');
 
+  const na = payloads(rows, 'new-arrivals');
+
   const groupSales = ss.reduce((s, p) => s + num(p.totalSales), 0);
   const tx = ss.reduce((s, p) => s + num(p.transactions), 0);
   const units = ss.reduce((s, p) => s + num(p.unitsSold), 0);
+
+  // SKU performance
+  const skus = sku.map((p) => ({
+    sku: String(p.sku ?? ''),
+    name: String(p.name ?? p.sku ?? ''),
+    category: labelFor(CATEGORY_LABELS, p.category),
+    salesValue: num(p.salesValue),
+    unitsSold: num(p.unitsSold),
+    stock: num(p.stock),
+    daysInStock: num(p.daysInStock),
+    status: String(p.status ?? ''),
+  }));
+  const topSelling = [...skus].sort((a, b) => b.salesValue - a.salesValue).slice(0, 6);
+  const lowMoving = [...skus]
+    .filter((s) => s.daysInStock >= 60 && s.daysInStock < 180)
+    .sort((a, b) => b.daysInStock - a.daysInStock)
+    .slice(0, 6);
+  const deadStock = [...skus]
+    .filter((s) => s.daysInStock >= 180 || /dead/i.test(s.status))
+    .sort((a, b) => b.daysInStock - a.daysInStock)
+    .slice(0, 6);
+
+  // New arrivals
+  const newArrivals = na
+    .map((p) => ({
+      date: String(p.date ?? ''),
+      brand: labelFor(BRAND_LABELS, p.brand),
+      category: labelFor(CATEGORY_LABELS, p.category),
+      qty: num(p.qty),
+      stockValue: num(p.stockValue),
+      store: labelFor(STORE_LABELS, p.store),
+      supplier: String(p.supplier ?? ''),
+    }))
+    .slice(0, 10);
+  const deploymentByStore = groupSum(na, 'store', 'qty').map((x) => ({
+    name: labelFor(STORE_LABELS, x.name),
+    value: x.value,
+  }));
 
   return {
     groupSales,
@@ -168,6 +235,11 @@ function commercialMetrics(rows: Entry[]) {
       name: labelFor(STORE_LABELS, x.name),
       value: x.value,
     })),
+    topSelling,
+    lowMoving,
+    deadStock,
+    newArrivals,
+    deploymentByStore,
     entryCount: rows.length,
   };
 }
@@ -204,6 +276,33 @@ function operationsMetrics(rows: Entry[]) {
     cx: round1(avg(v.cx)),
   }));
 
+  // Incidents by type
+  const typeCount = (t: string) => inc.filter((p) => String(p.type).toLowerCase().includes(t)).length;
+  const incidentsByType = { security: typeCount('secur'), safety: typeCount('safet'), operational: typeCount('operat') };
+
+  // Top risks — high-severity incidents
+  const topRisks = inc
+    .filter((p) => /high|critical/i.test(String(p.severity)))
+    .map((p) => ({
+      description: String(p.description || p.type || 'Incident'),
+      severity: String(p.severity || ''),
+      store: labelFor(STORE_LABELS, p.store),
+      status: String(p.status || ''),
+    }))
+    .slice(0, 8);
+
+  // Priority actions — from maintenance requests
+  const priorityActions = maint
+    .map((p) => ({
+      description: String(p.description || p.category || 'Maintenance'),
+      priority: String(p.priority || ''),
+      owner: String(p.assignedTo || p.reportedBy || ''),
+      store: labelFor(STORE_LABELS, p.store),
+      status: String(p.status || ''),
+    }))
+    .sort((a, b) => (/(critical|high)/i.test(b.priority) ? 1 : 0) - (/(critical|high)/i.test(a.priority) ? 1 : 0))
+    .slice(0, 8);
+
   return {
     opsScore: round1(avg(audit.map((p) => num(p.opsScore)).filter((n) => n > 0))),
     vmScore: round1(
@@ -223,6 +322,9 @@ function operationsMetrics(rows: Entry[]) {
     ),
     storeScores,
     risk: { high: sev('high'), medium: sev('med'), low: sev('low') },
+    incidentsByType,
+    topRisks,
+    priorityActions,
     entryCount: rows.length,
   };
 }
@@ -276,6 +378,18 @@ function inventoryMetrics(rows: Entry[]) {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([k, value]) => ({ name: MONTHS[parseInt(k.slice(5), 10) - 1] ?? k, value }));
 
+  // Stock movement summary (from the inventory forms)
+  const tr = payloads(rows, 'stock-transfer');
+  const movement = {
+    receivedUnits: gr.reduce((s, p) => s + num(p.units), 0),
+    receivedValue,
+    transferredUnits: tr.reduce((s, p) => s + num(p.qty), 0),
+    transferredValue: tr.reduce((s, p) => s + num(p.qty) * num(p.unitValue), 0),
+    deadStockValue: deadValue,
+    replenishmentRequests: rep.length,
+    countedValue: onHandValue,
+  };
+
   return {
     inventoryValue,
     accuracy: sysTotal ? round1(Math.max(0, 100 - (varTotal / sysTotal) * 100)) : 0,
@@ -287,6 +401,7 @@ function inventoryMetrics(rows: Entry[]) {
     })),
     accuracyDistribution,
     valueTrend,
+    movement,
     entryCount: rows.length,
   };
 }
@@ -335,6 +450,48 @@ function brandMetrics(rows: Entry[]) {
   });
   const healthIndex = portfolio.length ? Math.round(avg(portfolio.map((p) => p.score))) : 0;
 
+  // Digital reputation (digital form)
+  const last = dig[dig.length - 1] ?? {};
+  const digitalReputation = {
+    googleRating: round1(avg(dig.map((p) => num(p.googleRating)).filter((n) => n > 0))),
+    googleReviews: dig.reduce((s, p) => s + num(p.googleReviews), 0),
+    trustpilot: round1(avg(dig.map((p) => num(p.trustpilot)).filter((n) => n > 0))),
+    responseRate: round1(avg(dig.map((p) => num(p.responseRate)).filter((n) => n > 0))),
+    nps: Math.round(avg(dig.map((p) => num(p.nps)).filter((n) => n !== 0))),
+  };
+  const social = {
+    followers: num(last.instaFollowers),
+    sentiment: round1(avg(dig.map((p) => num(p.instaSentiment)).filter((n) => n > 0))),
+    newReviews: dig.reduce((s, p) => s + num(p.newReviews), 0),
+    negReviews: dig.reduce((s, p) => s + num(p.negReviews), 0),
+  };
+
+  // Risks & opportunities (customer voice + competitor threats)
+  const voice = payloads(rows, 'voice');
+  const risks = [
+    ...voice
+      .filter((p) => /frustrat|complain|negativ|risk/i.test(String(p.type)))
+      .map((p) => ({ text: String(p.detail || p.type), tag: String(p.frequency || '') })),
+    ...comp
+      .filter((p) => /high|critical/i.test(String(p.threat)))
+      .map((p) => ({ text: `${p.competitor}: ${p.activity || 'competitor activity'}`, tag: String(p.threat) })),
+  ].slice(0, 8);
+  const opportunities = voice
+    .filter((p) => /complim|positiv|request|opportun/i.test(String(p.type)))
+    .map((p) => ({ text: String(p.detail || p.type), tag: String(p.frequency || '') }))
+    .slice(0, 8);
+
+  // CEO attention items (attention form)
+  const ceoAttention = payloads(rows, 'attention')
+    .map((p) => ({
+      priority: String(p.priority || ''),
+      issue: String(p.issue || ''),
+      impact: String(p.impact || ''),
+      owner: String(p.owner || ''),
+      status: String(p.status || ''),
+    }))
+    .slice(0, 8);
+
   return {
     sentiment: {
       positive: total ? Math.round((positive / total) * 100) : 0,
@@ -347,6 +504,11 @@ function brandMetrics(rows: Entry[]) {
     sentimentTrend,
     portfolio,
     healthIndex,
+    digitalReputation,
+    social,
+    risks,
+    opportunities,
+    ceoAttention,
     entryCount: rows.length,
   };
 }
@@ -358,7 +520,68 @@ function marketingMetrics(rows: Entry[]) {
   const spend = camp.reduce((s, p) => s + num(p.spend), 0);
   const campaignRevenue = camp.reduce((s, p) => s + num(p.revenue), 0);
 
+  // Social — grouped by channel/platform (not combined)
   const social = payloads(rows, 'social');
+  const platMap = new Map<string, { followers: number; reach: number; impressions: number; engagement: number; clicks: number }>();
+  for (const p of social) {
+    const k = String(p.platform || 'Other');
+    const e = platMap.get(k) ?? { followers: 0, reach: 0, impressions: 0, engagement: 0, clicks: 0 };
+    if (num(p.followers)) e.followers = num(p.followers); // latest reading
+    e.reach += num(p.reach);
+    e.impressions += num(p.impressions);
+    e.engagement += num(p.engagement);
+    e.clicks += num(p.clicks);
+    platMap.set(k, e);
+  }
+  const socialByChannel = [...platMap].map(([platform, v]) => ({ platform, ...v }));
+
+  // Per-campaign performance
+  const campaigns = camp
+    .map((p) => ({
+      name: String(p.name || 'Campaign'),
+      platform: String(p.platform || ''),
+      reach: num(p.reach),
+      engagement: num(p.engagement),
+      leads: num(p.leads),
+      revenue: num(p.revenue),
+      spend: num(p.spend),
+      roas: num(p.spend) ? round1(num(p.revenue) / num(p.spend)) : 0,
+      status: String(p.status || ''),
+    }))
+    .slice(0, 12);
+
+  // Clienteling
+  const cl = payloads(rows, 'clienteling');
+  const contacted = cl.reduce((s, p) => s + num(p.contacted), 0);
+  const responses = cl.reduce((s, p) => s + num(p.responses), 0);
+  const clienteling = {
+    contacted,
+    responses,
+    appointments: cl.reduce((s, p) => s + num(p.appointments), 0),
+    estRevenue: cl.reduce((s, p) => s + num(p.estRevenue), 0),
+    responseRate: contacted ? round1((responses / contacted) * 100) : 0,
+  };
+
+  // Customer intelligence
+  const customerIntel = payloads(rows, 'customer-intel')
+    .map((p) => ({
+      type: String(p.type || ''),
+      detail: String(p.detail || ''),
+      frequency: String(p.frequency || ''),
+      store: labelFor(STORE_LABELS, p.store),
+    }))
+    .slice(0, 10);
+
+  // Action tracker (priorities form)
+  const actions = payloads(rows, 'priorities')
+    .map((p) => ({
+      task: String(p.task || ''),
+      owner: String(p.owner || ''),
+      priority: String(p.priority || ''),
+      status: String(p.status || ''),
+      deadline: String(p.deadline || ''),
+    }))
+    .slice(0, 10);
 
   return {
     leadChannelMix: groupSum(leads, 'channel', 'count'),
@@ -375,13 +598,11 @@ function marketingMetrics(rows: Entry[]) {
       storeVisits: camp.reduce((s, p) => s + num(p.storeVisits), 0),
       revenueInfluenced: campaignRevenue,
     },
-    social: {
-      followers: social.reduce((s, p) => s + num(p.followers), 0),
-      reach: social.reduce((s, p) => s + num(p.reach), 0),
-      impressions: social.reduce((s, p) => s + num(p.impressions), 0),
-      engagement: social.reduce((s, p) => s + num(p.engagement), 0),
-      clicks: social.reduce((s, p) => s + num(p.clicks), 0),
-    },
+    socialByChannel,
+    campaigns,
+    clienteling,
+    customerIntel,
+    actions,
     entryCount: rows.length,
   };
 }

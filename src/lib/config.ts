@@ -45,7 +45,13 @@ export const EXPENSE_CATEGORIES: Option[] = [
   { label: 'Admin', value: 'admin' },
   { label: 'Maintenance', value: 'maintenance' },
   { label: 'Other', value: 'other' },
+  // Below-the-line items — excluded from operating expenses, used for net profit.
+  { label: 'Interest / Finance Cost', value: 'interest' },
+  { label: 'Tax', value: 'tax' },
 ];
+
+// Categories treated as below operating line (for Operating vs Net Profit).
+export const BELOW_LINE_CATEGORIES = ['interest', 'tax'];
 
 // value -> label maps (for turning stored form values back into display names)
 const toMap = (opts: Option[]) => Object.fromEntries(opts.map((o) => [o.value, o.label]));

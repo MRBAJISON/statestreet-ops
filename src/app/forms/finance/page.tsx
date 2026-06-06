@@ -236,6 +236,8 @@ export default function FinanceFormsPage() {
                 { label: 'Admin', value: 'admin' },
                 { label: 'Maintenance', value: 'maintenance' },
                 { label: 'Other', value: 'other' },
+                { label: 'Interest / Finance Cost', value: 'interest' },
+                { label: 'Tax', value: 'tax' },
               ]} />
               <FormField label="Store / Department" name="store" type="select" options={[
                 { label: 'Head Office', value: 'hq' },
