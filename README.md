@@ -1,83 +1,51 @@
 # StateStreet Retail Group — Operations Command Center
 
-A full operational system with role-based dashboards and department intake forms. Each department enters its own data; data is analyzed and visualized on command-center dashboards. The owner sees everything across all departments plus an Executive Command Center, and can drill into any single department.
+An internal operations system for StateStreet Retail Group. Department teams enter data
+through forms; role-based dashboards compute every KPI and chart live from the database.
+No mock data — empty states show until real data is entered.
 
-## Getting Started
+## Stack
+- **Next.js 16** (App Router) + React 19 + TypeScript + Tailwind
+- **Neon Postgres** via **Drizzle ORM** (`@neondatabase/serverless`)
+- **Recharts** for analytics; HMAC-signed session cookies for auth
 
+## Departments
+Executive (overview), Finance, Commercial, Marketing, Operations, Inventory, Brand Health.
+Each has a data-entry form and a live dashboard. The Executive/CEO sees all dashboards but
+no forms; department managers see only their own dashboard + form (Marketing also sees Brand).
+
+## How it works
+- Forms POST submissions to `POST /api/entries` → stored in the `entries` table (jsonb payload).
+- Dashboards read `GET /api/metrics/[department]?period=&date=&store=` — aggregated live in
+  `src/lib/metrics.ts`. Filters: period (day/week/month/year/all) + calendar date + store.
+- Entries can be edited/deleted (`PATCH`/`DELETE /api/entries/[id]`) from the forms and dashboards.
+
+## Environment variables
+Create `.env.local` (see `.env.example`):
+
+| Name | Description |
+| --- | --- |
+| `DATABASE_URL` | Neon Postgres connection string |
+| `AUTH_SECRET` | Long random string used to sign session cookies |
+
+## Local development
 ```bash
 npm install
-npm run dev
+npm run db:push                 # create tables in your Neon DB
+node scripts/seed-users.mjs     # seed login accounts (run with DATABASE_URL set)
+npm run dev                     # http://localhost:3000
 ```
 
-Open http://localhost:3000 — you'll be redirected to the login page.
+## Database scripts
+- `npm run db:push` — sync schema to the database
+- `npm run db:studio` — open Drizzle Studio
+- `node scripts/reset-db.mjs` — clear all entries (keeps users)
 
-## Demo Logins
+## Deployment (Vercel)
+1. Push to GitHub and import the repo at vercel.com/new (framework auto-detected).
+2. Set `DATABASE_URL` and `AUTH_SECRET` as Environment Variables.
+3. Deploy. The same Neon database is used in production.
 
-| Role | Email | Password | Sees |
-|------|-------|----------|------|
-| Owner / CEO | owner@statestreet.com | owner123 | Everything + Executive Command Center |
-| Finance Manager | finance@statestreet.com | finance123 | Finance only |
-| Commercial Director | commercial@statestreet.com | commercial123 | Commercial only |
-| Marketing Director | marketing@statestreet.com | marketing123 | Marketing + Brand Health |
-| Operations Manager | operations@statestreet.com | operations123 | Operations only |
-| Inventory Manager | inventory@statestreet.com | inventory123 | Inventory only |
-| Brand Manager | brand@statestreet.com | brand123 | Brand Health only |
-
-Use the **Quick Login** buttons on the login screen to fill credentials instantly.
-
-## Structure
-
-```
-src/
-  app/
-    login/                 Login page
-    api/auth/              Authentication endpoint
-    dashboard/
-      executive/           Executive Command Center (owner only)
-      finance/             Finance Command Center
-      commercial/          Commercial Command Center
-      marketing/           Marketing Command Center
-      operations/          Business Operations Command Center
-      inventory/           Inventory Command Center
-      brand-health/        Brand Health Command Center
-    forms/
-      finance/ commercial/ marketing/ operations/ inventory/ brand-health/
-                           Department data-entry forms (multi-tab)
-  components/
-    layout/                Sidebar, DashboardHeader
-    ui/                    KPICard, Section, StatusBadge, ScoreGauge, ProgressBar
-    charts/                Recharts wrappers (line, bar, donut, sparkline)
-    forms/                 FormField, FormSection
-  lib/
-    auth.ts                Users, roles, department access control
-    data.ts                Demo data for all dashboards
-    types.ts               TypeScript interfaces
-```
-
-## How Access Control Works
-
-`src/lib/auth.ts` maps each role to the departments it can access. The sidebar and dashboards
-only render departments in that list. The owner role maps to all departments plus `executive`.
-
-## Dashboards
-
-1. **Executive** — group-wide KPIs summarizing all six departments
-2. **Finance** — revenue, profitability, cash flow, working capital, expenses, forecast
-3. **Commercial** — store sales, categories, SKU performance, new arrivals, accountability
-4. **Marketing** — campaigns, customer acquisition, clienteling, customer intelligence
-5. **Operations** — store ops, VM compliance, maintenance, CX, SOP, incidents
-6. **Inventory** — stock value, aging, dead stock, accuracy, replenishment
-7. **Brand Health** — brand equity, sentiment, market position, digital reputation
-
-## Data Entry
-
-Each department has a **Forms** section in the sidebar with multi-tab intake forms.
-Currently the forms validate and show a success confirmation (demo). To persist data,
-wire the form `onSubmit` handlers to API routes that write to your database of choice.
-
-## Tech Stack
-
-- Next.js (App Router) + TypeScript
-- Tailwind CSS v4 (dark command-center theme)
-- Recharts for visualizations
-- Cookie-based session auth (demo-grade — replace with a real auth provider for production)
+## Security notes
+- Sessions are HMAC-signed (tamper-proof); set a strong `AUTH_SECRET` in production.
+- Seeded demo passwords should be rotated before real use.
