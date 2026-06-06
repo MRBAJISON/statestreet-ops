@@ -27,11 +27,23 @@ async function hmac(data: string): Promise<string> {
 
 export interface SessionData {
   userId: string;
+  name: string;
+  role: string;
+  department: string;
   ts: number;
 }
 
-export async function signSession(userId: string): Promise<string> {
-  const payload = toB64url(enc.encode(JSON.stringify({ userId, ts: Date.now() })));
+export async function signSession(user: {
+  id: string | number;
+  name: string;
+  role: string;
+  department: string;
+}): Promise<string> {
+  const payload = toB64url(
+    enc.encode(
+      JSON.stringify({ userId: String(user.id), name: user.name, role: user.role, department: user.department, ts: Date.now() })
+    )
+  );
   const sig = await hmac(payload);
   return `${payload}.${sig}`;
 }

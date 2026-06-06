@@ -12,12 +12,6 @@ const ROLE_DEPARTMENTS: Record<string, string[]> = {
   brand: ['brand'],
 };
 
-// userId -> role (mirrors the demo users in src/lib/auth.ts).
-const USER_ROLES: Record<string, string> = {
-  '1': 'owner', '2': 'finance', '3': 'commercial', '4': 'marketing',
-  '5': 'operations', '6': 'inventory', '7': 'brand',
-};
-
 // URL segment -> department key.
 const SEGMENT_TO_DEPT: Record<string, string> = {
   executive: 'executive',
@@ -34,7 +28,7 @@ async function getRoleFromSession(req: NextRequest): Promise<string | null> {
   if (!session) return null;
   const data = await verifySession(session.value); // rejects forged/edited cookies
   if (!data) return null;
-  return USER_ROLES[data.userId] ?? null;
+  return data.role ?? null; // role is embedded in the signed token
 }
 
 function homeFor(role: string, allowed: string[]): string {
