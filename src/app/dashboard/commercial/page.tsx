@@ -45,6 +45,7 @@ interface CommercialLive {
   deadStock: SkuRow[];
   newArrivals: { date: string; brand: string; category: string; qty: number; stockValue: number; store: string; supplier: string }[];
   deploymentByStore: { name: string; value: number }[];
+  accountability: { member: string; role: string; kpi: string; target: string; actual: string; status: string }[];
 }
 
 export default function CommercialPage() {
@@ -58,6 +59,7 @@ export default function CommercialPage() {
   const deadStock = m?.deadStock ?? [];
   const newArrivals = m?.newArrivals ?? [];
   const deploymentByStore = m?.deploymentByStore ?? [];
+  const accountability = m?.accountability ?? [];
 
   const skuTable = (title: string, rows: SkuRow[], hint: string) => (
     <div>
@@ -217,7 +219,40 @@ export default function CommercialPage() {
           </div>
         </Section>
 
-        <Section number={5} title="Recent Entries">
+        <Section number={5} title="Accountability">
+          {accountability.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                    <th className="text-left py-2 pr-3 font-medium">Member</th>
+                    <th className="text-left py-2 px-3 font-medium">Role</th>
+                    <th className="text-left py-2 px-3 font-medium">KPI</th>
+                    <th className="text-left py-2 px-3 font-medium">Target</th>
+                    <th className="text-left py-2 px-3 font-medium">Actual</th>
+                    <th className="text-left py-2 pl-3 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {accountability.map((a, i) => (
+                    <tr key={i} className="border-b border-[#1a1a1a]">
+                      <td className="py-2 pr-3">{a.member}</td>
+                      <td className="py-2 px-3 capitalize">{a.role || '—'}</td>
+                      <td className="py-2 px-3">{a.kpi}</td>
+                      <td className="py-2 px-3">{a.target || '—'}</td>
+                      <td className="py-2 px-3">{a.actual || '—'}</td>
+                      <td className="py-2 pl-3 capitalize">{a.status || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState message="No accountability entries yet" hint="Submit Accountability Update in the Commercial form." height={120} />
+          )}
+        </Section>
+
+        <Section number={6} title="Recent Entries">
           <RecentEntries department="commercial" />
         </Section>
       </div>

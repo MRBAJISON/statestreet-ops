@@ -30,6 +30,9 @@ interface FinanceMetricsData {
   footfall: number;
   itemsSold: number;
   expensesByCategory: { name: string; actual: number; budget: number }[];
+  revenueByStore: { name: string; value: number }[];
+  expensesByStore: { name: string; value: number }[];
+  debtorAging: { name: string; value: number }[];
   expensesTotal: number;
   expenseBudgetTotal: number;
   grossProfit: number;
@@ -65,6 +68,9 @@ export default function FinancePage() {
   const expenseData = expenses.map((c) => ({ name: c.name, value: c.actual, value2: c.budget }));
   const expensesTotal = m?.expensesTotal ?? 0;
   const budgetTotal = m?.expenseBudgetTotal ?? 0;
+  const revenueByStore = m?.revenueByStore ?? [];
+  const expensesByStore = m?.expensesByStore ?? [];
+  const debtorAging = m?.debtorAging ?? [];
 
   const forecast = m?.forecast ?? { revenue: 0, grossProfit: 0, netProfit: 0, cash: 0 };
   const hasForecast = !!(forecast.revenue || forecast.grossProfit || forecast.netProfit || forecast.cash);
@@ -261,9 +267,39 @@ export default function FinancePage() {
           </div>
         </Section>
 
-        {/* 5. Forecast (only when forecast data exists) */}
+        {/* 4b. By Store + Debtor Aging */}
+        <Section number={5} title="Store P&L & Debtor Aging">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Revenue by Store</div>
+              {revenueByStore.length ? (
+                <SimpleBarChart data={revenueByStore} height={200} color="#c8a951" horizontal prefix="GHS " />
+              ) : (
+                <EmptyState message="No store revenue yet" hint="Set Store on Daily Revenue entries." height={200} />
+              )}
+            </div>
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Expenses by Store</div>
+              {expensesByStore.length ? (
+                <SimpleBarChart data={expensesByStore} height={200} color="#ef4444" horizontal prefix="GHS " />
+              ) : (
+                <EmptyState message="No store expenses yet" hint="Set Store/Department on Expense entries." height={200} />
+              )}
+            </div>
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Debtor Aging</div>
+              {debtorAging.length ? (
+                <SimpleDonutChart data={debtorAging} height={200} innerRadius={45} outerRadius={65} centerLabel="Debtors" centerValue={fmtGHS(debtorAging.reduce((s, d) => s + d.value, 0))} />
+              ) : (
+                <EmptyState message="No debtor data yet" hint="Submit Debtors / Creditors (with status) in the Finance form." height={200} />
+              )}
+            </div>
+          </div>
+        </Section>
+
+        {/* 6. Forecast (only when forecast data exists) */}
         {hasForecast && (
-          <Section number={5} title="Forecast & Outlook">
+          <Section number={6} title="Forecast & Outlook">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-[#0d0d0d] border border-[#c8a951]/30 rounded-lg p-4">
                 <div className="text-[0.65rem] text-[#c8a951] uppercase tracking-wider">Revenue Forecast</div>
@@ -286,7 +322,7 @@ export default function FinancePage() {
         )}
 
         {/* 6. Recent Entries */}
-        <Section number={hasForecast ? 6 : 5} title="Recent Entries">
+        <Section number={hasForecast ? 7 : 6} title="Recent Entries">
           <RecentEntries department="finance" />
         </Section>
       </div>

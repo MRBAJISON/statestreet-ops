@@ -155,6 +155,18 @@ function financeMetrics(rows: Entry[]) {
     footfall,
     itemsSold,
     expensesByCategory,
+    revenueByStore: groupSum(payloads(rows, 'revenue'), 'store', 'grossRevenue').map((x) => ({
+      name: labelFor(STORE_LABELS, x.name),
+      value: x.value,
+    })),
+    expensesByStore: groupSum(exp, 'store', 'amount')
+      .filter((x) => x.name !== '—')
+      .map((x) => ({ name: labelFor(STORE_LABELS, x.name), value: x.value })),
+    debtorAging: groupSum(
+      deb.filter((p) => String(p.type) === 'debtor'),
+      'status',
+      'amount'
+    ).map((x) => ({ name: x.name === '—' ? 'Unspecified' : x.name, value: x.value })),
     expensesTotal,
     expenseBudgetTotal,
     operatingExpenses,
@@ -192,6 +204,7 @@ function commercialMetrics(rows: Entry[]) {
   const sku = payloads(rows, 'sku-entry');
 
   const na = payloads(rows, 'new-arrivals');
+  const acc = payloads(rows, 'accountability');
 
   const groupSales = ss.reduce((s, p) => s + num(p.totalSales), 0);
   const tx = ss.reduce((s, p) => s + num(p.transactions), 0);
@@ -260,6 +273,14 @@ function commercialMetrics(rows: Entry[]) {
     deadStock,
     newArrivals,
     deploymentByStore,
+    accountability: acc.map((p) => ({
+      member: String(p.member || ''),
+      role: String(p.role || ''),
+      kpi: String(p.kpi || ''),
+      target: String(p.target || ''),
+      actual: String(p.actual || ''),
+      status: String(p.status || ''),
+    })),
     entryCount: rows.length,
   };
 }
@@ -271,6 +292,7 @@ function operationsMetrics(rows: Entry[]) {
   const maint = payloads(rows, 'maintenance');
   const inc = payloads(rows, 'incident');
   const sop = payloads(rows, 'sop-check');
+  const cx = payloads(rows, 'cx-feedback');
 
   const closed = (s: unknown) => /resolv|close|complete|done/i.test(String(s));
   const maintDone = maint.filter((p) => closed(p.status)).length;
@@ -295,6 +317,16 @@ function operationsMetrics(rows: Entry[]) {
     readiness: round1(avg(v.readiness)),
     cx: round1(avg(v.cx)),
   }));
+
+  // VM compliance breakdown (vm-check sub-scores)
+  const vmDim = (k: string) => round1(avg(vm.map((p) => num(p[k])).filter((n) => n > 0)));
+  const vmBreakdown = [
+    { name: 'Window Display', value: vmDim('windowDisplay') },
+    { name: 'Mannequin', value: vmDim('mannequin') },
+    { name: 'Presentation', value: vmDim('productPresentation') },
+    { name: 'Signage', value: vmDim('signage') },
+    { name: 'Cleanliness', value: vmDim('cleanliness') },
+  ];
 
   // Incidents by type
   const typeCount = (t: string) => inc.filter((p) => String(p.type).toLowerCase().includes(t)).length;
@@ -343,8 +375,17 @@ function operationsMetrics(rows: Entry[]) {
     storeScores,
     risk: { high: sev('high'), medium: sev('med'), low: sev('low') },
     incidentsByType,
+    vmBreakdown,
     topRisks,
     priorityActions,
+    cxFeedback: {
+      avgRating: round1(avg(cx.map((p) => num(p.rating)).filter((n) => n > 0))),
+      avgNps: Math.round(avg(cx.map((p) => num(p.nps)).filter((n) => n !== 0))),
+      recommendRate: cx.length
+        ? round1((cx.filter((p) => /yes|recommend|likely/i.test(String(p.recommend))).length / cx.length) * 100)
+        : 0,
+      count: cx.length,
+    },
     entryCount: rows.length,
   };
 }
@@ -422,6 +463,17 @@ function inventoryMetrics(rows: Entry[]) {
     accuracyDistribution,
     valueTrend,
     movement,
+    supplierPerformance: groupSum(gr, 'supplier', 'totalValue').filter((x) => x.name && x.name !== '—'),
+    replenishments: rep
+      .map((p) => ({
+        sku: String(p.sku || ''),
+        description: String(p.description || ''),
+        currentStock: num(p.currentStock),
+        reorderQty: num(p.reorderQty),
+        urgency: String(p.urgency || ''),
+        store: labelFor(STORE_LABELS, p.store),
+      }))
+      .slice(0, 10),
     entryCount: rows.length,
   };
 }
@@ -469,6 +521,17 @@ function brandMetrics(rows: Entry[]) {
     return { brand, score: s, status: s >= 80 ? 'STRONG' : s >= 70 ? 'STABLE' : 'AT RISK', trend: 'stable' };
   });
   const healthIndex = portfolio.length ? Math.round(avg(portfolio.map((p) => p.score))) : 0;
+
+  // Brand equity dimensions (brand-score form)
+  const dim = (k: string) => round1(avg(score.map((p) => num(p[k])).filter((n) => n > 0)));
+  const equity = [
+    { name: 'Awareness', value: dim('awareness') },
+    { name: 'Consideration', value: dim('consideration') },
+    { name: 'Preference', value: dim('preference') },
+    { name: 'Satisfaction', value: dim('satisfaction') },
+    { name: 'Loyalty', value: dim('loyalty') },
+    { name: 'Advocacy', value: dim('advocacy') },
+  ];
 
   // Digital reputation (digital form)
   const last = dig[dig.length - 1] ?? {};
@@ -524,6 +587,7 @@ function brandMetrics(rows: Entry[]) {
     sentimentTrend,
     portfolio,
     healthIndex,
+    equity,
     digitalReputation,
     social,
     risks,
@@ -554,6 +618,23 @@ function marketingMetrics(rows: Entry[]) {
     platMap.set(k, e);
   }
   const socialByChannel = [...platMap].map(([platform, v]) => ({ platform, ...v }));
+  const webVisits = social.reduce((s, p) => s + num(p.webVisits), 0);
+
+  // Campaign ROI by brand
+  const brandCampMap = new Map<string, { revenue: number; spend: number }>();
+  for (const p of camp) {
+    const b = labelFor(BRAND_LABELS, p.brand);
+    const e = brandCampMap.get(b) ?? { revenue: 0, spend: 0 };
+    e.revenue += num(p.revenue);
+    e.spend += num(p.spend);
+    brandCampMap.set(b, e);
+  }
+  const campaignByBrand = [...brandCampMap].map(([brand, v]) => ({
+    brand,
+    revenue: v.revenue,
+    spend: v.spend,
+    roas: v.spend ? round1(v.revenue / v.spend) : 0,
+  }));
 
   // Per-campaign performance
   const campaigns = camp
@@ -619,6 +700,8 @@ function marketingMetrics(rows: Entry[]) {
       revenueInfluenced: campaignRevenue,
     },
     socialByChannel,
+    webVisits,
+    campaignByBrand,
     campaigns,
     clienteling,
     customerIntel,
