@@ -22,6 +22,15 @@ interface FinanceMetricsData {
   revenueByBrand: { name: string; value: number }[];
   daily: number[];
   labels: string[];
+  expensesByCategory: { name: string; actual: number }[];
+  expensesTotal: number;
+  debtors: number;
+  creditors: number;
+  cashInflow: number;
+  cashOutflow: number;
+  cashNet: number;
+  operatingResult: number;
+  forecast: { revenue: number; grossProfit: number; netProfit: number; cash: number };
 }
 
 export default function FinancePage() {
@@ -33,6 +42,15 @@ export default function FinancePage() {
     daily: m?.daily ?? new Array(31).fill(0),
     labels: m?.labels ?? Array.from({ length: 31 }, (_, i) => String(i + 1)),
     revenueTarget: financeData.revenue.target,
+    expensesByCategory: m?.expensesByCategory ?? [],
+    expensesTotal: m?.expensesTotal ?? 0,
+    debtors: m?.debtors ?? 0,
+    creditors: m?.creditors ?? 0,
+    cashInflow: m?.cashInflow ?? 0,
+    cashOutflow: m?.cashOutflow ?? 0,
+    cashNet: m?.cashNet ?? 0,
+    operatingResult: m?.operatingResult ?? 0,
+    forecast: m?.forecast ?? { revenue: 0, grossProfit: 0, netProfit: 0, cash: 0 },
   };
 
   // Prepare chart data (revenue series is live — driven by the Daily Revenue Entry form)
@@ -47,14 +65,14 @@ export default function FinancePage() {
     value: v,
   }));
 
-  const expenseData = d.expenses.categories.map(c => ({
+  const expenseData = live.expensesByCategory.map(c => ({
     name: c.name,
     value: c.actual,
-    value2: c.budget,
+    value2: 0,
   }));
 
-  const totalOpEx = d.expenses.categories.reduce((sum, c) => sum + c.actual, 0);
-  const totalBudget = d.expenses.categories.reduce((sum, c) => sum + c.budget, 0);
+  const totalOpEx = live.expensesTotal;
+  const totalBudget = live.expensesTotal;
 
   const workingCapitalTrend = [
     { name: 'Jan', value: 1.08 },
@@ -115,64 +133,53 @@ export default function FinancePage() {
           />
           <KPICard
             label="Gross Profit MTD"
-            value="307,235"
-            prefix="GHS "
-            change={6.7}
-            changeLabel="% | 47.2% Margin"
+            value="—"
             status="green"
             small
           />
           <KPICard
-            label="Operating Profit MTD"
-            value="98,421"
+            label="Operating Result MTD"
+            value={fmt(live.operatingResult, '')}
             prefix="GHS "
-            changeLabel="15.1% Margin"
-            status="green"
+            status={live.operatingResult >= 0 ? 'green' : 'red'}
             small
           />
           <KPICard
             label="Net Profit MTD"
-            value="67,890"
-            prefix="GHS "
-            change={4.8}
+            value="—"
             status="green"
             small
           />
           <KPICard
-            label="Cash Balance"
-            value="2.48M"
+            label="Cash Position"
+            value={fmt(live.cashNet, '')}
             prefix="GHS "
-            change={-6.2}
-            changeLabel="% vs LM"
-            status="yellow"
+            status={live.cashNet >= 0 ? 'green' : 'red'}
             small
           />
           <KPICard
             label="Debtors Total"
-            value="1.32M"
+            value={fmt(live.debtors, '')}
             prefix="GHS "
-            change={-4}
             status="green"
             small
           />
           <KPICard
             label="Creditors Total"
-            value="2.15M"
+            value={fmt(live.creditors, '')}
             prefix="GHS "
-            change={1.8}
             status="yellow"
             small
           />
           <KPICard
             label="Inventory Value"
-            value="11.80M"
-            prefix="GHS "
+            value="—"
             status="green"
             small
           />
           <KPICard
             label="Current Ratio"
-            value="1.62x"
+            value={live.creditors > 0 ? `${((live.cashNet + live.debtors) / live.creditors).toFixed(2)}x` : '—'}
             status="green"
             small
           />
@@ -309,15 +316,15 @@ export default function FinancePage() {
               <div className="grid grid-cols-1 gap-3">
                 <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
                   <div className="text-[0.65rem] text-gray-500">Cash Inflow</div>
-                  <div className="text-lg font-bold text-green-400">{fmt(d.cashFlow.inflow)}</div>
+                  <div className="text-lg font-bold text-green-400">{fmt(live.cashInflow)}</div>
                 </div>
                 <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
                   <div className="text-[0.65rem] text-gray-500">Cash Outflow</div>
-                  <div className="text-lg font-bold text-red-400">{fmt(d.cashFlow.outflow)}</div>
+                  <div className="text-lg font-bold text-red-400">{fmt(live.cashOutflow)}</div>
                 </div>
                 <div className="bg-[#0d0d0d] border border-[#c8a951]/30 rounded-lg p-3">
                   <div className="text-[0.65rem] text-[#c8a951]">Net Cash Flow</div>
-                  <div className="text-lg font-bold text-[#c8a951]">{fmt(d.cashFlow.net)}</div>
+                  <div className="text-lg font-bold text-[#c8a951]">{fmt(live.cashNet)}</div>
                 </div>
               </div>
             </div>
@@ -345,7 +352,7 @@ export default function FinancePage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Net Cash Flow</span>
-                    <span className="text-green-400">+{fmt(d.cashFlow.net)}</span>
+                    <span className="text-green-400">+{fmt(live.cashNet)}</span>
                   </div>
                   <div className="border-t border-[#2a2a2a] pt-2 flex justify-between font-semibold">
                     <span className="text-gray-400">Closing Balance</span>
@@ -372,9 +379,8 @@ export default function FinancePage() {
             <div className="space-y-3">
               <div className="grid grid-cols-1 gap-3">
                 {[
-                  { label: 'Inventory', value: d.workingCapital.inventory, color: 'text-blue-400' },
-                  { label: 'Debtors', value: d.workingCapital.debtors, color: 'text-green-400' },
-                  { label: 'Creditors', value: d.workingCapital.creditors, color: 'text-red-400' },
+                  { label: 'Debtors', value: live.debtors, color: 'text-green-400' },
+                  { label: 'Creditors', value: live.creditors, color: 'text-red-400' },
                 ].map((item) => (
                   <div key={item.label} className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
                     <div className="text-[0.65rem] text-gray-500">{item.label}</div>
@@ -498,17 +504,16 @@ export default function FinancePage() {
 
               {/* Expense breakdown mini list */}
               <div className="space-y-2">
-                {d.expenses.categories.map((c) => {
-                  const pct = Math.round((c.actual / c.budget) * 100);
-                  const over = c.actual > c.budget;
+                {live.expensesByCategory.map((c) => {
+                  const share = totalOpEx ? Math.round((c.actual / totalOpEx) * 100) : 0;
                   return (
                     <div key={c.name} className="flex items-center gap-2 text-xs">
                       <span className="text-gray-400 w-16 truncate">{c.name}</span>
                       <div className="flex-1">
-                        <ProgressBar value={pct} max={120} color={over ? '#ef4444' : '#22c55e'} height={4} />
+                        <ProgressBar value={share} max={100} color="#c8a951" height={4} />
                       </div>
-                      <span className={`text-[0.65rem] min-w-[2rem] text-right ${over ? 'text-red-400' : 'text-green-400'}`}>
-                        {pct}%
+                      <span className="text-[0.65rem] min-w-[2rem] text-right text-gray-300">
+                        {share}%
                       </span>
                     </div>
                   );
@@ -543,17 +548,17 @@ export default function FinancePage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-[#0d0d0d] border border-[#c8a951]/30 rounded-lg p-4">
               <div className="text-[0.65rem] text-[#c8a951] uppercase tracking-wider">Revenue Forecast</div>
-              <div className="text-xl font-bold mt-1">{fmt(d.forecast.revenue)}</div>
+              <div className="text-xl font-bold mt-1">{fmt(live.forecast.revenue)}</div>
               <MiniSparkline data={[1500000, 1620000, 1710000, 1780000, 1860000]} color="#c8a951" height={35} />
             </div>
             <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-4">
               <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Gross Profit Forecast</div>
-              <div className="text-xl font-bold mt-1">{fmt(d.forecast.grossProfit)}</div>
+              <div className="text-xl font-bold mt-1">{fmt(live.forecast.grossProfit)}</div>
               <MiniSparkline data={[720000, 760000, 810000, 850000, 880000]} color="#22c55e" height={35} />
             </div>
             <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-4">
               <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Net Profit Forecast</div>
-              <div className="text-xl font-bold mt-1">{fmt(d.forecast.netProfit)}</div>
+              <div className="text-xl font-bold mt-1">{fmt(live.forecast.netProfit)}</div>
               <MiniSparkline data={[150000, 162000, 172000, 182000, 190000]} color="#3b82f6" height={35} />
             </div>
             <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-4">

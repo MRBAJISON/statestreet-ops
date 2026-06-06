@@ -3,6 +3,7 @@ import DashboardHeader from '@/components/layout/DashboardHeader';
 import Section from '@/components/ui/Section';
 import ExecutiveCharts from './ExecutiveCharts';
 import ExecutiveRevenueDonut from './ExecutiveRevenueDonut';
+import ExecutiveGroupRevenue from './ExecutiveGroupRevenue';
 
 export const metadata = {
   title: 'Executive Command Center | StateStreet Retail Group',
@@ -168,7 +169,7 @@ export default function ExecutiveCommandCenter() {
           <div className="bg-[#111] border border-[#2a2a2a] rounded-lg p-3">
             <div className="text-[0.65rem] text-gray-400 uppercase tracking-wider">Group Revenue</div>
             <div className="text-lg font-bold text-white mt-1">
-              <span className="text-sm text-gray-400">GHS </span>{fmtGHS(groupRevenue)}
+              <span className="text-sm text-gray-400">GHS </span><ExecutiveGroupRevenue />
             </div>
             <div className="flex items-center justify-between mt-1">
               <span className="text-[0.6rem] text-gray-500">Target: 1M</span>

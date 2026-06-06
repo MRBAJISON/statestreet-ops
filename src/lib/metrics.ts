@@ -61,6 +61,32 @@ function financeMetrics(rows: Entry[]) {
     if (day >= 1 && day <= 31) daily[day - 1] += gross;
   }
 
+  // Debtors / creditors (debtors form)
+  const deb = payloads(rows, 'debtors');
+  const debtors = deb
+    .filter((p) => String(p.type) === 'debtor')
+    .reduce((s, p) => s + num(p.amount), 0);
+  const creditors = deb
+    .filter((p) => String(p.type) === 'creditor')
+    .reduce((s, p) => s + num(p.amount), 0);
+
+  // Cash flow (cashflow form)
+  const cf = payloads(rows, 'cashflow');
+  const cashInflow = cf
+    .filter((p) => String(p.type) === 'inflow')
+    .reduce((s, p) => s + num(p.amount), 0);
+  const cashOutflow = cf
+    .filter((p) => String(p.type) === 'outflow')
+    .reduce((s, p) => s + num(p.amount), 0);
+
+  // Expenses (expenses form)
+  const exp = payloads(rows, 'expenses');
+  const expensesTotal = exp.reduce((s, p) => s + num(p.amount), 0);
+
+  // Forecast (latest forecast entry)
+  const fc = payloads(rows, 'forecast');
+  const lastFc = fc[fc.length - 1] ?? {};
+
   return {
     revenueMtd,
     revenueByBrand: [...brandMap].map(([name, value]) => ({ name, value })),
@@ -69,10 +95,23 @@ function financeMetrics(rows: Entry[]) {
     transactions,
     footfall,
     itemsSold,
-    expensesByCategory: groupSum(payloads(rows, 'expenses'), 'category', 'amount').map((x) => ({
+    expensesByCategory: groupSum(exp, 'category', 'amount').map((x) => ({
       name: x.name,
       actual: x.value,
     })),
+    expensesTotal,
+    debtors,
+    creditors,
+    cashInflow,
+    cashOutflow,
+    cashNet: cashInflow - cashOutflow,
+    operatingResult: revenueMtd - expensesTotal,
+    forecast: {
+      revenue: num(lastFc.revenueForecast),
+      grossProfit: num(lastFc.gpForecast),
+      netProfit: num(lastFc.npForecast),
+      cash: num(lastFc.cashForecast),
+    },
     entryCount: rows.length,
   };
 }
@@ -151,12 +190,46 @@ function inventoryMetrics(rows: Entry[]) {
   );
   const deadValue = ds.reduce((s, p) => s + num(p.stockValue), 0);
 
+  // Accuracy distribution buckets (share of stock-count lines by variance %)
+  const buckets = { within2: 0, b2_5: 0, b5_10: 0, over10: 0 };
+  for (const p of sc) {
+    const sys = num(p.systemQty);
+    const variance = Math.abs(num(p.variance) || sys - num(p.physicalQty));
+    const vp = sys ? (variance / sys) * 100 : 0;
+    if (vp <= 2) buckets.within2++;
+    else if (vp <= 5) buckets.b2_5++;
+    else if (vp <= 10) buckets.b5_10++;
+    else buckets.over10++;
+  }
+  const scTotal = sc.length || 1;
+  const accuracyDistribution = [
+    { name: 'Accurate (≤2%)', value: round1((buckets.within2 / scTotal) * 100) },
+    { name: 'Variance (2-5%)', value: round1((buckets.b2_5 / scTotal) * 100) },
+    { name: 'Variance (5-10%)', value: round1((buckets.b5_10 / scTotal) * 100) },
+    { name: 'Variance (>10%)', value: round1((buckets.over10 / scTotal) * 100) },
+  ];
+
+  // Monthly received-value trend (goods receipts grouped by month)
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const trendMap = new Map<string, number>();
+  for (const p of gr) {
+    const dt = p.date ? new Date(String(p.date)) : null;
+    if (!dt || isNaN(dt.getTime())) continue;
+    const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+    trendMap.set(key, (trendMap.get(key) ?? 0) + num(p.totalValue));
+  }
+  const valueTrend = [...trendMap.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, value]) => ({ name: MONTHS[parseInt(k.slice(5), 10) - 1] ?? k, value }));
+
   return {
     inventoryValue,
     accuracy: sysTotal ? round1(Math.max(0, 100 - (varTotal / sysTotal) * 100)) : 0,
     deadPct: inventoryValue ? round1((deadValue / inventoryValue) * 100) : 0,
     outOfStock: rep.filter((p) => num(p.currentStock) === 0).length || rep.length,
     byBrand: groupSum(gr, 'brand', 'totalValue'),
+    accuracyDistribution,
+    valueTrend,
     entryCount: rows.length,
   };
 }
@@ -173,6 +246,38 @@ function brandMetrics(rows: Entry[]) {
   const negative = sent.reduce((s, p) => s + num(p.negative), 0);
   const total = positive + neutral + negative;
 
+  // Monthly positive-sentiment trend
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const trendMap = new Map<string, { pos: number; total: number }>();
+  for (const p of sent) {
+    const dt = p.date ? new Date(String(p.date)) : null;
+    if (!dt || isNaN(dt.getTime())) continue;
+    const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+    const e = trendMap.get(key) ?? { pos: 0, total: 0 };
+    e.pos += num(p.positive);
+    e.total += num(p.positive) + num(p.neutral) + num(p.negative);
+    trendMap.set(key, e);
+  }
+  const sentimentTrend = [...trendMap.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => ({
+      name: MONTHS[parseInt(k.slice(5), 10) - 1] ?? k,
+      value: v.total ? Math.round((v.pos / v.total) * 100) : 0,
+    }));
+
+  // Portfolio health from brand-score (avg overall per brand)
+  const portMap = new Map<string, number[]>();
+  for (const p of score) {
+    const b = BRAND_LABELS[String(p.brand)] ?? String(p.brand || '—');
+    if (!portMap.has(b)) portMap.set(b, []);
+    portMap.get(b)!.push(num(p.overall));
+  }
+  const portfolio = [...portMap].map(([brand, vals]) => {
+    const s = Math.round(avg(vals));
+    return { brand, score: s, status: s >= 80 ? 'STRONG' : s >= 70 ? 'STABLE' : 'AT RISK', trend: 'stable' };
+  });
+  const healthIndex = portfolio.length ? Math.round(avg(portfolio.map((p) => p.score))) : 0;
+
   return {
     sentiment: {
       positive: total ? Math.round((positive / total) * 100) : 0,
@@ -182,6 +287,9 @@ function brandMetrics(rows: Entry[]) {
     nps: Math.round(avg(dig.map((p) => num(p.nps)).filter((n) => n !== 0))),
     momentum: Math.round(avg(score.map((p) => num(p.momentum)).filter((n) => n > 0))),
     shareOfConversation: groupAvg(comp, 'competitor', 'sov'),
+    sentimentTrend,
+    portfolio,
+    healthIndex,
     entryCount: rows.length,
   };
 }
@@ -193,6 +301,8 @@ function marketingMetrics(rows: Entry[]) {
   const spend = camp.reduce((s, p) => s + num(p.spend), 0);
   const campaignRevenue = camp.reduce((s, p) => s + num(p.revenue), 0);
 
+  const social = payloads(rows, 'social');
+
   return {
     leadChannelMix: groupSum(leads, 'channel', 'count'),
     totalLeads: leads.reduce((s, p) => s + num(p.count), 0),
@@ -201,6 +311,20 @@ function marketingMetrics(rows: Entry[]) {
     campaignRevenue,
     spend,
     roas: spend ? round1(campaignRevenue / spend) : 0,
+    funnel: {
+      reach: camp.reduce((s, p) => s + num(p.reach), 0),
+      engagement: camp.reduce((s, p) => s + num(p.engagement), 0),
+      leads: camp.reduce((s, p) => s + num(p.leads), 0),
+      storeVisits: camp.reduce((s, p) => s + num(p.storeVisits), 0),
+      revenueInfluenced: campaignRevenue,
+    },
+    social: {
+      followers: social.reduce((s, p) => s + num(p.followers), 0),
+      reach: social.reduce((s, p) => s + num(p.reach), 0),
+      impressions: social.reduce((s, p) => s + num(p.impressions), 0),
+      engagement: social.reduce((s, p) => s + num(p.engagement), 0),
+      clicks: social.reduce((s, p) => s + num(p.clicks), 0),
+    },
     entryCount: rows.length,
   };
 }

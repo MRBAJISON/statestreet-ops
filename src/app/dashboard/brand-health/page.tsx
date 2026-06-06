@@ -15,6 +15,9 @@ interface BrandLive {
   nps: number;
   momentum: number;
   shareOfConversation: { name: string; value: number }[];
+  sentimentTrend: { name: string; value: number }[];
+  portfolio: { brand: string; score: number; status: string; trend: string }[];
+  healthIndex: number;
 }
 
 const fmt = (n: number, prefix = 'GHS ') => {
@@ -45,6 +48,8 @@ export default function BrandHealthPage() {
   const liveSentiment = m?.sentiment ?? { positive: 0, neutral: 0, negative: 0 };
   const nps = m?.nps ?? 0;
   const momentum = m?.momentum ?? 0;
+  const healthIndex = m?.healthIndex ?? 0;
+  const portfolio = m?.portfolio ?? [];
 
   // Chart data
   const socData = (m?.shareOfConversation?.length ? m.shareOfConversation : []);
@@ -53,7 +58,7 @@ export default function BrandHealthPage() {
     { name: 'Neutral', value: liveSentiment.neutral },
     { name: 'Negative', value: liveSentiment.negative },
   ];
-  const sentimentTrend = d.sentiment.trend.map(t => ({ name: t.month, value: t.score }));
+  const sentimentTrend = m?.sentimentTrend ?? [];
   const momentumData = d.momentumDrivers.map(m => ({ name: m.driver, value: m.score }));
 
   // vs last month deltas for momentum (simulated)
@@ -85,16 +90,12 @@ export default function BrandHealthPage() {
           {/* Brand Health Index Gauge */}
           <div className="lg:col-span-3 bg-[#111] border border-[#2a2a2a] rounded-lg p-4 flex flex-col items-center justify-center">
             <div className="text-[0.65rem] text-gray-400 uppercase tracking-wider mb-2">StateStreet Brand Health Index</div>
-            <ScoreGauge score={d.healthIndex.score} size="lg" color="#c8a951" />
-            <StatusBadge status="HEALTHY" size="md" />
+            <ScoreGauge score={healthIndex} size="lg" color="#c8a951" />
+            <StatusBadge status={healthIndex >= 75 ? 'HEALTHY' : healthIndex >= 60 ? 'WATCH' : 'AT RISK'} size="md" />
             <div className="flex gap-4 mt-3 text-[0.65rem]">
               <div className="text-center">
-                <div className="text-gray-500">vs Last Month</div>
-                <div className="text-green-400 font-bold">+{d.healthIndex.vsLastMonth}</div>
-              </div>
-              <div className="text-center">
-                <div className="text-gray-500">vs Last Year</div>
-                <div className="text-green-400 font-bold">+{d.healthIndex.vsLastYear}</div>
+                <div className="text-gray-500">Brands Tracked</div>
+                <div className="text-[#c8a951] font-bold">{portfolio.length}</div>
               </div>
             </div>
           </div>
@@ -103,7 +104,7 @@ export default function BrandHealthPage() {
           <div className="lg:col-span-4 bg-[#111] border border-[#2a2a2a] rounded-lg p-4">
             <div className="text-[0.65rem] text-gray-400 uppercase tracking-wider mb-3">Brand Portfolio Health</div>
             <div className="space-y-2">
-              {d.portfolio.map(b => (
+              {portfolio.map(b => (
                 <div key={b.brand} className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">

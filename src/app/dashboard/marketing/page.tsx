@@ -13,6 +13,7 @@ import { useMetrics } from '@/lib/api';
 interface MarketingLive {
   leadChannelMix: { name: string; value: number }[];
   totalLeads: number;
+  funnel: { reach: number; engagement: number; leads: number; storeVisits: number; revenueInfluenced: number };
 }
 
 /* ─── helpers ──────────────────────────────────────────────── */
@@ -28,14 +29,6 @@ const ghc = (n: number) =>
 /* ─── derived data ─────────────────────────────────────────── */
 const md = marketingData;
 const bd = brandData;
-
-const campaignFunnel = {
-  reach: md.campaigns.reduce((a, c) => a + c.reach, 0),
-  engagement: md.campaigns.reduce((a, c) => a + c.engagement, 0),
-  leads: md.acquisition.totalLeads,
-  storeVisits: 759,
-  revenueInfluenced: md.campaigns.reduce((a, c) => a + c.revenue, 0),
-};
 
 const shareOfConversation = [
   { brand: 'Statestreet', pct: 42 },
@@ -67,6 +60,8 @@ const brandExecution = {
 export default function MarketingDashboard() {
   const { data: m } = useMetrics<MarketingLive>('marketing');
   const leadChannelMix = m?.leadChannelMix ?? [];
+  const totalLeads = m?.totalLeads ?? 0;
+  const funnel = m?.funnel ?? { reach: 0, engagement: 0, leads: 0, storeVisits: 0, revenueInfluenced: 0 };
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
       <DashboardHeader
@@ -184,11 +179,11 @@ export default function MarketingDashboard() {
             <h4 className="text-xs text-[#c8a951] uppercase tracking-wider mb-3 font-semibold">Campaign Funnel</h4>
             <div className="flex items-center justify-between gap-2 flex-wrap">
               {[
-                { label: 'Reach', value: campaignFunnel.reach },
-                { label: 'Engagement', value: campaignFunnel.engagement },
-                { label: 'Leads', value: campaignFunnel.leads },
-                { label: 'Store Visits', value: campaignFunnel.storeVisits },
-                { label: 'Revenue Influenced', value: campaignFunnel.revenueInfluenced },
+                { label: 'Reach', value: funnel.reach },
+                { label: 'Engagement', value: funnel.engagement },
+                { label: 'Leads', value: funnel.leads },
+                { label: 'Store Visits', value: funnel.storeVisits },
+                { label: 'Revenue Influenced', value: funnel.revenueInfluenced },
               ].map((step, i, arr) => (
                 <div key={step.label} className="flex items-center gap-2">
                   <div className="text-center min-w-[100px]">
@@ -227,7 +222,7 @@ export default function MarketingDashboard() {
 
               {/* Summary KPIs */}
               <div className="grid grid-cols-2 gap-2 mt-3">
-                <KPICard label="Total Leads" value={fmt(md.acquisition.totalLeads)} small />
+                <KPICard label="Total Leads" value={fmt(totalLeads)} small />
                 <KPICard label="Cost Per Lead" value={`GHS ${md.acquisition.costPerLead}`} small />
                 <KPICard label="New Customers (MTD)" value={md.acquisition.newCustomers} small />
                 <KPICard label="Client Database" value={`+${fmt(md.acquisition.clientDatabase)}`} small />

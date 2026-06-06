@@ -16,6 +16,8 @@ interface InventoryLive {
   deadPct: number;
   outOfStock: number;
   byBrand: { name: string; value: number }[];
+  accuracyDistribution: { name: string; value: number }[];
+  valueTrend: { name: string; value: number }[];
 }
 
 const fmt = (n: number, prefix = 'GHS ') => {
@@ -35,17 +37,12 @@ export default function InventoryPage() {
   const outOfStock = m?.outOfStock ?? 0;
   const byBrand = m?.byBrand ?? [];
 
-  // Chart data
-  const valueTrendData = d.valueTrend.map(v => ({ name: v.month, value: v.value }));
+  // Chart data (live)
+  const valueTrendData = m?.valueTrend ?? [];
 
   const ageChartData = d.healthByAge.map(a => ({ name: a.range, value: a.pct }));
 
-  const accuracyBreakdown = [
-    { name: 'Accurate (Within 2%)', value: 98.2 },
-    { name: 'Variance (2-5%)', value: 1.1 },
-    { name: 'Variance (5-10%)', value: 0.5 },
-    { name: 'Variance (>10%)', value: 0.2 },
-  ];
+  const accuracyBreakdown = m?.accuracyDistribution ?? [];
 
   const totalReplenishmentPOs = d.replenishment.reduce((s, r) => s + r.pos, 0);
   const totalReplenishmentValue = d.replenishment.reduce((s, r) => s + r.value, 0);
@@ -326,7 +323,7 @@ export default function InventoryPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Accuracy Donut */}
             <div className="flex flex-col items-center">
-              <ScoreGauge score={98.2} label="Stock Accuracy" size="lg" color="#22c55e" />
+              <ScoreGauge score={accuracy} label="Stock Accuracy" size="lg" color="#22c55e" />
               <div className="mt-4 space-y-2 w-full">
                 {accuracyBreakdown.map((a, i) => {
                   const colors = ['#22c55e', '#eab308', '#f97316', '#ef4444'];
@@ -350,7 +347,7 @@ export default function InventoryPage() {
                 innerRadius={50}
                 outerRadius={70}
                 centerLabel="Accuracy"
-                centerValue="98.2%"
+                centerValue={`${accuracy}%`}
                 colors={['#22c55e', '#eab308', '#f97316', '#ef4444']}
               />
             </div>
