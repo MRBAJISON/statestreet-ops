@@ -6,7 +6,9 @@ import Section from '@/components/ui/Section';
 import EmptyState from '@/components/ui/EmptyState';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
-import { useMetrics } from '@/lib/api';
+import { useState } from 'react';
+import PeriodTabs from '@/components/ui/PeriodTabs';
+import { useMetrics, type Period } from '@/lib/api';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -46,7 +48,8 @@ interface CommercialLive {
 }
 
 export default function CommercialPage() {
-  const { data: m } = useMetrics<CommercialLive>('commercial');
+  const [period, setPeriod] = useState<Period>('mtd');
+  const { data: m } = useMetrics<CommercialLive>('commercial', period);
   const categorySales = m?.categorySales ?? [];
   const sellThroughCat = m?.sellThroughByCategory ?? [];
   const salesByStore = m?.salesByStore ?? [];
@@ -97,7 +100,10 @@ export default function CommercialPage() {
         missionDetail="Drive profitable sell-through across every store and category."
       />
 
-      <div className="px-6 py-4">
+      <div className="px-6 pt-4 flex justify-end">
+        <PeriodTabs value={period} onChange={setPeriod} />
+      </div>
+      <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           <KPICard label="Group Sales" value={dash(m?.groupSales ?? 0, fmtGHS)} status="green" small />
           <KPICard label="ATV" value={dash(m?.atv ?? 0, fmtGHS)} small />

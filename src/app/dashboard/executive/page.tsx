@@ -6,7 +6,9 @@ import KPICard from '@/components/ui/KPICard';
 import Section from '@/components/ui/Section';
 import EmptyState from '@/components/ui/EmptyState';
 import { SimpleDonutChart, SimpleBarChart } from '@/components/charts/Charts';
-import { useMetrics } from '@/lib/api';
+import { useState } from 'react';
+import PeriodTabs from '@/components/ui/PeriodTabs';
+import { useMetrics, type Period } from '@/lib/api';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -18,12 +20,13 @@ const dash = (n: number, f: (x: number) => string) => (n ? f(n) : '—');
 const pct = (n: number) => (n ? `${n}%` : '—');
 
 export default function ExecutiveCommandCenter() {
-  const fin = useMetrics<{ revenueMtd: number; netProfit: number; grossMargin: number; cashNet: number; revenueByBrand: { name: string; value: number }[] }>('finance').data;
-  const com = useMetrics<{ groupSales: number; convRate: number; salesByStore: { name: string; value: number }[] }>('commercial').data;
-  const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[] }>('operations').data;
-  const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory').data;
-  const brd = useMetrics<{ healthIndex: number; sentiment: { positive: number } }>('brand').data;
-  const mkt = useMetrics<{ totalLeads: number }>('marketing').data;
+  const [period, setPeriod] = useState<Period>('mtd');
+  const fin = useMetrics<{ revenueMtd: number; netProfit: number; grossMargin: number; cashNet: number; revenueByBrand: { name: string; value: number }[] }>('finance', period).data;
+  const com = useMetrics<{ groupSales: number; convRate: number; salesByStore: { name: string; value: number }[] }>('commercial', period).data;
+  const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[] }>('operations', period).data;
+  const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory', period).data;
+  const brd = useMetrics<{ healthIndex: number; sentiment: { positive: number } }>('brand', period).data;
+  const mkt = useMetrics<{ totalLeads: number }>('marketing', period).data;
 
   const revenueByBrand = fin?.revenueByBrand ?? [];
   const salesByStore = com?.salesByStore ?? [];
@@ -58,7 +61,10 @@ export default function ExecutiveCommandCenter() {
       />
 
       {/* GROUP KPI BAR */}
-      <div className="px-6 py-4">
+      <div className="px-6 pt-4 flex justify-end">
+        <PeriodTabs value={period} onChange={setPeriod} />
+      </div>
+      <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
           <KPICard label="Group Revenue" value={dash(fin?.revenueMtd ?? 0, fmtGHS)} status="green" small />
           <KPICard label="Net Profit" value={dash(fin?.netProfit ?? 0, fmtGHS)} status={(fin?.netProfit ?? 0) >= 0 ? 'green' : 'red'} small />

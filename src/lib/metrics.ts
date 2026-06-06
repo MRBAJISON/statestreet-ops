@@ -9,6 +9,26 @@ type P = Record<string, unknown>;
 const payloads = (rows: Entry[], type: string): P[] =>
   rows.filter((r) => r.formType === type).map((r) => r.payload as P);
 
+export type Period = 'mtd' | 'ytd' | 'all';
+
+// Best-effort date for an entry: a date field in the payload, else its createdAt.
+function entryDate(r: Entry): Date {
+  const p = r.payload as P;
+  const cand = p.date ?? p.datetime ?? p.weekEnd ?? p.dueDate ?? p.deadline;
+  const d = cand ? new Date(String(cand)) : new Date(r.createdAt as unknown as string);
+  return isNaN(d.getTime()) ? new Date(r.createdAt as unknown as string) : d;
+}
+
+// Filter entries to a reporting period (month-to-date / year-to-date / all time).
+export function filterByPeriod(rows: Entry[], period: Period, now = new Date()): Entry[] {
+  if (period === 'all') return rows;
+  return rows.filter((r) => {
+    const d = entryDate(r);
+    if (period === 'ytd') return d.getFullYear() === now.getFullYear();
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  });
+}
+
 // Sum `valKey` grouped by `key` -> [{name, value}]
 function groupSum(items: P[], key: string, valKey: string) {
   const m = new Map<string, number>();

@@ -6,7 +6,9 @@ import Section from '@/components/ui/Section';
 import EmptyState from '@/components/ui/EmptyState';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
-import { useMetrics } from '@/lib/api';
+import { useState } from 'react';
+import PeriodTabs from '@/components/ui/PeriodTabs';
+import { useMetrics, type Period } from '@/lib/api';
 
 const pct = (n: number) => (n ? `${n}%` : '—');
 const score = (v: number): 'green' | 'yellow' | 'red' => (v >= 90 ? 'green' : v >= 70 ? 'yellow' : 'red');
@@ -29,7 +31,8 @@ interface OperationsLive {
 }
 
 export default function OperationsPage() {
-  const { data: m } = useMetrics<OperationsLive>('operations');
+  const [period, setPeriod] = useState<Period>('mtd');
+  const { data: m } = useMetrics<OperationsLive>('operations', period);
   const vmByStore = m?.vmByStore ?? [];
   const storeScores = m?.storeScores ?? [];
   const risk = m?.risk ?? { high: 0, medium: 0, low: 0 };
@@ -47,7 +50,10 @@ export default function OperationsPage() {
         missionDetail="Consistent, compliant, customer-ready stores every day."
       />
 
-      <div className="px-6 py-4">
+      <div className="px-6 pt-4 flex justify-end">
+        <PeriodTabs value={period} onChange={setPeriod} />
+      </div>
+      <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           <KPICard label="Store Ops Score" value={pct(m?.opsScore ?? 0)} status={score(m?.opsScore ?? 0)} small />
           <KPICard label="VM Compliance" value={pct(m?.vmScore ?? 0)} status={score(m?.vmScore ?? 0)} small />

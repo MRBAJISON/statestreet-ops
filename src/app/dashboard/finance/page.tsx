@@ -1,13 +1,15 @@
 'use client';
 
+import { useState } from 'react';
 import DashboardHeader from '@/components/layout/DashboardHeader';
 import KPICard from '@/components/ui/KPICard';
 import Section from '@/components/ui/Section';
 import ProgressBar from '@/components/ui/ProgressBar';
 import EmptyState from '@/components/ui/EmptyState';
 import RecentEntries from '@/components/ui/RecentEntries';
+import PeriodTabs from '@/components/ui/PeriodTabs';
 import { SimpleLineChart, SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
-import { useMetrics } from '@/lib/api';
+import { useMetrics, type Period } from '@/lib/api';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -49,7 +51,8 @@ interface FinanceMetricsData {
 }
 
 export default function FinancePage() {
-  const { data: m } = useMetrics<FinanceMetricsData>('finance');
+  const [period, setPeriod] = useState<Period>('mtd');
+  const { data: m } = useMetrics<FinanceMetricsData>('finance', period);
 
   const revenueMtd = m?.revenueMtd ?? 0;
   const revenueByBrand = m?.revenueByBrand ?? [];
@@ -88,8 +91,12 @@ export default function FinancePage() {
         missionDetail="Maximize profitability, protect cash, and drive sustainable value."
       />
 
+      <div className="px-6 pt-4 flex justify-end">
+        <PeriodTabs value={period} onChange={setPeriod} />
+      </div>
+
       {/* KPI BAR */}
-      <div className="px-6 py-4">
+      <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <KPICard label="Revenue MTD" value={dash(revenueMtd, fmtGHS)} status="green" small />
           <KPICard

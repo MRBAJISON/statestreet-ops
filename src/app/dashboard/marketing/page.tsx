@@ -6,7 +6,9 @@ import Section from '@/components/ui/Section';
 import EmptyState from '@/components/ui/EmptyState';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { SimpleBarChart } from '@/components/charts/Charts';
-import { useMetrics } from '@/lib/api';
+import { useState } from 'react';
+import PeriodTabs from '@/components/ui/PeriodTabs';
+import { useMetrics, type Period } from '@/lib/api';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -34,7 +36,8 @@ interface MarketingLive {
 }
 
 export default function MarketingPage() {
-  const { data: m } = useMetrics<MarketingLive>('marketing');
+  const [period, setPeriod] = useState<Period>('mtd');
+  const { data: m } = useMetrics<MarketingLive>('marketing', period);
   const leadChannelMix = m?.leadChannelMix ?? [];
   const funnel = m?.funnel ?? { reach: 0, engagement: 0, leads: 0, storeVisits: 0, revenueInfluenced: 0 };
   const socialByChannel = m?.socialByChannel ?? [];
@@ -62,7 +65,10 @@ export default function MarketingPage() {
         missionDetail="Generate qualified demand and grow brand equity efficiently."
       />
 
-      <div className="px-6 py-4">
+      <div className="px-6 pt-4 flex justify-end">
+        <PeriodTabs value={period} onChange={setPeriod} />
+      </div>
+      <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <KPICard label="Total Leads" value={numOrDash(m?.totalLeads ?? 0)} status="green" small />
           <KPICard label="Converted" value={numOrDash(m?.converted ?? 0)} small />

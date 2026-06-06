@@ -9,7 +9,9 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { SimpleBarChart, SimpleDonutChart, SimpleLineChart } from '@/components/charts/Charts';
-import { useMetrics } from '@/lib/api';
+import { useState } from 'react';
+import PeriodTabs from '@/components/ui/PeriodTabs';
+import { useMetrics, type Period } from '@/lib/api';
 
 interface BrandLive {
   sentiment: { positive: number; neutral: number; negative: number };
@@ -27,7 +29,8 @@ interface BrandLive {
 }
 
 export default function BrandHealthPage() {
-  const { data: m } = useMetrics<BrandLive>('brand');
+  const [period, setPeriod] = useState<Period>('mtd');
+  const { data: m } = useMetrics<BrandLive>('brand', period);
   const sentiment = m?.sentiment ?? { positive: 0, neutral: 0, negative: 0 };
   const portfolio = m?.portfolio ?? [];
   const sentimentTrend = m?.sentimentTrend ?? [];
@@ -50,7 +53,10 @@ export default function BrandHealthPage() {
         missionDetail="Stronger brands, deeper connections, sustainable growth."
       />
 
-      <div className="px-6 py-4">
+      <div className="px-6 pt-4 flex justify-end">
+        <PeriodTabs value={period} onChange={setPeriod} />
+      </div>
+      <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KPICard label="Brand Health Index" value={healthIndex ? String(healthIndex) : '—'} status="green" small />
           <KPICard label="NPS" value={(m?.nps ?? 0) ? String(m?.nps) : '—'} small />

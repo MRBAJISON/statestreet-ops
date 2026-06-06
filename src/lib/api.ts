@@ -72,8 +72,10 @@ export function useEntries(department: string, limit = 8) {
   return { entries, loading, refresh };
 }
 
-// Live metrics hook: fetches a department's aggregated metrics and exposes a refresh().
-export function useMetrics<T = Record<string, unknown>>(department: string) {
+export type Period = 'mtd' | 'ytd' | 'all';
+
+// Live metrics hook: fetches a department's aggregated metrics for a period.
+export function useMetrics<T = Record<string, unknown>>(department: string, period: Period = 'mtd') {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,7 +83,7 @@ export function useMetrics<T = Record<string, unknown>>(department: string) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/metrics/${department}`, { cache: 'no-store' });
+      const res = await fetch(`/api/metrics/${department}?period=${period}`, { cache: 'no-store' });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to load');
       setData(json);
@@ -91,7 +93,7 @@ export function useMetrics<T = Record<string, unknown>>(department: string) {
     } finally {
       setLoading(false);
     }
-  }, [department]);
+  }, [department, period]);
 
   useEffect(() => {
     refresh();

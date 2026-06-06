@@ -6,7 +6,9 @@ import Section from '@/components/ui/Section';
 import EmptyState from '@/components/ui/EmptyState';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { SimpleLineChart, SimpleDonutChart } from '@/components/charts/Charts';
-import { useMetrics } from '@/lib/api';
+import { useState } from 'react';
+import PeriodTabs from '@/components/ui/PeriodTabs';
+import { useMetrics, type Period } from '@/lib/api';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -37,7 +39,8 @@ interface InventoryLive {
 }
 
 export default function InventoryPage() {
-  const { data: m } = useMetrics<InventoryLive>('inventory');
+  const [period, setPeriod] = useState<Period>('mtd');
+  const { data: m } = useMetrics<InventoryLive>('inventory', period);
   const byBrand = m?.byBrand ?? [];
   const valueTrend = m?.valueTrend ?? [];
   const accuracyDistribution = (m?.accuracyDistribution ?? []).filter((a) => a.value > 0);
@@ -53,7 +56,10 @@ export default function InventoryPage() {
         missionDetail="Optimize inventory value, eliminate dead stock, maximize availability."
       />
 
-      <div className="px-6 py-4">
+      <div className="px-6 pt-4 flex justify-end">
+        <PeriodTabs value={period} onChange={setPeriod} />
+      </div>
+      <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KPICard label="Inventory Value" value={dash(m?.inventoryValue ?? 0, fmtGHS)} status="green" small />
           <KPICard label="Stock Accuracy" value={pct(m?.accuracy ?? 0)} status={(m?.accuracy ?? 0) >= 98 ? 'green' : 'yellow'} small />
