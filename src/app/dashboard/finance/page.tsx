@@ -90,7 +90,7 @@ export default function FinancePage() {
 
       {/* KPI BAR */}
       <div className="px-6 py-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <KPICard label="Revenue MTD" value={dash(revenueMtd, fmtGHS)} status="green" small />
           <KPICard
             label="Gross Profit"
@@ -108,15 +108,6 @@ export default function FinancePage() {
             status={(m?.operatingProfit ?? 0) >= 0 ? 'green' : 'red'}
             small
           />
-          <KPICard
-            label="Net Profit"
-            value={dash(m?.netProfit ?? 0, fmtGHS)}
-            change={m?.netProfit ? m.netMargin : undefined}
-            changeLabel="% margin"
-            status={(m?.netProfit ?? 0) >= 0 ? 'green' : 'red'}
-            small
-          />
-          <KPICard label="Net Cash Flow" value={dash(m?.cashNet ?? 0, fmtGHS)} status={(m?.cashNet ?? 0) >= 0 ? 'green' : 'red'} small />
           <KPICard label="Debtors" value={dash(m?.debtors ?? 0, fmtGHS)} small />
           <KPICard label="Creditors" value={dash(m?.creditors ?? 0, fmtGHS)} small />
           <KPICard label="Transactions" value={(m?.transactions ?? 0) ? (m?.transactions ?? 0).toLocaleString() : '—'} small />
