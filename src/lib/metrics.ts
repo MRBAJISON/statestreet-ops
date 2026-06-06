@@ -43,6 +43,7 @@ function financeMetrics(rows: Entry[]) {
   const daily = new Array(31).fill(0);
   const brandMap = new Map<string, number>();
   let revenueMtd = 0;
+  let cogsTotal = 0;
   let transactions = 0;
   let footfall = 0;
   let itemsSold = 0;
@@ -50,6 +51,7 @@ function financeMetrics(rows: Entry[]) {
   for (const p of payloads(rows, 'revenue')) {
     const gross = num(p.grossRevenue);
     revenueMtd += gross;
+    cogsTotal += num(p.cogs);
     transactions += num(p.transactions);
     footfall += num(p.footfall);
     itemsSold += num(p.itemsSold);
@@ -79,9 +81,31 @@ function financeMetrics(rows: Entry[]) {
     .filter((p) => String(p.type) === 'outflow')
     .reduce((s, p) => s + num(p.amount), 0);
 
-  // Expenses (expenses form)
+  // Expenses (expenses form) — actual + budget per category
   const exp = payloads(rows, 'expenses');
   const expensesTotal = exp.reduce((s, p) => s + num(p.amount), 0);
+  const expenseBudgetTotal = exp.reduce((s, p) => s + num(p.budget), 0);
+  const expCatMap = new Map<string, { actual: number; budget: number }>();
+  for (const p of exp) {
+    const cat = String(p.category ?? 'other');
+    const e = expCatMap.get(cat) ?? { actual: 0, budget: 0 };
+    e.actual += num(p.amount);
+    e.budget += num(p.budget);
+    expCatMap.set(cat, e);
+  }
+  const expensesByCategory = [...expCatMap].map(([name, v]) => ({
+    name,
+    actual: v.actual,
+    budget: v.budget,
+  }));
+
+  // Profit & loss (now that COGS is captured)
+  const grossProfit = revenueMtd - cogsTotal;
+  const grossMargin = revenueMtd ? round1((grossProfit / revenueMtd) * 100) : 0;
+  const operatingProfit = grossProfit - expensesTotal;
+  const operatingMargin = revenueMtd ? round1((operatingProfit / revenueMtd) * 100) : 0;
+  const netProfit = operatingProfit; // before tax/interest (not captured)
+  const netMargin = revenueMtd ? round1((netProfit / revenueMtd) * 100) : 0;
 
   // Forecast (latest forecast entry)
   const fc = payloads(rows, 'forecast');
@@ -89,23 +113,28 @@ function financeMetrics(rows: Entry[]) {
 
   return {
     revenueMtd,
+    cogs: cogsTotal,
     revenueByBrand: [...brandMap].map(([name, value]) => ({ name, value })),
     daily,
     labels,
     transactions,
     footfall,
     itemsSold,
-    expensesByCategory: groupSum(exp, 'category', 'amount').map((x) => ({
-      name: x.name,
-      actual: x.value,
-    })),
+    expensesByCategory,
     expensesTotal,
+    expenseBudgetTotal,
+    grossProfit,
+    grossMargin,
+    operatingProfit,
+    operatingMargin,
+    netProfit,
+    netMargin,
     debtors,
     creditors,
     cashInflow,
     cashOutflow,
     cashNet: cashInflow - cashOutflow,
-    operatingResult: revenueMtd - expensesTotal,
+    operatingResult: operatingProfit,
     forecast: {
       revenue: num(lastFc.revenueForecast),
       grossProfit: num(lastFc.gpForecast),

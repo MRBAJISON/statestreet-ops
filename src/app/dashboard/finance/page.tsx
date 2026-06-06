@@ -19,11 +19,19 @@ const fmtFull = (n: number) => `GHS ${n.toLocaleString()}`;
 
 interface FinanceMetricsData {
   revenueMtd: number;
+  cogs: number;
   revenueByBrand: { name: string; value: number }[];
   daily: number[];
   labels: string[];
-  expensesByCategory: { name: string; actual: number }[];
+  expensesByCategory: { name: string; actual: number; budget: number }[];
   expensesTotal: number;
+  expenseBudgetTotal: number;
+  grossProfit: number;
+  grossMargin: number;
+  operatingProfit: number;
+  operatingMargin: number;
+  netProfit: number;
+  netMargin: number;
   debtors: number;
   creditors: number;
   cashInflow: number;
@@ -44,6 +52,13 @@ export default function FinancePage() {
     revenueTarget: financeData.revenue.target,
     expensesByCategory: m?.expensesByCategory ?? [],
     expensesTotal: m?.expensesTotal ?? 0,
+    expenseBudgetTotal: m?.expenseBudgetTotal ?? 0,
+    grossProfit: m?.grossProfit ?? 0,
+    grossMargin: m?.grossMargin ?? 0,
+    operatingProfit: m?.operatingProfit ?? 0,
+    operatingMargin: m?.operatingMargin ?? 0,
+    netProfit: m?.netProfit ?? 0,
+    netMargin: m?.netMargin ?? 0,
     debtors: m?.debtors ?? 0,
     creditors: m?.creditors ?? 0,
     cashInflow: m?.cashInflow ?? 0,
@@ -68,11 +83,11 @@ export default function FinancePage() {
   const expenseData = live.expensesByCategory.map(c => ({
     name: c.name,
     value: c.actual,
-    value2: 0,
+    value2: c.budget,
   }));
 
   const totalOpEx = live.expensesTotal;
-  const totalBudget = live.expensesTotal;
+  const totalBudget = live.expenseBudgetTotal || live.expensesTotal;
 
   const workingCapitalTrend = [
     { name: 'Jan', value: 1.08 },
@@ -133,21 +148,29 @@ export default function FinancePage() {
           />
           <KPICard
             label="Gross Profit MTD"
-            value="—"
-            status="green"
+            value={fmt(live.grossProfit, '')}
+            prefix="GHS "
+            change={live.grossMargin}
+            changeLabel="% margin"
+            status={live.grossProfit >= 0 ? 'green' : 'red'}
             small
           />
           <KPICard
-            label="Operating Result MTD"
-            value={fmt(live.operatingResult, '')}
+            label="Operating Profit MTD"
+            value={fmt(live.operatingProfit, '')}
             prefix="GHS "
-            status={live.operatingResult >= 0 ? 'green' : 'red'}
+            change={live.operatingMargin}
+            changeLabel="% margin"
+            status={live.operatingProfit >= 0 ? 'green' : 'red'}
             small
           />
           <KPICard
             label="Net Profit MTD"
-            value="—"
-            status="green"
+            value={fmt(live.netProfit, '')}
+            prefix="GHS "
+            change={live.netMargin}
+            changeLabel="% margin"
+            status={live.netProfit >= 0 ? 'green' : 'red'}
             small
           />
           <KPICard
@@ -291,10 +314,9 @@ export default function FinancePage() {
             <div className="space-y-3">
               <div className="text-xs text-gray-400 mb-1 font-medium uppercase tracking-wider">Key Margins</div>
               {[
-                { label: 'Gross Margin', value: 47.2 },
-                { label: 'Operating Margin', value: 15.1 },
-                { label: 'Net Margin', value: 10.4 },
-                { label: 'ROCE', value: 18.6 },
+                { label: 'Gross Margin', value: live.grossMargin },
+                { label: 'Operating Margin', value: live.operatingMargin },
+                { label: 'Net Margin', value: live.netMargin },
               ].map((m) => (
                 <div key={m.label} className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
                   <div className="flex justify-between items-center">

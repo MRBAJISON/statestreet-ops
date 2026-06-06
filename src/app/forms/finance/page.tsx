@@ -76,6 +76,7 @@ export default function FinanceFormsPage() {
           store: String(pick(r, 'store') || ''),
           brand: normalizeBrand(String(pick(r, 'brand') || '')),
           grossRevenue: num(pick(r, 'grossrevenue', 'gross', 'revenue') as string),
+          cogs: num(pick(r, 'cogs', 'costofgoods', 'cost') as string),
           discounts: num(pick(r, 'discounts', 'discount') as string),
           netRevenue: num(pick(r, 'netrevenue', 'net') as string),
           transactions: num(pick(r, 'transactions', 'txns') as string),
@@ -112,6 +113,7 @@ export default function FinanceFormsPage() {
         Store: 'Labone Men',
         Brand: 'Boulevard Men',
         GrossRevenue: 18500,
+        COGS: 9800,
         Discounts: 500,
         NetRevenue: 18000,
         Transactions: 42,
@@ -211,6 +213,7 @@ export default function FinanceFormsPage() {
                 { label: 'Carbon Shoes', value: 'carbon-shoes' },
               ]} />
               <FormField label="Gross Revenue" name="grossRevenue" type="number" prefix="GHS" required step={0.01} />
+              <FormField label="Cost of Goods (COGS)" name="cogs" type="number" prefix="GHS" step={0.01} />
               <FormField label="Discounts Given" name="discounts" type="number" prefix="GHS" step={0.01} />
               <FormField label="Net Revenue" name="netRevenue" type="number" prefix="GHS" step={0.01} />
               <FormField label="Number of Transactions" name="transactions" type="number" required />
@@ -245,6 +248,7 @@ export default function FinanceFormsPage() {
                 { label: 'Woodpeckers', value: 'woodpeckers' },
               ]} />
               <FormField label="Amount" name="amount" type="number" prefix="GHS" required step={0.01} />
+              <FormField label="Budget" name="budget" type="number" prefix="GHS" step={0.01} />
               <FormField label="Vendor / Payee" name="vendor" placeholder="Vendor name" />
               <FormField label="Invoice Number" name="invoice" placeholder="INV-XXXX" />
               <FormField label="Payment Method" name="paymentMethod" type="select" options={[
