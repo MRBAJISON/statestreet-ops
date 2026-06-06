@@ -4,13 +4,13 @@ import { cookies } from 'next/headers';
 
 export async function POST(req: NextRequest) {
   const { email, password } = await req.json();
-  const user = authenticate(email, password);
+  const user = await authenticate(email, password);
 
   if (!user) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
   }
 
-  const token = createSessionToken(user.id);
+  const token = await createSessionToken(user);
   const cookieStore = await cookies();
   cookieStore.set('session', token, {
     httpOnly: true,

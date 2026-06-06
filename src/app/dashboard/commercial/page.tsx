@@ -6,7 +6,11 @@ import Section from '@/components/ui/Section';
 import EmptyState from '@/components/ui/EmptyState';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
-import { useMetrics } from '@/lib/api';
+import { useState } from 'react';
+import PeriodTabs from '@/components/ui/PeriodTabs';
+import { useMetrics, type Period } from '@/lib/api';
+import { TARGETS, ragStatus } from '@/lib/targets';
+import { STORES } from '@/lib/config';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -43,10 +47,14 @@ interface CommercialLive {
   deadStock: SkuRow[];
   newArrivals: { date: string; brand: string; category: string; qty: number; stockValue: number; store: string; supplier: string }[];
   deploymentByStore: { name: string; value: number }[];
+  accountability: { member: string; role: string; kpi: string; target: string; actual: string; status: string }[];
 }
 
 export default function CommercialPage() {
-  const { data: m } = useMetrics<CommercialLive>('commercial');
+  const [period, setPeriod] = useState<Period>('mtd');
+  const [anchor, setAnchor] = useState('');
+  const [store, setStore] = useState('');
+  const { data: m } = useMetrics<CommercialLive>('commercial', period, anchor, store);
   const categorySales = m?.categorySales ?? [];
   const sellThroughCat = m?.sellThroughByCategory ?? [];
   const salesByStore = m?.salesByStore ?? [];
@@ -55,6 +63,7 @@ export default function CommercialPage() {
   const deadStock = m?.deadStock ?? [];
   const newArrivals = m?.newArrivals ?? [];
   const deploymentByStore = m?.deploymentByStore ?? [];
+  const accountability = m?.accountability ?? [];
 
   const skuTable = (title: string, rows: SkuRow[], hint: string) => (
     <div>
@@ -97,9 +106,18 @@ export default function CommercialPage() {
         missionDetail="Drive profitable sell-through across every store and category."
       />
 
-      <div className="px-6 py-4">
+      <div className="px-6 pt-4 flex justify-end">
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={STORES} onStoreChange={setStore} />
+      </div>
+      <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-          <KPICard label="Group Sales" value={dash(m?.groupSales ?? 0, fmtGHS)} status="green" small />
+          <KPICard
+            label="Group Sales"
+            value={dash(m?.groupSales ?? 0, fmtGHS)}
+            target={TARGETS.commercial.groupSales ? fmtGHS(TARGETS.commercial.groupSales) : undefined}
+            status={ragStatus(m?.groupSales ?? 0, TARGETS.commercial.groupSales) ?? 'green'}
+            small
+          />
           <KPICard label="ATV" value={dash(m?.atv ?? 0, fmtGHS)} small />
           <KPICard label="UPT" value={(m?.upt ?? 0) ? String(m?.upt) : '—'} small />
           <KPICard label="Conversion Rate" value={pct(m?.convRate ?? 0)} small />
@@ -211,7 +229,40 @@ export default function CommercialPage() {
           </div>
         </Section>
 
-        <Section number={5} title="Recent Entries">
+        <Section number={5} title="Accountability">
+          {accountability.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                    <th className="text-left py-2 pr-3 font-medium">Member</th>
+                    <th className="text-left py-2 px-3 font-medium">Role</th>
+                    <th className="text-left py-2 px-3 font-medium">KPI</th>
+                    <th className="text-left py-2 px-3 font-medium">Target</th>
+                    <th className="text-left py-2 px-3 font-medium">Actual</th>
+                    <th className="text-left py-2 pl-3 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {accountability.map((a, i) => (
+                    <tr key={i} className="border-b border-[#1a1a1a]">
+                      <td className="py-2 pr-3">{a.member}</td>
+                      <td className="py-2 px-3 capitalize">{a.role || '—'}</td>
+                      <td className="py-2 px-3">{a.kpi}</td>
+                      <td className="py-2 px-3">{a.target || '—'}</td>
+                      <td className="py-2 px-3">{a.actual || '—'}</td>
+                      <td className="py-2 pl-3 capitalize">{a.status || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState message="No accountability entries yet" hint="Submit Accountability Update in the Commercial form." height={120} />
+          )}
+        </Section>
+
+        <Section number={6} title="Recent Entries">
           <RecentEntries department="commercial" />
         </Section>
       </div>

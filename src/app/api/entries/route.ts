@@ -3,20 +3,36 @@ import { db } from '@/lib/db';
 import { entries } from '@/lib/db/schema';
 import { and, desc, eq } from 'drizzle-orm';
 
+const DEPARTMENTS = ['finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'];
+
 // Persist a form submission. Body: { department, formType, payload }
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { department, formType, payload } = body ?? {};
-    if (!department || !formType || typeof payload !== 'object' || payload === null) {
-      return NextResponse.json(
-        { error: 'department, formType, and payload are required' },
-        { status: 400 }
-      );
+
+    if (!DEPARTMENTS.includes(String(department))) {
+      return NextResponse.json({ error: `Unknown department "${department}"` }, { status: 400 });
     }
+    if (!formType || typeof formType !== 'string') {
+      return NextResponse.json({ error: 'formType is required' }, { status: 400 });
+    }
+    if (typeof payload !== 'object' || payload === null) {
+      return NextResponse.json({ error: 'payload object is required' }, { status: 400 });
+    }
+
+    // Drop empty fields and require at least one meaningful value.
+    const cleaned: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(payload as Record<string, unknown>)) {
+      if (v !== '' && v !== null && v !== undefined) cleaned[k] = typeof v === 'string' ? v.trim() : v;
+    }
+    if (Object.keys(cleaned).length === 0) {
+      return NextResponse.json({ error: 'Cannot save an empty entry' }, { status: 400 });
+    }
+
     const [row] = await db
       .insert(entries)
-      .values({ department, formType, payload })
+      .values({ department, formType, payload: cleaned })
       .returning();
     return NextResponse.json({ ok: true, entry: row });
   } catch (e) {

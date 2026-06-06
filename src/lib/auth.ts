@@ -1,15 +1,10 @@
 import { cookies } from 'next/headers';
-import type { User, UserRole, Department } from './types';
-
-const USERS: User[] = [
-  { id: '1', name: 'CEO / Owner', email: 'owner@statestreet.com', password: 'owner123', role: 'owner', department: 'executive' },
-  { id: '2', name: 'Finance Manager', email: 'finance@statestreet.com', password: 'finance123', role: 'finance', department: 'finance' },
-  { id: '3', name: 'Commercial Director', email: 'commercial@statestreet.com', password: 'commercial123', role: 'commercial', department: 'commercial' },
-  { id: '4', name: 'Marketing Director', email: 'marketing@statestreet.com', password: 'marketing123', role: 'marketing', department: 'marketing' },
-  { id: '5', name: 'Operations Manager', email: 'operations@statestreet.com', password: 'operations123', role: 'operations', department: 'operations' },
-  { id: '6', name: 'Inventory Manager', email: 'inventory@statestreet.com', password: 'inventory123', role: 'inventory', department: 'inventory' },
-  { id: '7', name: 'Brand Manager', email: 'brand@statestreet.com', password: 'brand123', role: 'brand', department: 'brand' },
-];
+import { eq } from 'drizzle-orm';
+import type { UserRole, Department } from './types';
+import { verifySession, signSession } from './session';
+import { verifyPassword } from './password';
+import { db } from './db';
+import { users } from './db/schema';
 
 const ROLE_DEPARTMENTS: Record<UserRole, Department[]> = {
   owner: ['executive', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'],
@@ -21,33 +16,44 @@ const ROLE_DEPARTMENTS: Record<UserRole, Department[]> = {
   brand: ['brand'],
 };
 
-export function authenticate(email: string, password: string): User | null {
-  return USERS.find(u => u.email === email && u.password === password) || null;
+export interface AppUser {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  department: Department;
 }
 
-export async function getSession(): Promise<{ user: User; departments: Department[] } | null> {
+// Verify credentials against the database (hashed passwords).
+export async function authenticate(email: string, password: string): Promise<AppUser | null> {
+  const [u] = await db.select().from(users).where(eq(users.email, email.toLowerCase().trim()));
+  if (!u) return null;
+  if (!(await verifyPassword(password, u.passwordHash))) return null;
+  return { id: String(u.id), name: u.name, email: u.email, role: u.role as UserRole, department: u.department as Department };
+}
+
+// Read the signed session cookie (no DB hit — identity is in the signed token).
+export async function getSession(): Promise<{ user: AppUser; departments: Department[] } | null> {
   const cookieStore = await cookies();
   const session = cookieStore.get('session');
   if (!session) return null;
-
-  try {
-    const data = JSON.parse(Buffer.from(session.value, 'base64').toString());
-    const user = USERS.find(u => u.id === data.userId);
-    if (!user) return null;
-    return { user, departments: ROLE_DEPARTMENTS[user.role] };
-  } catch {
-    return null;
-  }
+  const data = await verifySession(session.value);
+  if (!data) return null;
+  const role = data.role as UserRole;
+  return {
+    user: { id: data.userId, name: data.name, email: '', role, department: data.department as Department },
+    departments: ROLE_DEPARTMENTS[role] ?? [],
+  };
 }
 
-export function createSessionToken(userId: string): string {
-  return Buffer.from(JSON.stringify({ userId, ts: Date.now() })).toString('base64');
+export async function createSessionToken(user: AppUser): Promise<string> {
+  return signSession(user);
 }
 
 export function getDepartmentsForRole(role: UserRole): Department[] {
-  return ROLE_DEPARTMENTS[role];
+  return ROLE_DEPARTMENTS[role] ?? [];
 }
 
 export function canAccessDepartment(role: UserRole, dept: Department): boolean {
-  return ROLE_DEPARTMENTS[role].includes(dept);
+  return (ROLE_DEPARTMENTS[role] ?? []).includes(dept);
 }

@@ -9,7 +9,9 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { SimpleBarChart, SimpleDonutChart, SimpleLineChart } from '@/components/charts/Charts';
-import { useMetrics } from '@/lib/api';
+import { useState } from 'react';
+import PeriodTabs from '@/components/ui/PeriodTabs';
+import { useMetrics, type Period } from '@/lib/api';
 
 interface BrandLive {
   sentiment: { positive: number; neutral: number; negative: number };
@@ -19,6 +21,7 @@ interface BrandLive {
   sentimentTrend: { name: string; value: number }[];
   portfolio: { brand: string; score: number; status: string; trend: string }[];
   healthIndex: number;
+  equity: { name: string; value: number }[];
   digitalReputation: { googleRating: number; googleReviews: number; trustpilot: number; responseRate: number; nps: number };
   social: { followers: number; sentiment: number; newReviews: number; negReviews: number };
   risks: { text: string; tag: string }[];
@@ -27,12 +30,15 @@ interface BrandLive {
 }
 
 export default function BrandHealthPage() {
-  const { data: m } = useMetrics<BrandLive>('brand');
+  const [period, setPeriod] = useState<Period>('mtd');
+  const [anchor, setAnchor] = useState('');
+  const { data: m } = useMetrics<BrandLive>('brand', period, anchor);
   const sentiment = m?.sentiment ?? { positive: 0, neutral: 0, negative: 0 };
   const portfolio = m?.portfolio ?? [];
   const sentimentTrend = m?.sentimentTrend ?? [];
   const soc = m?.shareOfConversation ?? [];
   const healthIndex = m?.healthIndex ?? 0;
+  const equity = (m?.equity ?? []).filter((e) => e.value > 0);
   const hasSentiment = !!(sentiment.positive || sentiment.neutral || sentiment.negative);
   const dr = m?.digitalReputation ?? { googleRating: 0, googleReviews: 0, trustpilot: 0, responseRate: 0, nps: 0 };
   const social = m?.social ?? { followers: 0, sentiment: 0, newReviews: 0, negReviews: 0 };
@@ -50,7 +56,10 @@ export default function BrandHealthPage() {
         missionDetail="Stronger brands, deeper connections, sustainable growth."
       />
 
-      <div className="px-6 py-4">
+      <div className="px-6 pt-4 flex justify-end">
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} />
+      </div>
+      <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KPICard label="Brand Health Index" value={healthIndex ? String(healthIndex) : '—'} status="green" small />
           <KPICard label="NPS" value={(m?.nps ?? 0) ? String(m?.nps) : '—'} small />
@@ -95,7 +104,15 @@ export default function BrandHealthPage() {
           </div>
         </Section>
 
-        <Section number={2} title="Sentiment">
+        <Section number={2} title="Brand Equity Dimensions">
+          {equity.length ? (
+            <SimpleBarChart data={equity} height={200} color="#c8a951" />
+          ) : (
+            <EmptyState message="No brand equity data yet" hint="Submit Brand Health Score (awareness, consideration, etc.) in the Brand form." height={160} />
+          )}
+        </Section>
+
+        <Section number={3} title="Sentiment">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div>
               <div className="text-xs text-gray-400 mb-2">Sentiment Split</div>
@@ -126,7 +143,7 @@ export default function BrandHealthPage() {
           </div>
         </Section>
 
-        <Section number={3} title="Share of Conversation">
+        <Section number={4} title="Share of Conversation">
           {soc.length ? (
             <SimpleBarChart data={soc} height={200} color="#c8a951" horizontal />
           ) : (
@@ -134,7 +151,7 @@ export default function BrandHealthPage() {
           )}
         </Section>
 
-        <Section number={4} title="Digital Reputation & Social">
+        <Section number={5} title="Digital Reputation & Social">
           {hasDigital ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
@@ -168,7 +185,7 @@ export default function BrandHealthPage() {
           )}
         </Section>
 
-        <Section number={5} title="Risks & Opportunities">
+        <Section number={6} title="Risks & Opportunities">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <div className="text-xs text-gray-400 mb-2">Risks</div>
@@ -205,7 +222,7 @@ export default function BrandHealthPage() {
           </div>
         </Section>
 
-        <Section number={6} title="CEO Attention Index">
+        <Section number={7} title="CEO Attention Index">
           {ceoAttention.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -236,7 +253,7 @@ export default function BrandHealthPage() {
           )}
         </Section>
 
-        <Section number={7} title="Recent Entries">
+        <Section number={8} title="Recent Entries">
           <RecentEntries department="brand" />
         </Section>
       </div>

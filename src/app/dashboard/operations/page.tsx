@@ -6,7 +6,10 @@ import Section from '@/components/ui/Section';
 import EmptyState from '@/components/ui/EmptyState';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
-import { useMetrics } from '@/lib/api';
+import { useState } from 'react';
+import PeriodTabs from '@/components/ui/PeriodTabs';
+import { useMetrics, type Period } from '@/lib/api';
+import { STORES } from '@/lib/config';
 
 const pct = (n: number) => (n ? `${n}%` : '—');
 const score = (v: number): 'green' | 'yellow' | 'red' => (v >= 90 ? 'green' : v >= 70 ? 'yellow' : 'red');
@@ -24,12 +27,17 @@ interface OperationsLive {
   storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[];
   risk: { high: number; medium: number; low: number };
   incidentsByType: { security: number; safety: number; operational: number };
+  vmBreakdown: { name: string; value: number }[];
   topRisks: { description: string; severity: string; store: string; status: string }[];
   priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[];
+  cxFeedback: { avgRating: number; avgNps: number; recommendRate: number; count: number };
 }
 
 export default function OperationsPage() {
-  const { data: m } = useMetrics<OperationsLive>('operations');
+  const [period, setPeriod] = useState<Period>('mtd');
+  const [anchor, setAnchor] = useState('');
+  const [store, setStore] = useState('');
+  const { data: m } = useMetrics<OperationsLive>('operations', period, anchor, store);
   const vmByStore = m?.vmByStore ?? [];
   const storeScores = m?.storeScores ?? [];
   const risk = m?.risk ?? { high: 0, medium: 0, low: 0 };
@@ -37,6 +45,8 @@ export default function OperationsPage() {
   const byType = m?.incidentsByType ?? { security: 0, safety: 0, operational: 0 };
   const topRisks = m?.topRisks ?? [];
   const priorityActions = m?.priorityActions ?? [];
+  const vmBreakdown = (m?.vmBreakdown ?? []).filter((v) => v.value > 0);
+  const cx = m?.cxFeedback ?? { avgRating: 0, avgNps: 0, recommendRate: 0, count: 0 };
 
   return (
     <div className="bg-[#0a0a0a] min-h-screen text-white">
@@ -47,7 +57,10 @@ export default function OperationsPage() {
         missionDetail="Consistent, compliant, customer-ready stores every day."
       />
 
-      <div className="px-6 py-4">
+      <div className="px-6 pt-4 flex justify-end">
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={STORES} onStoreChange={setStore} />
+      </div>
+      <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           <KPICard label="Store Ops Score" value={pct(m?.opsScore ?? 0)} status={score(m?.opsScore ?? 0)} small />
           <KPICard label="VM Compliance" value={pct(m?.vmScore ?? 0)} status={score(m?.vmScore ?? 0)} small />
@@ -185,7 +198,41 @@ export default function OperationsPage() {
           )}
         </Section>
 
-        <Section number={5} title="Recent Entries">
+        <Section number={5} title="Customer Experience & VM Detail">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Customer Experience</div>
+              {cx.count ? (
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                    <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Avg Rating</div>
+                    <div className="text-lg font-bold">{cx.avgRating || '—'}</div>
+                  </div>
+                  <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                    <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">NPS</div>
+                    <div className="text-lg font-bold">{cx.avgNps || '—'}</div>
+                  </div>
+                  <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                    <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Recommend</div>
+                    <div className="text-lg font-bold">{cx.recommendRate ? `${cx.recommendRate}%` : '—'}</div>
+                  </div>
+                </div>
+              ) : (
+                <EmptyState message="No CX feedback yet" hint="Submit Customer Experience in the Operations form." height={120} />
+              )}
+            </div>
+            <div>
+              <div className="text-xs text-gray-400 mb-2">VM Compliance Breakdown</div>
+              {vmBreakdown.length ? (
+                <SimpleBarChart data={vmBreakdown} height={160} color="#c8a951" horizontal />
+              ) : (
+                <EmptyState message="No VM checklist data yet" hint="Submit VM Compliance (sub-scores) in the Operations form." height={160} />
+              )}
+            </div>
+          </div>
+        </Section>
+
+        <Section number={6} title="Recent Entries">
           <RecentEntries department="operations" />
         </Section>
       </div>

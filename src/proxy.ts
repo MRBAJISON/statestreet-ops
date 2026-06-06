@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifySession } from './lib/session';
 
 // Role -> departments map (mirrors src/lib/auth.ts; kept inline so proxy stays edge-safe).
 const ROLE_DEPARTMENTS: Record<string, string[]> = {
@@ -9,12 +10,6 @@ const ROLE_DEPARTMENTS: Record<string, string[]> = {
   operations: ['operations'],
   inventory: ['inventory'],
   brand: ['brand'],
-};
-
-// userId -> role (mirrors the demo users in src/lib/auth.ts).
-const USER_ROLES: Record<string, string> = {
-  '1': 'owner', '2': 'finance', '3': 'commercial', '4': 'marketing',
-  '5': 'operations', '6': 'inventory', '7': 'brand',
 };
 
 // URL segment -> department key.
@@ -28,15 +23,12 @@ const SEGMENT_TO_DEPT: Record<string, string> = {
   'brand-health': 'brand',
 };
 
-function getRoleFromSession(req: NextRequest): string | null {
+async function getRoleFromSession(req: NextRequest): Promise<string | null> {
   const session = req.cookies.get('session');
   if (!session) return null;
-  try {
-    const data = JSON.parse(Buffer.from(session.value, 'base64').toString());
-    return USER_ROLES[data.userId] ?? null;
-  } catch {
-    return null;
-  }
+  const data = await verifySession(session.value); // rejects forged/edited cookies
+  if (!data) return null;
+  return data.role ?? null; // role is embedded in the signed token
 }
 
 function homeFor(role: string, allowed: string[]): string {
@@ -44,13 +36,18 @@ function homeFor(role: string, allowed: string[]): string {
   return allowed[0] === 'brand' ? 'brand-health' : allowed[0];
 }
 
-export function proxy(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const role = getRoleFromSession(req);
+  const role = await getRoleFromSession(req);
 
   // Not signed in -> bounce to login for any protected route.
   if (!role) {
     return NextResponse.redirect(new URL('/login', req.url));
+  }
+
+  // The CEO/owner consumes dashboards only — no data-entry forms.
+  if (role === 'owner' && pathname.startsWith('/forms')) {
+    return NextResponse.redirect(new URL('/dashboard/executive', req.url));
   }
 
   const allowed = ROLE_DEPARTMENTS[role] ?? [];

@@ -31,6 +31,20 @@ export async function postEntry(
   return json;
 }
 
+export async function deleteEntry(id: number) {
+  const res = await fetch(`/api/entries/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed to delete');
+}
+
+export async function updateEntry(id: number, payload: Record<string, unknown>) {
+  const res = await fetch(`/api/entries/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ payload }),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed to update');
+}
+
 export async function postEntries(
   department: string,
   formType: string,
@@ -72,8 +86,15 @@ export function useEntries(department: string, limit = 8) {
   return { entries, loading, refresh };
 }
 
-// Live metrics hook: fetches a department's aggregated metrics and exposes a refresh().
-export function useMetrics<T = Record<string, unknown>>(department: string) {
+export type Period = 'day' | 'week' | 'mtd' | 'ytd' | 'all';
+
+// Live metrics hook: fetches a department's aggregated metrics for a period (+ optional anchor date).
+export function useMetrics<T = Record<string, unknown>>(
+  department: string,
+  period: Period = 'mtd',
+  date = '',
+  store = ''
+) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,7 +102,8 @@ export function useMetrics<T = Record<string, unknown>>(department: string) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/metrics/${department}`, { cache: 'no-store' });
+      const q = `period=${period}${date ? `&date=${date}` : ''}${store ? `&store=${encodeURIComponent(store)}` : ''}`;
+      const res = await fetch(`/api/metrics/${department}?${q}`, { cache: 'no-store' });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to load');
       setData(json);
@@ -91,7 +113,7 @@ export function useMetrics<T = Record<string, unknown>>(department: string) {
     } finally {
       setLoading(false);
     }
-  }, [department]);
+  }, [department, period, date, store]);
 
   useEffect(() => {
     refresh();

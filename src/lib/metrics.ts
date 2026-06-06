@@ -9,6 +9,60 @@ type P = Record<string, unknown>;
 const payloads = (rows: Entry[], type: string): P[] =>
   rows.filter((r) => r.formType === type).map((r) => r.payload as P);
 
+export type Period = 'day' | 'week' | 'mtd' | 'ytd' | 'all';
+
+// Best-effort date for an entry: a date field in the payload, else its createdAt.
+function entryDate(r: Entry): Date {
+  const p = r.payload as P;
+  const cand = p.date ?? p.datetime ?? p.weekEnd ?? p.dueDate ?? p.deadline;
+  const d = cand ? new Date(String(cand)) : new Date(r.createdAt as unknown as string);
+  return isNaN(d.getTime()) ? new Date(r.createdAt as unknown as string) : d;
+}
+
+const sameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+// Monday-start week containing `d`.
+function startOfWeek(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+
+// Filter entries to a reporting period, anchored at `anchorISO` (defaults to today).
+//  day  -> that calendar day   week -> the Mon–Sun week of the anchor
+//  mtd  -> the anchor's month   ytd -> the anchor's year   all -> everything
+export function filterByPeriod(rows: Entry[], period: Period, anchorISO?: string): Entry[] {
+  if (period === 'all') return rows;
+  const anchor = anchorISO ? new Date(anchorISO) : new Date();
+  if (isNaN(anchor.getTime())) return rows;
+  if (period === 'day') return rows.filter((r) => sameDay(entryDate(r), anchor));
+  if (period === 'week') {
+    const s = startOfWeek(anchor);
+    const e = new Date(s);
+    e.setDate(s.getDate() + 7);
+    return rows.filter((r) => {
+      const d = entryDate(r);
+      return d >= s && d < e;
+    });
+  }
+  if (period === 'ytd') return rows.filter((r) => entryDate(r).getFullYear() === anchor.getFullYear());
+  return rows.filter((r) => {
+    const d = entryDate(r);
+    return d.getFullYear() === anchor.getFullYear() && d.getMonth() === anchor.getMonth();
+  });
+}
+
+// Filter entries to a single store ('' or 'all' = every store).
+export function filterByStore(rows: Entry[], store: string): Entry[] {
+  if (!store || store === 'all') return rows;
+  return rows.filter((r) => {
+    const p = r.payload as P;
+    return String(p.store ?? p.fromStore ?? p.toStore ?? '') === store;
+  });
+}
+
 // Sum `valKey` grouped by `key` -> [{name, value}]
 function groupSum(items: P[], key: string, valKey: string) {
   const m = new Map<string, number>();
@@ -135,6 +189,18 @@ function financeMetrics(rows: Entry[]) {
     footfall,
     itemsSold,
     expensesByCategory,
+    revenueByStore: groupSum(payloads(rows, 'revenue'), 'store', 'grossRevenue').map((x) => ({
+      name: labelFor(STORE_LABELS, x.name),
+      value: x.value,
+    })),
+    expensesByStore: groupSum(exp, 'store', 'amount')
+      .filter((x) => x.name !== '—')
+      .map((x) => ({ name: labelFor(STORE_LABELS, x.name), value: x.value })),
+    debtorAging: groupSum(
+      deb.filter((p) => String(p.type) === 'debtor'),
+      'status',
+      'amount'
+    ).map((x) => ({ name: x.name === '—' ? 'Unspecified' : x.name, value: x.value })),
     expensesTotal,
     expenseBudgetTotal,
     operatingExpenses,
@@ -172,6 +238,7 @@ function commercialMetrics(rows: Entry[]) {
   const sku = payloads(rows, 'sku-entry');
 
   const na = payloads(rows, 'new-arrivals');
+  const acc = payloads(rows, 'accountability');
 
   const groupSales = ss.reduce((s, p) => s + num(p.totalSales), 0);
   const tx = ss.reduce((s, p) => s + num(p.transactions), 0);
@@ -240,6 +307,14 @@ function commercialMetrics(rows: Entry[]) {
     deadStock,
     newArrivals,
     deploymentByStore,
+    accountability: acc.map((p) => ({
+      member: String(p.member || ''),
+      role: String(p.role || ''),
+      kpi: String(p.kpi || ''),
+      target: String(p.target || ''),
+      actual: String(p.actual || ''),
+      status: String(p.status || ''),
+    })),
     entryCount: rows.length,
   };
 }
@@ -251,6 +326,7 @@ function operationsMetrics(rows: Entry[]) {
   const maint = payloads(rows, 'maintenance');
   const inc = payloads(rows, 'incident');
   const sop = payloads(rows, 'sop-check');
+  const cx = payloads(rows, 'cx-feedback');
 
   const closed = (s: unknown) => /resolv|close|complete|done/i.test(String(s));
   const maintDone = maint.filter((p) => closed(p.status)).length;
@@ -275,6 +351,16 @@ function operationsMetrics(rows: Entry[]) {
     readiness: round1(avg(v.readiness)),
     cx: round1(avg(v.cx)),
   }));
+
+  // VM compliance breakdown (vm-check sub-scores)
+  const vmDim = (k: string) => round1(avg(vm.map((p) => num(p[k])).filter((n) => n > 0)));
+  const vmBreakdown = [
+    { name: 'Window Display', value: vmDim('windowDisplay') },
+    { name: 'Mannequin', value: vmDim('mannequin') },
+    { name: 'Presentation', value: vmDim('productPresentation') },
+    { name: 'Signage', value: vmDim('signage') },
+    { name: 'Cleanliness', value: vmDim('cleanliness') },
+  ];
 
   // Incidents by type
   const typeCount = (t: string) => inc.filter((p) => String(p.type).toLowerCase().includes(t)).length;
@@ -323,8 +409,17 @@ function operationsMetrics(rows: Entry[]) {
     storeScores,
     risk: { high: sev('high'), medium: sev('med'), low: sev('low') },
     incidentsByType,
+    vmBreakdown,
     topRisks,
     priorityActions,
+    cxFeedback: {
+      avgRating: round1(avg(cx.map((p) => num(p.rating)).filter((n) => n > 0))),
+      avgNps: Math.round(avg(cx.map((p) => num(p.nps)).filter((n) => n !== 0))),
+      recommendRate: cx.length
+        ? round1((cx.filter((p) => /yes|recommend|likely/i.test(String(p.recommend))).length / cx.length) * 100)
+        : 0,
+      count: cx.length,
+    },
     entryCount: rows.length,
   };
 }
@@ -402,6 +497,17 @@ function inventoryMetrics(rows: Entry[]) {
     accuracyDistribution,
     valueTrend,
     movement,
+    supplierPerformance: groupSum(gr, 'supplier', 'totalValue').filter((x) => x.name && x.name !== '—'),
+    replenishments: rep
+      .map((p) => ({
+        sku: String(p.sku || ''),
+        description: String(p.description || ''),
+        currentStock: num(p.currentStock),
+        reorderQty: num(p.reorderQty),
+        urgency: String(p.urgency || ''),
+        store: labelFor(STORE_LABELS, p.store),
+      }))
+      .slice(0, 10),
     entryCount: rows.length,
   };
 }
@@ -449,6 +555,17 @@ function brandMetrics(rows: Entry[]) {
     return { brand, score: s, status: s >= 80 ? 'STRONG' : s >= 70 ? 'STABLE' : 'AT RISK', trend: 'stable' };
   });
   const healthIndex = portfolio.length ? Math.round(avg(portfolio.map((p) => p.score))) : 0;
+
+  // Brand equity dimensions (brand-score form)
+  const dim = (k: string) => round1(avg(score.map((p) => num(p[k])).filter((n) => n > 0)));
+  const equity = [
+    { name: 'Awareness', value: dim('awareness') },
+    { name: 'Consideration', value: dim('consideration') },
+    { name: 'Preference', value: dim('preference') },
+    { name: 'Satisfaction', value: dim('satisfaction') },
+    { name: 'Loyalty', value: dim('loyalty') },
+    { name: 'Advocacy', value: dim('advocacy') },
+  ];
 
   // Digital reputation (digital form)
   const last = dig[dig.length - 1] ?? {};
@@ -504,6 +621,7 @@ function brandMetrics(rows: Entry[]) {
     sentimentTrend,
     portfolio,
     healthIndex,
+    equity,
     digitalReputation,
     social,
     risks,
@@ -534,6 +652,23 @@ function marketingMetrics(rows: Entry[]) {
     platMap.set(k, e);
   }
   const socialByChannel = [...platMap].map(([platform, v]) => ({ platform, ...v }));
+  const webVisits = social.reduce((s, p) => s + num(p.webVisits), 0);
+
+  // Campaign ROI by brand
+  const brandCampMap = new Map<string, { revenue: number; spend: number }>();
+  for (const p of camp) {
+    const b = labelFor(BRAND_LABELS, p.brand);
+    const e = brandCampMap.get(b) ?? { revenue: 0, spend: 0 };
+    e.revenue += num(p.revenue);
+    e.spend += num(p.spend);
+    brandCampMap.set(b, e);
+  }
+  const campaignByBrand = [...brandCampMap].map(([brand, v]) => ({
+    brand,
+    revenue: v.revenue,
+    spend: v.spend,
+    roas: v.spend ? round1(v.revenue / v.spend) : 0,
+  }));
 
   // Per-campaign performance
   const campaigns = camp
@@ -599,6 +734,8 @@ function marketingMetrics(rows: Entry[]) {
       revenueInfluenced: campaignRevenue,
     },
     socialByChannel,
+    webVisits,
+    campaignByBrand,
     campaigns,
     clienteling,
     customerIntel,

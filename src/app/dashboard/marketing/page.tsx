@@ -6,7 +6,9 @@ import Section from '@/components/ui/Section';
 import EmptyState from '@/components/ui/EmptyState';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { SimpleBarChart } from '@/components/charts/Charts';
-import { useMetrics } from '@/lib/api';
+import { useState } from 'react';
+import PeriodTabs from '@/components/ui/PeriodTabs';
+import { useMetrics, type Period } from '@/lib/api';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -27,6 +29,8 @@ interface MarketingLive {
   roas: number;
   funnel: { reach: number; engagement: number; leads: number; storeVisits: number; revenueInfluenced: number };
   socialByChannel: { platform: string; followers: number; reach: number; impressions: number; engagement: number; clicks: number }[];
+  webVisits: number;
+  campaignByBrand: { brand: string; revenue: number; spend: number; roas: number }[];
   campaigns: { name: string; platform: string; reach: number; engagement: number; leads: number; revenue: number; spend: number; roas: number; status: string }[];
   clienteling: { contacted: number; responses: number; appointments: number; estRevenue: number; responseRate: number };
   customerIntel: { type: string; detail: string; frequency: string; store: string }[];
@@ -34,10 +38,14 @@ interface MarketingLive {
 }
 
 export default function MarketingPage() {
-  const { data: m } = useMetrics<MarketingLive>('marketing');
+  const [period, setPeriod] = useState<Period>('mtd');
+  const [anchor, setAnchor] = useState('');
+  const { data: m } = useMetrics<MarketingLive>('marketing', period, anchor);
   const leadChannelMix = m?.leadChannelMix ?? [];
   const funnel = m?.funnel ?? { reach: 0, engagement: 0, leads: 0, storeVisits: 0, revenueInfluenced: 0 };
   const socialByChannel = m?.socialByChannel ?? [];
+  const campaignByBrand = m?.campaignByBrand ?? [];
+  const webVisits = m?.webVisits ?? 0;
   const campaigns = m?.campaigns ?? [];
   const cl = m?.clienteling ?? { contacted: 0, responses: 0, appointments: 0, estRevenue: 0, responseRate: 0 };
   const customerIntel = m?.customerIntel ?? [];
@@ -62,7 +70,10 @@ export default function MarketingPage() {
         missionDetail="Generate qualified demand and grow brand equity efficiently."
       />
 
-      <div className="px-6 py-4">
+      <div className="px-6 pt-4 flex justify-end">
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} />
+      </div>
+      <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <KPICard label="Total Leads" value={numOrDash(m?.totalLeads ?? 0)} status="green" small />
           <KPICard label="Converted" value={numOrDash(m?.converted ?? 0)} small />
@@ -137,6 +148,20 @@ export default function MarketingPage() {
           ) : (
             <EmptyState message="No campaigns yet" hint="Each campaign you submit appears here with its own performance." height={140} />
           )}
+          {campaignByBrand.length > 0 && (
+            <div className="mt-4">
+              <div className="text-xs text-gray-400 mb-2">Campaign ROI by Brand</div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                {campaignByBrand.map((b) => (
+                  <div key={b.brand} className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                    <div className="text-[0.65rem] text-gray-500 truncate">{b.brand}</div>
+                    <div className="text-base font-bold text-[#c8a951]">{b.roas ? `${b.roas}x` : '—'}</div>
+                    <div className="text-[0.6rem] text-gray-600">{fmtGHS(b.revenue)} rev</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </Section>
 
         <Section number={3} title="Social Media by Channel">
@@ -169,6 +194,11 @@ export default function MarketingPage() {
             </div>
           ) : (
             <EmptyState message="No social metrics yet" hint="Submit Social Media Metrics (per platform) in the Marketing form." height={120} />
+          )}
+          {webVisits > 0 && (
+            <div className="mt-3 text-xs text-gray-400">
+              Website visits from social: <span className="text-[#c8a951] font-bold">{webVisits.toLocaleString()}</span>
+            </div>
           )}
         </Section>
 

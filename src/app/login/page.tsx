@@ -3,16 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-const DEMO_ACCOUNTS = [
-  { label: 'Owner / CEO', email: 'owner@statestreet.com', password: 'owner123' },
-  { label: 'Finance Manager', email: 'finance@statestreet.com', password: 'finance123' },
-  { label: 'Commercial Director', email: 'commercial@statestreet.com', password: 'commercial123' },
-  { label: 'Marketing Director', email: 'marketing@statestreet.com', password: 'marketing123' },
-  { label: 'Operations Manager', email: 'operations@statestreet.com', password: 'operations123' },
-  { label: 'Inventory Manager', email: 'inventory@statestreet.com', password: 'inventory123' },
-  { label: 'Brand Manager', email: 'brand@statestreet.com', password: 'brand123' },
-];
-
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -36,17 +26,13 @@ export default function LoginPage() {
       if (data.user.role === 'owner') {
         router.push('/dashboard/executive');
       } else {
-        router.push(`/dashboard/${data.user.department}`);
+        const seg = data.user.department === 'brand' ? 'brand-health' : data.user.department;
+        router.push(`/dashboard/${seg}`);
       }
     } else {
       setError('Invalid email or password');
     }
     setLoading(false);
-  }
-
-  function quickLogin(acc: typeof DEMO_ACCOUNTS[0]) {
-    setEmail(acc.email);
-    setPassword(acc.password);
   }
 
   return (
@@ -91,17 +77,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6">
-          <p className="text-xs text-gray-500 text-center mb-3">Quick Login (Demo)</p>
-          <div className="grid grid-cols-2 gap-2">
-            {DEMO_ACCOUNTS.map(acc => (
-              <button key={acc.email} onClick={() => quickLogin(acc)}
-                className="bg-[#111] border border-[#2a2a2a] hover:border-[#c8a951]/50 text-xs text-gray-400 hover:text-[#c8a951] py-2 px-3 rounded-lg transition-colors text-left">
-                {acc.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <p className="text-[0.65rem] text-gray-600 text-center mt-4">Authorized personnel only.</p>
       </div>
     </div>
   );
