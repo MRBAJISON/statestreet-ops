@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import type { User, UserRole, Department } from './types';
+import { verifySession, signSession } from './session';
 
 const USERS: User[] = [
   { id: '1', name: 'CEO / Owner', email: 'owner@statestreet.com', password: 'owner123', role: 'owner', department: 'executive' },
@@ -30,18 +31,15 @@ export async function getSession(): Promise<{ user: User; departments: Departmen
   const session = cookieStore.get('session');
   if (!session) return null;
 
-  try {
-    const data = JSON.parse(Buffer.from(session.value, 'base64').toString());
-    const user = USERS.find(u => u.id === data.userId);
-    if (!user) return null;
-    return { user, departments: ROLE_DEPARTMENTS[user.role] };
-  } catch {
-    return null;
-  }
+  const data = await verifySession(session.value);
+  if (!data) return null;
+  const user = USERS.find((u) => u.id === data.userId);
+  if (!user) return null;
+  return { user, departments: ROLE_DEPARTMENTS[user.role] };
 }
 
-export function createSessionToken(userId: string): string {
-  return Buffer.from(JSON.stringify({ userId, ts: Date.now() })).toString('base64');
+export async function createSessionToken(userId: string): Promise<string> {
+  return signSession(userId);
 }
 
 export function getDepartmentsForRole(role: UserRole): Department[] {

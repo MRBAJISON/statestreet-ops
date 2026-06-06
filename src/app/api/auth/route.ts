@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
   }
 
-  const token = createSessionToken(user.id);
+  const token = await createSessionToken(user.id);
   const cookieStore = await cookies();
   cookieStore.set('session', token, {
     httpOnly: true,
