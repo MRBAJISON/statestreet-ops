@@ -31,6 +31,20 @@ export async function postEntry(
   return json;
 }
 
+export async function deleteEntry(id: number) {
+  const res = await fetch(`/api/entries/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed to delete');
+}
+
+export async function updateEntry(id: number, payload: Record<string, unknown>) {
+  const res = await fetch(`/api/entries/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ payload }),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed to update');
+}
+
 export async function postEntries(
   department: string,
   formType: string,
