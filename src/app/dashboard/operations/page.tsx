@@ -9,6 +9,7 @@ import { SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
 import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, type Period } from '@/lib/api';
+import { STORES } from '@/lib/config';
 
 const pct = (n: number) => (n ? `${n}%` : '—');
 const score = (v: number): 'green' | 'yellow' | 'red' => (v >= 90 ? 'green' : v >= 70 ? 'yellow' : 'red');
@@ -35,7 +36,8 @@ interface OperationsLive {
 export default function OperationsPage() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
-  const { data: m } = useMetrics<OperationsLive>('operations', period, anchor);
+  const [store, setStore] = useState('');
+  const { data: m } = useMetrics<OperationsLive>('operations', period, anchor, store);
   const vmByStore = m?.vmByStore ?? [];
   const storeScores = m?.storeScores ?? [];
   const risk = m?.risk ?? { high: 0, medium: 0, low: 0 };
@@ -56,7 +58,7 @@ export default function OperationsPage() {
       />
 
       <div className="px-6 pt-4 flex justify-end">
-        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} />
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={STORES} onStoreChange={setStore} />
       </div>
       <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">

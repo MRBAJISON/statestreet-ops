@@ -89,7 +89,12 @@ export function useEntries(department: string, limit = 8) {
 export type Period = 'day' | 'week' | 'mtd' | 'ytd' | 'all';
 
 // Live metrics hook: fetches a department's aggregated metrics for a period (+ optional anchor date).
-export function useMetrics<T = Record<string, unknown>>(department: string, period: Period = 'mtd', date = '') {
+export function useMetrics<T = Record<string, unknown>>(
+  department: string,
+  period: Period = 'mtd',
+  date = '',
+  store = ''
+) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -97,7 +102,7 @@ export function useMetrics<T = Record<string, unknown>>(department: string, peri
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const q = `period=${period}${date ? `&date=${date}` : ''}`;
+      const q = `period=${period}${date ? `&date=${date}` : ''}${store ? `&store=${encodeURIComponent(store)}` : ''}`;
       const res = await fetch(`/api/metrics/${department}?${q}`, { cache: 'no-store' });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to load');
@@ -108,7 +113,7 @@ export function useMetrics<T = Record<string, unknown>>(department: string, peri
     } finally {
       setLoading(false);
     }
-  }, [department, period]);
+  }, [department, period, date, store]);
 
   useEffect(() => {
     refresh();

@@ -54,6 +54,15 @@ export function filterByPeriod(rows: Entry[], period: Period, anchorISO?: string
   });
 }
 
+// Filter entries to a single store ('' or 'all' = every store).
+export function filterByStore(rows: Entry[], store: string): Entry[] {
+  if (!store || store === 'all') return rows;
+  return rows.filter((r) => {
+    const p = r.payload as P;
+    return String(p.store ?? p.fromStore ?? p.toStore ?? '') === store;
+  });
+}
+
 // Sum `valKey` grouped by `key` -> [{name, value}]
 function groupSum(items: P[], key: string, valKey: string) {
   const m = new Map<string, number>();

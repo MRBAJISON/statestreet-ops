@@ -10,6 +10,7 @@ import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, type Period } from '@/lib/api';
 import { TARGETS, ragStatus } from '@/lib/targets';
+import { STORES } from '@/lib/config';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -52,7 +53,8 @@ interface CommercialLive {
 export default function CommercialPage() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
-  const { data: m } = useMetrics<CommercialLive>('commercial', period, anchor);
+  const [store, setStore] = useState('');
+  const { data: m } = useMetrics<CommercialLive>('commercial', period, anchor, store);
   const categorySales = m?.categorySales ?? [];
   const sellThroughCat = m?.sellThroughByCategory ?? [];
   const salesByStore = m?.salesByStore ?? [];
@@ -105,7 +107,7 @@ export default function CommercialPage() {
       />
 
       <div className="px-6 pt-4 flex justify-end">
-        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} />
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={STORES} onStoreChange={setStore} />
       </div>
       <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">

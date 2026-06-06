@@ -11,6 +11,7 @@ import PeriodTabs from '@/components/ui/PeriodTabs';
 import { SimpleLineChart, SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
 import { useMetrics, type Period } from '@/lib/api';
 import { TARGETS, ragStatus } from '@/lib/targets';
+import { STORES } from '@/lib/config';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -57,7 +58,8 @@ interface FinanceMetricsData {
 export default function FinancePage() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
-  const { data: m } = useMetrics<FinanceMetricsData>('finance', period, anchor);
+  const [store, setStore] = useState('');
+  const { data: m } = useMetrics<FinanceMetricsData>('finance', period, anchor, store);
 
   const revenueMtd = m?.revenueMtd ?? 0;
   const revenueByBrand = m?.revenueByBrand ?? [];
@@ -100,7 +102,7 @@ export default function FinancePage() {
       />
 
       <div className="px-6 pt-4 flex justify-end">
-        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} />
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={STORES} onStoreChange={setStore} />
       </div>
 
       {/* KPI BAR */}

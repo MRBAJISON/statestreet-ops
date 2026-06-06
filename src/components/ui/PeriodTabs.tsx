@@ -2,44 +2,63 @@
 
 import type { Period } from '@/lib/api';
 
-const OPTIONS: { value: Period; label: string }[] = [
-  { value: 'day', label: 'Day' },
+const PERIOD_OPTIONS: { value: Period; label: string }[] = [
+  { value: 'day', label: 'Date' },
   { value: 'week', label: 'Week' },
   { value: 'mtd', label: 'Month' },
   { value: 'ytd', label: 'Year' },
-  { value: 'all', label: 'All' },
+  { value: 'all', label: 'All time' },
 ];
+
+interface StoreOption {
+  label: string;
+  value: string;
+}
 
 interface Props {
   value: Period;
   date: string;
   onChange: (p: Period) => void;
   onDateChange: (d: string) => void;
+  // Optional store filter (only shown on store-scoped dashboards).
+  store?: string;
+  stores?: StoreOption[];
+  onStoreChange?: (s: string) => void;
 }
 
-// Reporting-period selector. Day/Week reveal a date picker that anchors the range.
-export default function PeriodTabs({ value, date, onChange, onDateChange }: Props) {
+const selectClass =
+  'bg-[#0d0d0d] border border-[#2a2a2a] text-xs text-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#c8a951]';
+
+// Filter bar: period dropdown + calendar date picker + optional store dropdown.
+export default function PeriodTabs({ value, date, onChange, onDateChange, store, stores, onStoreChange }: Props) {
   return (
-    <div className="flex items-center gap-2">
-      <div className="inline-flex rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-0.5">
-        {OPTIONS.map((o) => (
-          <button
-            key={o.value}
-            onClick={() => onChange(o.value)}
-            className={`px-3 py-1 text-xs rounded-md transition-colors ${
-              value === o.value ? 'bg-[#c8a951] text-black font-semibold' : 'text-gray-400 hover:text-white'
-            }`}
-          >
+    <div className="flex items-center gap-2 flex-wrap">
+      {onStoreChange && stores && (
+        <select value={store ?? ''} onChange={(e) => onStoreChange(e.target.value)} className={selectClass} aria-label="Store">
+          <option value="">All Stores</option>
+          {stores.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      )}
+
+      <select value={value} onChange={(e) => onChange(e.target.value as Period)} className={selectClass} aria-label="Period">
+        {PERIOD_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
             {o.label}
-          </button>
+          </option>
         ))}
-      </div>
-      {(value === 'day' || value === 'week') && (
+      </select>
+
+      {value !== 'all' && (
         <input
           type="date"
           value={date}
           onChange={(e) => onDateChange(e.target.value)}
-          className="bg-[#0d0d0d] border border-[#2a2a2a] text-xs text-white rounded-lg px-2 py-1"
+          className={selectClass}
+          aria-label="Anchor date"
         />
       )}
     </div>

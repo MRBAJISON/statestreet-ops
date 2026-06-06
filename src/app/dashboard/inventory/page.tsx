@@ -9,6 +9,7 @@ import { SimpleLineChart, SimpleDonutChart, SimpleBarChart } from '@/components/
 import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, type Period } from '@/lib/api';
+import { STORES } from '@/lib/config';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -43,7 +44,8 @@ interface InventoryLive {
 export default function InventoryPage() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
-  const { data: m } = useMetrics<InventoryLive>('inventory', period, anchor);
+  const [store, setStore] = useState('');
+  const { data: m } = useMetrics<InventoryLive>('inventory', period, anchor, store);
   const byBrand = m?.byBrand ?? [];
   const valueTrend = m?.valueTrend ?? [];
   const accuracyDistribution = (m?.accuracyDistribution ?? []).filter((a) => a.value > 0);
@@ -62,7 +64,7 @@ export default function InventoryPage() {
       />
 
       <div className="px-6 pt-4 flex justify-end">
-        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} />
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={STORES} onStoreChange={setStore} />
       </div>
       <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
