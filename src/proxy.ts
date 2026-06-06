@@ -52,6 +52,11 @@ export async function proxy(req: NextRequest) {
 
   const allowed = ROLE_DEPARTMENTS[role] ?? [];
 
+  // Admin area is owner-only.
+  if (pathname.startsWith('/dashboard/admin') && role !== 'owner') {
+    return NextResponse.redirect(new URL(`/dashboard/${homeFor(role, allowed)}`, req.url));
+  }
+
   // Enforce department access on /dashboard/<segment> and /forms/<segment>.
   const match = pathname.match(/^\/(dashboard|forms)\/([^/]+)/);
   if (match) {
