@@ -1,4 +1,5 @@
 import type { Entry } from './db/schema';
+import { BRAND_LABELS, STORE_LABELS, CATEGORY_LABELS, labelFor } from './config';
 
 const num = (v: unknown) => Number(String(v ?? '').replace(/[, ]/g, '')) || 0;
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
@@ -28,14 +29,6 @@ function groupAvg(items: P[], key: string, valKey: string) {
   }
   return [...m].map(([name, vals]) => ({ name, value: round1(avg(vals)) }));
 }
-
-const BRAND_LABELS: Record<string, string> = {
-  'boulevard-men': 'Boulevard Men',
-  'boulevard-women': 'Boulevard Women',
-  dangelo: "D'Angelo",
-  woodpeckers: 'Woodpeckers',
-  'carbon-shoes': 'Carbon Shoes',
-};
 
 /* ----------------------------- FINANCE ----------------------------- */
 function financeMetrics(rows: Entry[]) {
@@ -163,8 +156,18 @@ function commercialMetrics(rows: Entry[]) {
     grossMargin: round1(avg(cp.map((p) => num(p.gm)).filter((n) => n > 0))),
     sellThrough: round1(avg(cp.map((p) => num(p.sellThrough)).filter((n) => n > 0))),
     activeSku: new Set(sku.map((p) => String(p.sku)).filter(Boolean)).size,
-    categorySales: groupSum(cp, 'category', 'sales'),
-    sellThroughByCategory: groupAvg(cp, 'category', 'sellThrough'),
+    categorySales: groupSum(cp, 'category', 'sales').map((x) => ({
+      name: labelFor(CATEGORY_LABELS, x.name),
+      value: x.value,
+    })),
+    sellThroughByCategory: groupAvg(cp, 'category', 'sellThrough').map((x) => ({
+      name: labelFor(CATEGORY_LABELS, x.name),
+      value: x.value,
+    })),
+    salesByStore: groupSum(ss, 'store', 'totalSales').map((x) => ({
+      name: labelFor(STORE_LABELS, x.name),
+      value: x.value,
+    })),
     entryCount: rows.length,
   };
 }
@@ -182,6 +185,25 @@ function operationsMetrics(rows: Entry[]) {
   const sev = (lvl: string) =>
     inc.filter((p) => String(p.severity).toLowerCase().includes(lvl)).length;
 
+  // Per-store audit scores
+  const storeMap = new Map<string, { ops: number[]; vm: number[]; readiness: number[]; cx: number[] }>();
+  for (const p of audit) {
+    const k = labelFor(STORE_LABELS, p.store);
+    if (!storeMap.has(k)) storeMap.set(k, { ops: [], vm: [], readiness: [], cx: [] });
+    const e = storeMap.get(k)!;
+    e.ops.push(num(p.opsScore));
+    e.vm.push(num(p.vmScore));
+    e.readiness.push(num(p.readinessScore));
+    e.cx.push(num(p.cxScore));
+  }
+  const storeScores = [...storeMap].map(([store, v]) => ({
+    store,
+    ops: round1(avg(v.ops)),
+    vm: round1(avg(v.vm)),
+    readiness: round1(avg(v.readiness)),
+    cx: round1(avg(v.cx)),
+  }));
+
   return {
     opsScore: round1(avg(audit.map((p) => num(p.opsScore)).filter((n) => n > 0))),
     vmScore: round1(
@@ -196,7 +218,10 @@ function operationsMetrics(rows: Entry[]) {
     openIssues:
       inc.filter((p) => !closed(p.status)).length + maint.filter((p) => !closed(p.status)).length,
     incidentsTotal: inc.length,
-    vmByStore: vm.length ? groupAvg(vm, 'store', 'overallVM') : groupAvg(audit, 'store', 'vmScore'),
+    vmByStore: (vm.length ? groupAvg(vm, 'store', 'overallVM') : groupAvg(audit, 'store', 'vmScore')).map(
+      (x) => ({ name: labelFor(STORE_LABELS, x.name), value: x.value })
+    ),
+    storeScores,
     risk: { high: sev('high'), medium: sev('med'), low: sev('low') },
     entryCount: rows.length,
   };
@@ -256,7 +281,10 @@ function inventoryMetrics(rows: Entry[]) {
     accuracy: sysTotal ? round1(Math.max(0, 100 - (varTotal / sysTotal) * 100)) : 0,
     deadPct: inventoryValue ? round1((deadValue / inventoryValue) * 100) : 0,
     outOfStock: rep.filter((p) => num(p.currentStock) === 0).length || rep.length,
-    byBrand: groupSum(gr, 'brand', 'totalValue'),
+    byBrand: groupSum(gr, 'brand', 'totalValue').map((x) => ({
+      name: labelFor(BRAND_LABELS, x.name),
+      value: x.value,
+    })),
     accuracyDistribution,
     valueTrend,
     entryCount: rows.length,

@@ -39,6 +39,39 @@ export async function postEntries(
   for (const payload of payloads) await postEntry(department, formType, payload);
 }
 
+export interface EntryRow {
+  id: number;
+  department: string;
+  formType: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
+// Recent raw entries for a department (for "recent activity" tables).
+export function useEntries(department: string, limit = 8) {
+  const [entries, setEntries] = useState<EntryRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/entries?department=${department}`, { cache: 'no-store' });
+      const json = await res.json();
+      setEntries(Array.isArray(json.entries) ? json.entries.slice(0, limit) : []);
+    } catch {
+      setEntries([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [department, limit]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { entries, loading, refresh };
+}
+
 // Live metrics hook: fetches a department's aggregated metrics and exposes a refresh().
 export function useMetrics<T = Record<string, unknown>>(department: string) {
   const [data, setData] = useState<T | null>(null);
