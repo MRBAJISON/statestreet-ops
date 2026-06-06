@@ -8,6 +8,14 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import ScoreGauge from '@/components/ui/ScoreGauge';
 import ProgressBar from '@/components/ui/ProgressBar';
 import { SimpleLineChart, SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
+import { useMetrics } from '@/lib/api';
+
+interface BrandLive {
+  sentiment: { positive: number; neutral: number; negative: number };
+  nps: number;
+  momentum: number;
+  shareOfConversation: { name: string; value: number }[];
+}
 
 const fmt = (n: number, prefix = 'GHS ') => {
   if (n >= 1_000_000) return `${prefix}${(n / 1_000_000).toFixed(2)}M`;
@@ -33,13 +41,17 @@ const weatherIcon = (weather: string) => {
 
 export default function BrandHealthPage() {
   const d = brandData;
+  const { data: m } = useMetrics<BrandLive>('brand');
+  const liveSentiment = m?.sentiment ?? { positive: 0, neutral: 0, negative: 0 };
+  const nps = m?.nps ?? 0;
+  const momentum = m?.momentum ?? 0;
 
   // Chart data
-  const socData = d.shareOfConversation.map(s => ({ name: s.brand, value: s.pct }));
+  const socData = (m?.shareOfConversation?.length ? m.shareOfConversation : []);
   const sentimentDonut = [
-    { name: 'Positive', value: d.sentiment.positive },
-    { name: 'Neutral', value: d.sentiment.neutral },
-    { name: 'Negative', value: d.sentiment.negative },
+    { name: 'Positive', value: liveSentiment.positive },
+    { name: 'Neutral', value: liveSentiment.neutral },
+    { name: 'Negative', value: liveSentiment.negative },
   ];
   const sentimentTrend = d.sentiment.trend.map(t => ({ name: t.month, value: t.score }));
   const momentumData = d.momentumDrivers.map(m => ({ name: m.driver, value: m.score }));
@@ -115,8 +127,8 @@ export default function BrandHealthPage() {
               <KPICard label="Total Traffic" value="23,842" status="green" small />
               <KPICard label="Conversion Rate" value="25.8" suffix="%" status="green" small />
               <KPICard label="Avg Transaction Value" value="3,185" prefix="GHS " status="green" small />
-              <KPICard label="NPS" value={61} status="green" small />
-              <KPICard label="Brand Momentum Score" value={78} status="green" small />
+              <KPICard label="NPS" value={nps} status="green" small />
+              <KPICard label="Brand Momentum Score" value={momentum} status="green" small />
             </div>
           </div>
         </div>
@@ -171,22 +183,22 @@ export default function BrandHealthPage() {
                 innerRadius={60}
                 outerRadius={85}
                 centerLabel="Overall"
-                centerValue={`${d.sentiment.positive}%`}
+                centerValue={`${liveSentiment.positive}%`}
                 colors={['#22c55e', '#6b7280', '#ef4444']}
               />
               <div className="flex justify-center gap-6 mt-3">
                 <div className="text-center">
-                  <div className="text-green-400 text-lg font-bold">{d.sentiment.positive}%</div>
+                  <div className="text-green-400 text-lg font-bold">{liveSentiment.positive}%</div>
                   <div className="text-[0.6rem] text-gray-500">Positive</div>
                   <div className="text-[0.6rem] text-green-400">+6pp</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-gray-400 text-lg font-bold">{d.sentiment.neutral}%</div>
+                  <div className="text-gray-400 text-lg font-bold">{liveSentiment.neutral}%</div>
                   <div className="text-[0.6rem] text-gray-500">Neutral</div>
                   <div className="text-[0.6rem] text-yellow-400">-2pp</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-red-400 text-lg font-bold">{d.sentiment.negative}%</div>
+                  <div className="text-red-400 text-lg font-bold">{liveSentiment.negative}%</div>
                   <div className="text-[0.6rem] text-gray-500">Negative</div>
                   <div className="text-[0.6rem] text-green-400">-4pp</div>
                 </div>

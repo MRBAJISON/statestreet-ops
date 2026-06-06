@@ -8,6 +8,15 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import ScoreGauge from '@/components/ui/ScoreGauge';
 import ProgressBar from '@/components/ui/ProgressBar';
 import { SimpleLineChart, SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
+import { useMetrics } from '@/lib/api';
+
+interface InventoryLive {
+  inventoryValue: number;
+  accuracy: number;
+  deadPct: number;
+  outOfStock: number;
+  byBrand: { name: string; value: number }[];
+}
 
 const fmt = (n: number, prefix = 'GHS ') => {
   if (n >= 1_000_000) return `${prefix}${(n / 1_000_000).toFixed(2)}M`;
@@ -19,6 +28,12 @@ const fmtFull = (n: number) => `GHS ${n.toLocaleString()}`;
 
 export default function InventoryPage() {
   const d = inventoryData;
+  const { data: m } = useMetrics<InventoryLive>('inventory');
+  const inventoryValue = m?.inventoryValue ?? 0;
+  const accuracy = m?.accuracy ?? 0;
+  const deadPct = m?.deadPct ?? 0;
+  const outOfStock = m?.outOfStock ?? 0;
+  const byBrand = m?.byBrand ?? [];
 
   // Chart data
   const valueTrendData = d.valueTrend.map(v => ({ name: v.month, value: v.value }));
@@ -55,10 +70,8 @@ export default function InventoryPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
           <KPICard
             label="Total Inventory Value"
-            value="1.18M"
+            value={fmt(inventoryValue, '')}
             prefix="GHS "
-            change={4.8}
-            changeLabel="% vs Last Month"
             status="green"
             small
           />
@@ -98,26 +111,22 @@ export default function InventoryPage() {
           />
           <KPICard
             label="Dead Stock % (180+ Days)"
-            value="11.9%"
+            value={`${deadPct}%`}
             target="< 8%"
-            status="red"
+            status={deadPct < 8 ? 'green' : deadPct < 12 ? 'yellow' : 'red'}
             small
           />
           <KPICard
             label="Out of Stock Items"
-            value={126}
-            change={18}
-            changeLabel=" vs Last Month"
-            status="yellow"
+            value={outOfStock}
+            status={outOfStock > 0 ? 'yellow' : 'green'}
             small
           />
           <KPICard
             label="Stock Accuracy"
-            value="98.2%"
+            value={`${accuracy}%`}
             target="98%"
-            change={0.2}
-            changeLabel="pp"
-            status="green"
+            status={accuracy >= 98 ? 'green' : 'yellow'}
             small
           />
         </div>
@@ -145,15 +154,15 @@ export default function InventoryPage() {
             <div>
               <div className="text-xs text-gray-400 mb-2">Value by Brand</div>
               <SimpleDonutChart
-                data={d.byBrand}
+                data={byBrand}
                 height={180}
                 innerRadius={45}
                 outerRadius={65}
                 centerLabel="Total"
-                centerValue="GHS 1.18M"
+                centerValue={fmt(inventoryValue)}
               />
               <div className="grid grid-cols-1 gap-y-1 mt-2">
-                {d.byBrand.map((b, i) => (
+                {byBrand.map((b, i) => (
                   <div key={b.name} className="flex items-center gap-1.5 text-[0.65rem]">
                     <span
                       className="w-2 h-2 rounded-full flex-shrink-0"

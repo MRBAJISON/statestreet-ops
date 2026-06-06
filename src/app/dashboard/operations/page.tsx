@@ -8,6 +8,20 @@ import ScoreGauge from '@/components/ui/ScoreGauge';
 import ProgressBar from '@/components/ui/ProgressBar';
 import { SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
 import { operationsData } from '@/lib/data';
+import { useMetrics } from '@/lib/api';
+
+interface OperationsLive {
+  opsScore: number;
+  vmScore: number;
+  readiness: number;
+  sopCompliance: number;
+  cxScore: number;
+  maintenanceCompliance: number;
+  openIssues: number;
+  incidentsTotal: number;
+  vmByStore: { name: string; value: number }[];
+  risk: { high: number; medium: number; low: number };
+}
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
@@ -41,6 +55,17 @@ function priorityColor(p: string): string {
 
 export default function OperationsPage() {
   const totalDeployments = d.deployment.categories.reduce((s, c) => s + c.planned, 0);
+  const { data: m } = useMetrics<OperationsLive>('operations');
+  const opsScore = m?.opsScore ?? 0;
+  const vmScore = m?.vmScore ?? 0;
+  const readiness = m?.readiness ?? 0;
+  const sopComp = m?.sopCompliance ?? 0;
+  const cxScoreV = m?.cxScore ?? 0;
+  const maintComp = m?.maintenanceCompliance ?? 0;
+  const openIssues = m?.openIssues ?? 0;
+  const vmByStore = m?.vmByStore ?? [];
+  const risk = m?.risk ?? { high: 0, medium: 0, low: 0 };
+  const incidentsTotal = m?.incidentsTotal ?? 0;
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
@@ -57,69 +82,59 @@ export default function OperationsPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           <KPICard
             label="Store Operations Score"
-            value={`${d.storeOpsScore.pct}%`}
+            value={`${opsScore}%`}
             target={`${d.storeOpsScore.target}%`}
-            change={d.storeOpsScore.pct - d.storeOpsScore.target}
+            change={parseFloat((opsScore - d.storeOpsScore.target).toFixed(1))}
             changeLabel="pp"
-            status={scoreColor(d.storeOpsScore.pct)}
+            status={scoreColor(opsScore)}
             small
           />
           <KPICard
             label="VM Compliance Score"
-            value={`${d.vmCompliance.pct}%`}
+            value={`${vmScore}%`}
             target={`${d.vmCompliance.target}%`}
-            change={d.vmCompliance.pct - d.vmCompliance.target}
+            change={parseFloat((vmScore - d.vmCompliance.target).toFixed(1))}
             changeLabel="pp"
-            status={scoreColor(d.vmCompliance.pct)}
+            status={scoreColor(vmScore)}
             small
           />
           <KPICard
             label="Store Readiness Score"
-            value={`${d.storeReadiness.pct}%`}
+            value={`${readiness}%`}
             target={`${d.storeReadiness.target}%`}
-            change={d.storeReadiness.pct - d.storeReadiness.target}
+            change={parseFloat((readiness - d.storeReadiness.target).toFixed(1))}
             changeLabel="pp"
-            status={scoreColor(d.storeReadiness.pct)}
+            status={scoreColor(readiness)}
             small
           />
           <KPICard
             label="Maintenance Compliance"
-            value={`${d.maintenanceCompliance.pct}%`}
+            value={`${maintComp}%`}
             target={`${d.maintenanceCompliance.target}%`}
-            change={2}
-            changeLabel="pp"
-            status={scoreColor(d.maintenanceCompliance.pct)}
+            status={scoreColor(maintComp)}
             small
           />
           <KPICard
             label="SOP Compliance"
-            value={`${d.sopCompliance.pct}%`}
+            value={`${sopComp}%`}
             target={`${d.sopCompliance.target}%`}
-            change={1}
-            changeLabel="pp"
-            status={scoreColor(d.sopCompliance.pct)}
+            status={scoreColor(sopComp)}
             small
           />
           <KPICard
             label="Customer Experience Score"
-            value={`${d.cxScore.pct}%`}
+            value={`${cxScoreV}%`}
             target={`${d.cxScore.target}%`}
-            change={d.cxScore.pct - d.cxScore.target}
+            change={parseFloat((cxScoreV - d.cxScore.target).toFixed(1))}
             changeLabel="pp"
-            status={scoreColor(d.cxScore.pct)}
+            status={scoreColor(cxScoreV)}
             small
           />
           <KPICard
             label="Open Issues"
-            value={d.openIssues}
-            status="red"
+            value={openIssues}
+            status={openIssues > 0 ? 'red' : 'green'}
             small
-            icon={
-              <span className="flex flex-col text-[0.6rem] leading-tight text-right">
-                <span className="text-red-400">13 Critical</span>
-                <span className="text-orange-400">7 Immediate</span>
-              </span>
-            }
           />
         </div>
 
@@ -169,7 +184,7 @@ export default function OperationsPage() {
             <div className="lg:col-span-2">
               <p className="text-[0.65rem] text-gray-500 uppercase tracking-wider mb-2">VM Compliance % by Store</p>
               <SimpleBarChart
-                data={d.vmByStore.map((s) => ({ name: s.store, value: s.compliance }))}
+                data={vmByStore}
                 height={180}
                 color="#c8a951"
                 horizontal
@@ -204,8 +219,8 @@ export default function OperationsPage() {
               <div>
                 <p className="text-[0.65rem] text-gray-500 uppercase tracking-wider mb-1">Needs Improvement</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {d.vmByStore.filter((s) => s.compliance < 85).map((s) => (
-                    <span key={s.store} className="bg-red-500/10 text-red-400 text-[0.65rem] px-2 py-0.5 rounded-full">{s.store}</span>
+                  {vmByStore.filter((s) => s.value < 85).map((s) => (
+                    <span key={s.name} className="bg-red-500/10 text-red-400 text-[0.65rem] px-2 py-0.5 rounded-full">{s.name}</span>
                   ))}
                 </div>
               </div>
@@ -528,7 +543,7 @@ export default function OperationsPage() {
                 </div>
                 <div className="bg-[#0a0a0a] border border-[#c8a951]/30 rounded-lg p-3 text-center">
                   <p className="text-[0.6rem] text-gray-500 uppercase">Total</p>
-                  <p className="text-lg font-bold text-[#c8a951]">{d.incidents.total}</p>
+                  <p className="text-lg font-bold text-[#c8a951]">{incidentsTotal}</p>
                 </div>
               </div>
             </div>
@@ -538,21 +553,21 @@ export default function OperationsPage() {
               <p className="text-[0.65rem] text-gray-500 uppercase tracking-wider mb-2">Risk Level Distribution</p>
               <SimpleDonutChart
                 data={[
-                  { name: 'High', value: d.riskLevel.high },
-                  { name: 'Medium', value: d.riskLevel.medium },
-                  { name: 'Low', value: d.riskLevel.low },
+                  { name: 'High', value: risk.high },
+                  { name: 'Medium', value: risk.medium },
+                  { name: 'Low', value: risk.low },
                 ]}
                 height={160}
                 innerRadius={35}
                 outerRadius={55}
                 colors={['#ef4444', '#eab308', '#22c55e']}
                 centerLabel="Incidents"
-                centerValue={String(d.incidents.total)}
+                centerValue={String(incidentsTotal)}
               />
               <div className="flex justify-center gap-4 text-[0.65rem] mt-1">
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" />High: {d.riskLevel.high}</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500" />Medium: {d.riskLevel.medium}</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" />Low: {d.riskLevel.low}</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" />High: {risk.high}</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500" />Medium: {risk.medium}</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" />Low: {risk.low}</span>
               </div>
             </div>
 

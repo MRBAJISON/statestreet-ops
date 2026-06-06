@@ -8,6 +8,12 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import ProgressBar from '@/components/ui/ProgressBar';
 import ScoreGauge from '@/components/ui/ScoreGauge';
 import { SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
+import { useMetrics } from '@/lib/api';
+
+interface MarketingLive {
+  leadChannelMix: { name: string; value: number }[];
+  totalLeads: number;
+}
 
 /* ─── helpers ──────────────────────────────────────────────── */
 const fmt = (n: number) => n.toLocaleString();
@@ -59,6 +65,8 @@ const brandExecution = {
 
 /* ─── page ─────────────────────────────────────────────────── */
 export default function MarketingDashboard() {
+  const { data: m } = useMetrics<MarketingLive>('marketing');
+  const leadChannelMix = m?.leadChannelMix ?? [];
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
       <DashboardHeader
@@ -251,13 +259,7 @@ export default function MarketingDashboard() {
             <div className="lg:col-span-1">
               <h4 className="text-xs text-[#c8a951] uppercase tracking-wider mb-2 font-semibold">Lead Channel Mix</h4>
               <SimpleBarChart
-                data={[
-                  { name: 'WhatsApp', value: md.acquisition.whatsappLeads },
-                  { name: 'Instagram', value: md.acquisition.instagramLeads },
-                  { name: 'Website', value: md.acquisition.websiteLeads },
-                  { name: 'Walk-In', value: md.acquisition.walkInLeads },
-                  { name: 'Corporate', value: md.acquisition.corporateLeads },
-                ]}
+                data={leadChannelMix}
                 height={180}
                 color="#c8a951"
               />
