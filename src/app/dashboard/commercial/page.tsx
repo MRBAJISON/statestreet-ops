@@ -9,6 +9,7 @@ import { SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
 import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, type Period } from '@/lib/api';
+import { TARGETS, ragStatus } from '@/lib/targets';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -107,7 +108,13 @@ export default function CommercialPage() {
       </div>
       <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-          <KPICard label="Group Sales" value={dash(m?.groupSales ?? 0, fmtGHS)} status="green" small />
+          <KPICard
+            label="Group Sales"
+            value={dash(m?.groupSales ?? 0, fmtGHS)}
+            target={TARGETS.commercial.groupSales ? fmtGHS(TARGETS.commercial.groupSales) : undefined}
+            status={ragStatus(m?.groupSales ?? 0, TARGETS.commercial.groupSales) ?? 'green'}
+            small
+          />
           <KPICard label="ATV" value={dash(m?.atv ?? 0, fmtGHS)} small />
           <KPICard label="UPT" value={(m?.upt ?? 0) ? String(m?.upt) : '—'} small />
           <KPICard label="Conversion Rate" value={pct(m?.convRate ?? 0)} small />

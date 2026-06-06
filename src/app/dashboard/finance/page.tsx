@@ -10,6 +10,7 @@ import RecentEntries from '@/components/ui/RecentEntries';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { SimpleLineChart, SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
 import { useMetrics, type Period } from '@/lib/api';
+import { TARGETS, ragStatus } from '@/lib/targets';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -104,7 +105,13 @@ export default function FinancePage() {
       {/* KPI BAR */}
       <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <KPICard label="Revenue MTD" value={dash(revenueMtd, fmtGHS)} status="green" small />
+          <KPICard
+            label="Revenue MTD"
+            value={dash(revenueMtd, fmtGHS)}
+            target={TARGETS.finance.revenueMtd ? fmtGHS(TARGETS.finance.revenueMtd) : undefined}
+            status={ragStatus(revenueMtd, TARGETS.finance.revenueMtd) ?? 'green'}
+            small
+          />
           <KPICard
             label="Gross Profit"
             value={dash(m?.grossProfit ?? 0, fmtGHS)}
