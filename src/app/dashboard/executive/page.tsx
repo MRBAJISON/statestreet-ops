@@ -21,12 +21,13 @@ const pct = (n: number) => (n ? `${n}%` : '—');
 
 export default function ExecutiveCommandCenter() {
   const [period, setPeriod] = useState<Period>('mtd');
-  const fin = useMetrics<{ revenueMtd: number; netProfit: number; grossMargin: number; cashNet: number; revenueByBrand: { name: string; value: number }[] }>('finance', period).data;
-  const com = useMetrics<{ groupSales: number; convRate: number; salesByStore: { name: string; value: number }[] }>('commercial', period).data;
-  const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[] }>('operations', period).data;
-  const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory', period).data;
-  const brd = useMetrics<{ healthIndex: number; sentiment: { positive: number } }>('brand', period).data;
-  const mkt = useMetrics<{ totalLeads: number }>('marketing', period).data;
+  const [anchor, setAnchor] = useState('');
+  const fin = useMetrics<{ revenueMtd: number; netProfit: number; grossMargin: number; cashNet: number; revenueByBrand: { name: string; value: number }[] }>('finance', period, anchor).data;
+  const com = useMetrics<{ groupSales: number; convRate: number; salesByStore: { name: string; value: number }[] }>('commercial', period, anchor).data;
+  const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[] }>('operations', period, anchor).data;
+  const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory', period, anchor).data;
+  const brd = useMetrics<{ healthIndex: number; sentiment: { positive: number }; ceoAttention: { priority: string; issue: string; impact: string; owner: string; status: string }[] }>('brand', period, anchor).data;
+  const mkt = useMetrics<{ totalLeads: number }>('marketing', period, anchor).data;
 
   const revenueByBrand = fin?.revenueByBrand ?? [];
   const salesByStore = com?.salesByStore ?? [];
@@ -41,6 +42,7 @@ export default function ExecutiveCommandCenter() {
     storeMap.set(s.store, cur);
   }
   const storePerformance = [...storeMap].map(([store, v]) => ({ store, ...v })).sort((a, b) => b.sales - a.sales);
+  const ceoAttention = brd?.ceoAttention ?? [];
 
   const departments = [
     { name: 'Finance', href: '/dashboard/finance', metric: 'Revenue MTD', value: dash(fin?.revenueMtd ?? 0, fmtGHS) },
@@ -62,7 +64,7 @@ export default function ExecutiveCommandCenter() {
 
       {/* GROUP KPI BAR */}
       <div className="px-6 pt-4 flex justify-end">
-        <PeriodTabs value={period} onChange={setPeriod} />
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} />
       </div>
       <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
@@ -152,6 +154,38 @@ export default function ExecutiveCommandCenter() {
               </Link>
             ))}
           </div>
+        </Section>
+
+        {/* CEO Attention */}
+        <Section number={4} title="CEO Attention Index">
+          {ceoAttention.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                    <th className="text-left py-2 pr-3 font-medium">Priority</th>
+                    <th className="text-left py-2 px-3 font-medium">Issue</th>
+                    <th className="text-left py-2 px-3 font-medium">Impact</th>
+                    <th className="text-left py-2 px-3 font-medium">Owner</th>
+                    <th className="text-left py-2 pl-3 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ceoAttention.map((c, i) => (
+                    <tr key={i} className="border-b border-[#1a1a1a]">
+                      <td className="py-2 pr-3 capitalize">{c.priority || '—'}</td>
+                      <td className="py-2 px-3">{c.issue}</td>
+                      <td className="py-2 px-3 capitalize">{c.impact || '—'}</td>
+                      <td className="py-2 px-3">{c.owner || '—'}</td>
+                      <td className="py-2 pl-3 capitalize">{c.status || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState message="No CEO attention items" hint="Raised via the Brand → CEO Attention Items form." height={120} />
+          )}
         </Section>
       </div>
     </div>

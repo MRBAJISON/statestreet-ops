@@ -9,7 +9,7 @@ type P = Record<string, unknown>;
 const payloads = (rows: Entry[], type: string): P[] =>
   rows.filter((r) => r.formType === type).map((r) => r.payload as P);
 
-export type Period = 'mtd' | 'ytd' | 'all';
+export type Period = 'day' | 'week' | 'mtd' | 'ytd' | 'all';
 
 // Best-effort date for an entry: a date field in the payload, else its createdAt.
 function entryDate(r: Entry): Date {
@@ -19,13 +19,38 @@ function entryDate(r: Entry): Date {
   return isNaN(d.getTime()) ? new Date(r.createdAt as unknown as string) : d;
 }
 
-// Filter entries to a reporting period (month-to-date / year-to-date / all time).
-export function filterByPeriod(rows: Entry[], period: Period, now = new Date()): Entry[] {
+const sameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+// Monday-start week containing `d`.
+function startOfWeek(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+
+// Filter entries to a reporting period, anchored at `anchorISO` (defaults to today).
+//  day  -> that calendar day   week -> the Mon–Sun week of the anchor
+//  mtd  -> the anchor's month   ytd -> the anchor's year   all -> everything
+export function filterByPeriod(rows: Entry[], period: Period, anchorISO?: string): Entry[] {
   if (period === 'all') return rows;
+  const anchor = anchorISO ? new Date(anchorISO) : new Date();
+  if (isNaN(anchor.getTime())) return rows;
+  if (period === 'day') return rows.filter((r) => sameDay(entryDate(r), anchor));
+  if (period === 'week') {
+    const s = startOfWeek(anchor);
+    const e = new Date(s);
+    e.setDate(s.getDate() + 7);
+    return rows.filter((r) => {
+      const d = entryDate(r);
+      return d >= s && d < e;
+    });
+  }
+  if (period === 'ytd') return rows.filter((r) => entryDate(r).getFullYear() === anchor.getFullYear());
   return rows.filter((r) => {
     const d = entryDate(r);
-    if (period === 'ytd') return d.getFullYear() === now.getFullYear();
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    return d.getFullYear() === anchor.getFullYear() && d.getMonth() === anchor.getMonth();
   });
 }
 

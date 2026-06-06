@@ -51,6 +51,11 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL('/login', req.url));
   }
 
+  // The CEO/owner consumes dashboards only — no data-entry forms.
+  if (role === 'owner' && pathname.startsWith('/forms')) {
+    return NextResponse.redirect(new URL('/dashboard/executive', req.url));
+  }
+
   const allowed = ROLE_DEPARTMENTS[role] ?? [];
 
   // Enforce department access on /dashboard/<segment> and /forms/<segment>.

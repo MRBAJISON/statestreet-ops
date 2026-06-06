@@ -65,21 +65,25 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
           );
         })}
 
-        <div className="text-[0.6rem] text-gray-600 uppercase tracking-wider px-3 py-2 mt-4">Data Entry</div>
-        {departments.filter(d => d !== 'executive').map(dept => {
-          const config = DEPT_CONFIG[dept];
-          const href = `/forms/${dept === 'brand' ? 'brand-health' : dept}`;
-          const isActive = pathname === href;
-          return (
-            <Link key={`form-${dept}`} href={href}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                isActive ? 'bg-[#1a1a1a] text-white' : 'text-gray-500 hover:text-gray-300 hover:bg-[#111]'
-              }`}>
-              <span className="text-xs">📝</span>
-              <span>{config.label} Forms</span>
-            </Link>
-          );
-        })}
+        {userRole !== 'owner' && (
+          <>
+            <div className="text-[0.6rem] text-gray-600 uppercase tracking-wider px-3 py-2 mt-4">Data Entry</div>
+            {departments.filter(d => d !== 'executive').map(dept => {
+              const config = DEPT_CONFIG[dept];
+              const href = `/forms/${dept === 'brand' ? 'brand-health' : dept}`;
+              const isActive = pathname === href;
+              return (
+                <Link key={`form-${dept}`} href={href}
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    isActive ? 'bg-[#1a1a1a] text-white' : 'text-gray-500 hover:text-gray-300 hover:bg-[#111]'
+                  }`}>
+                  <span className="text-xs">📝</span>
+                  <span>{config.label} Forms</span>
+                </Link>
+              );
+            })}
+          </>
+        )}
       </nav>
 
       <div className="p-3 border-t border-[#1a1a1a]">

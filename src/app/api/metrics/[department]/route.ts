@@ -11,10 +11,14 @@ export async function GET(
 ) {
   try {
     const { department } = await params;
-    const periodParam = req.nextUrl.searchParams.get('period');
-    const period: Period = periodParam === 'ytd' || periodParam === 'all' ? periodParam : 'mtd';
+    const sp = req.nextUrl.searchParams;
+    const p = sp.get('period');
+    const period: Period = (['day', 'week', 'mtd', 'ytd', 'all'] as const).includes(p as Period)
+      ? (p as Period)
+      : 'mtd';
+    const date = sp.get('date') || undefined;
     const rows = await db.select().from(entries).where(eq(entries.department, department));
-    return NextResponse.json(computeMetrics(department, filterByPeriod(rows, period)));
+    return NextResponse.json(computeMetrics(department, filterByPeriod(rows, period, date)));
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }

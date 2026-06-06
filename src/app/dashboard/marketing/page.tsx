@@ -39,7 +39,8 @@ interface MarketingLive {
 
 export default function MarketingPage() {
   const [period, setPeriod] = useState<Period>('mtd');
-  const { data: m } = useMetrics<MarketingLive>('marketing', period);
+  const [anchor, setAnchor] = useState('');
+  const { data: m } = useMetrics<MarketingLive>('marketing', period, anchor);
   const leadChannelMix = m?.leadChannelMix ?? [];
   const funnel = m?.funnel ?? { reach: 0, engagement: 0, leads: 0, storeVisits: 0, revenueInfluenced: 0 };
   const socialByChannel = m?.socialByChannel ?? [];
@@ -70,7 +71,7 @@ export default function MarketingPage() {
       />
 
       <div className="px-6 pt-4 flex justify-end">
-        <PeriodTabs value={period} onChange={setPeriod} />
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} />
       </div>
       <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

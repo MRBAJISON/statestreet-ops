@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
+import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry, postEntries } from '@/lib/api';
 
 // Normalize a free-text brand (from Excel or a select) to the canonical form value.
@@ -346,6 +347,11 @@ export default function FinanceFormsPage() {
           </button>
         </div>
       </form>
+
+      <div className="mt-8 max-w-4xl">
+        <h2 className="text-sm font-bold uppercase tracking-wide mb-3">Your Submissions</h2>
+        <RecentEntries department="finance" />
+      </div>
     </div>
   );
 }

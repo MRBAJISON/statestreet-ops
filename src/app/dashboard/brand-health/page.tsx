@@ -31,7 +31,8 @@ interface BrandLive {
 
 export default function BrandHealthPage() {
   const [period, setPeriod] = useState<Period>('mtd');
-  const { data: m } = useMetrics<BrandLive>('brand', period);
+  const [anchor, setAnchor] = useState('');
+  const { data: m } = useMetrics<BrandLive>('brand', period, anchor);
   const sentiment = m?.sentiment ?? { positive: 0, neutral: 0, negative: 0 };
   const portfolio = m?.portfolio ?? [];
   const sentimentTrend = m?.sentimentTrend ?? [];
@@ -56,7 +57,7 @@ export default function BrandHealthPage() {
       />
 
       <div className="px-6 pt-4 flex justify-end">
-        <PeriodTabs value={period} onChange={setPeriod} />
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} />
       </div>
       <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

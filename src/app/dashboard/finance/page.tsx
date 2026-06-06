@@ -56,7 +56,8 @@ interface FinanceMetricsData {
 
 export default function FinancePage() {
   const [period, setPeriod] = useState<Period>('mtd');
-  const { data: m } = useMetrics<FinanceMetricsData>('finance', period);
+  const [anchor, setAnchor] = useState('');
+  const { data: m } = useMetrics<FinanceMetricsData>('finance', period, anchor);
 
   const revenueMtd = m?.revenueMtd ?? 0;
   const revenueByBrand = m?.revenueByBrand ?? [];
@@ -99,7 +100,7 @@ export default function FinancePage() {
       />
 
       <div className="px-6 pt-4 flex justify-end">
-        <PeriodTabs value={period} onChange={setPeriod} />
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} />
       </div>
 
       {/* KPI BAR */}

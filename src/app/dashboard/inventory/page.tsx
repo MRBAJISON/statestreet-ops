@@ -42,7 +42,8 @@ interface InventoryLive {
 
 export default function InventoryPage() {
   const [period, setPeriod] = useState<Period>('mtd');
-  const { data: m } = useMetrics<InventoryLive>('inventory', period);
+  const [anchor, setAnchor] = useState('');
+  const { data: m } = useMetrics<InventoryLive>('inventory', period, anchor);
   const byBrand = m?.byBrand ?? [];
   const valueTrend = m?.valueTrend ?? [];
   const accuracyDistribution = (m?.accuracyDistribution ?? []).filter((a) => a.value > 0);
@@ -61,7 +62,7 @@ export default function InventoryPage() {
       />
 
       <div className="px-6 pt-4 flex justify-end">
-        <PeriodTabs value={period} onChange={setPeriod} />
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} />
       </div>
       <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

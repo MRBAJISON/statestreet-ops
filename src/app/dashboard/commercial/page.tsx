@@ -51,7 +51,8 @@ interface CommercialLive {
 
 export default function CommercialPage() {
   const [period, setPeriod] = useState<Period>('mtd');
-  const { data: m } = useMetrics<CommercialLive>('commercial', period);
+  const [anchor, setAnchor] = useState('');
+  const { data: m } = useMetrics<CommercialLive>('commercial', period, anchor);
   const categorySales = m?.categorySales ?? [];
   const sellThroughCat = m?.sellThroughByCategory ?? [];
   const salesByStore = m?.salesByStore ?? [];
@@ -104,7 +105,7 @@ export default function CommercialPage() {
       />
 
       <div className="px-6 pt-4 flex justify-end">
-        <PeriodTabs value={period} onChange={setPeriod} />
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} />
       </div>
       <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
