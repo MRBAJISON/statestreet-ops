@@ -26,16 +26,24 @@ interface MarketingLive {
   spend: number;
   roas: number;
   funnel: { reach: number; engagement: number; leads: number; storeVisits: number; revenueInfluenced: number };
-  social: { followers: number; reach: number; impressions: number; engagement: number; clicks: number };
+  socialByChannel: { platform: string; followers: number; reach: number; impressions: number; engagement: number; clicks: number }[];
+  campaigns: { name: string; platform: string; reach: number; engagement: number; leads: number; revenue: number; spend: number; roas: number; status: string }[];
+  clienteling: { contacted: number; responses: number; appointments: number; estRevenue: number; responseRate: number };
+  customerIntel: { type: string; detail: string; frequency: string; store: string }[];
+  actions: { task: string; owner: string; priority: string; status: string; deadline: string }[];
 }
 
 export default function MarketingPage() {
   const { data: m } = useMetrics<MarketingLive>('marketing');
   const leadChannelMix = m?.leadChannelMix ?? [];
   const funnel = m?.funnel ?? { reach: 0, engagement: 0, leads: 0, storeVisits: 0, revenueInfluenced: 0 };
-  const social = m?.social ?? { followers: 0, reach: 0, impressions: 0, engagement: 0, clicks: 0 };
+  const socialByChannel = m?.socialByChannel ?? [];
+  const campaigns = m?.campaigns ?? [];
+  const cl = m?.clienteling ?? { contacted: 0, responses: 0, appointments: 0, estRevenue: 0, responseRate: 0 };
+  const customerIntel = m?.customerIntel ?? [];
+  const actions = m?.actions ?? [];
   const hasFunnel = !!(funnel.reach || funnel.engagement || funnel.leads || funnel.storeVisits);
-  const hasSocial = !!(social.followers || social.reach || social.impressions || social.engagement || social.clicks);
+  const hasClienteling = !!(cl.contacted || cl.responses || cl.appointments || cl.estRevenue);
 
   const funnelSteps = [
     { label: 'Reach', value: numOrDash(funnel.reach) },
@@ -43,13 +51,6 @@ export default function MarketingPage() {
     { label: 'Leads', value: numOrDash(funnel.leads) },
     { label: 'Store Visits', value: numOrDash(funnel.storeVisits) },
     { label: 'Revenue Influenced', value: dash(funnel.revenueInfluenced, fmtGHS) },
-  ];
-  const socialStats = [
-    { label: 'Followers', value: numOrDash(social.followers) },
-    { label: 'Reach', value: numOrDash(social.reach) },
-    { label: 'Impressions', value: numOrDash(social.impressions) },
-    { label: 'Engagement', value: numOrDash(social.engagement) },
-    { label: 'Clicks', value: numOrDash(social.clicks) },
   ];
 
   return (
@@ -84,7 +85,7 @@ export default function MarketingPage() {
               )}
             </div>
             <div>
-              <div className="text-xs text-gray-400 mb-2">Campaign Funnel</div>
+              <div className="text-xs text-gray-400 mb-2">Campaign Funnel (all campaigns)</div>
               {hasFunnel ? (
                 <div className="space-y-2">
                   {funnelSteps.map((s) => (
@@ -101,22 +102,154 @@ export default function MarketingPage() {
           </div>
         </Section>
 
-        <Section number={2} title="Social Media">
-          {hasSocial ? (
+        <Section number={2} title="Campaign Performance" subtitle="per campaign">
+          {campaigns.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                    <th className="text-left py-2 pr-3 font-medium">Campaign</th>
+                    <th className="text-left py-2 px-2 font-medium">Platform</th>
+                    <th className="text-right py-2 px-2 font-medium">Reach</th>
+                    <th className="text-right py-2 px-2 font-medium">Leads</th>
+                    <th className="text-right py-2 px-2 font-medium">Revenue</th>
+                    <th className="text-right py-2 px-2 font-medium">Spend</th>
+                    <th className="text-right py-2 px-2 font-medium">ROAS</th>
+                    <th className="text-left py-2 pl-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {campaigns.map((c, i) => (
+                    <tr key={i} className="border-b border-[#1a1a1a]">
+                      <td className="py-2 pr-3">{c.name}</td>
+                      <td className="py-2 px-2 capitalize">{c.platform || '—'}</td>
+                      <td className="py-2 px-2 text-right">{numOrDash(c.reach)}</td>
+                      <td className="py-2 px-2 text-right">{numOrDash(c.leads)}</td>
+                      <td className="py-2 px-2 text-right">{c.revenue ? fmtGHS(c.revenue) : '—'}</td>
+                      <td className="py-2 px-2 text-right">{c.spend ? fmtGHS(c.spend) : '—'}</td>
+                      <td className="py-2 px-2 text-right text-[#c8a951]">{c.roas ? `${c.roas}x` : '—'}</td>
+                      <td className="py-2 pl-2 capitalize">{c.status || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState message="No campaigns yet" hint="Each campaign you submit appears here with its own performance." height={140} />
+          )}
+        </Section>
+
+        <Section number={3} title="Social Media by Channel">
+          {socialByChannel.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                    <th className="text-left py-2 pr-3 font-medium">Channel</th>
+                    <th className="text-right py-2 px-2 font-medium">Followers</th>
+                    <th className="text-right py-2 px-2 font-medium">Reach</th>
+                    <th className="text-right py-2 px-2 font-medium">Impressions</th>
+                    <th className="text-right py-2 px-2 font-medium">Engagement</th>
+                    <th className="text-right py-2 pl-2 font-medium">Clicks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {socialByChannel.map((s) => (
+                    <tr key={s.platform} className="border-b border-[#1a1a1a]">
+                      <td className="py-2 pr-3 capitalize text-[#c8a951]">{s.platform}</td>
+                      <td className="py-2 px-2 text-right">{numOrDash(s.followers)}</td>
+                      <td className="py-2 px-2 text-right">{numOrDash(s.reach)}</td>
+                      <td className="py-2 px-2 text-right">{numOrDash(s.impressions)}</td>
+                      <td className="py-2 px-2 text-right">{numOrDash(s.engagement)}</td>
+                      <td className="py-2 pl-2 text-right">{numOrDash(s.clicks)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState message="No social metrics yet" hint="Submit Social Media Metrics (per platform) in the Marketing form." height={120} />
+          )}
+        </Section>
+
+        <Section number={4} title="Clienteling">
+          {hasClienteling ? (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {socialStats.map((s) => (
-                <div key={s.label} className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
-                  <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">{s.label}</div>
-                  <div className="text-lg font-bold mt-1">{s.value}</div>
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Contacted</div>
+                <div className="text-lg font-bold">{numOrDash(cl.contacted)}</div>
+              </div>
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Responses</div>
+                <div className="text-lg font-bold">{numOrDash(cl.responses)}</div>
+              </div>
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Response Rate</div>
+                <div className="text-lg font-bold">{cl.responseRate ? `${cl.responseRate}%` : '—'}</div>
+              </div>
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Appointments</div>
+                <div className="text-lg font-bold">{numOrDash(cl.appointments)}</div>
+              </div>
+              <div className="bg-[#0d0d0d] border border-[#c8a951]/30 rounded-lg p-3">
+                <div className="text-[0.65rem] text-[#c8a951] uppercase tracking-wider">Est. Revenue</div>
+                <div className="text-lg font-bold text-[#c8a951]">{dash(cl.estRevenue, fmtGHS)}</div>
+              </div>
+            </div>
+          ) : (
+            <EmptyState message="No clienteling activity yet" hint="Submit Clienteling Activity in the Marketing form." height={120} />
+          )}
+        </Section>
+
+        <Section number={5} title="Customer Intelligence">
+          {customerIntel.length ? (
+            <div className="space-y-2">
+              {customerIntel.map((c, i) => (
+                <div key={i} className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3 flex items-start gap-2 text-xs">
+                  <span className="text-[#c8a951] capitalize whitespace-nowrap">{c.type || 'note'}</span>
+                  <span className="text-gray-300 flex-1">{c.detail}</span>
+                  {c.frequency && <span className="text-gray-500">{c.frequency}</span>}
+                  {c.store && <span className="text-gray-600">{c.store}</span>}
                 </div>
               ))}
             </div>
           ) : (
-            <EmptyState message="No social metrics yet" hint="Submit Social Media Metrics in the Marketing form." height={120} />
+            <EmptyState message="No customer intelligence yet" hint="Submit Customer Intelligence in the Marketing form." height={120} />
           )}
         </Section>
 
-        <Section number={3} title="Recent Entries">
+        <Section number={6} title="Action Tracker">
+          {actions.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                    <th className="text-left py-2 pr-3 font-medium">Task</th>
+                    <th className="text-left py-2 px-3 font-medium">Owner</th>
+                    <th className="text-left py-2 px-3 font-medium">Priority</th>
+                    <th className="text-left py-2 px-3 font-medium">Deadline</th>
+                    <th className="text-left py-2 pl-3 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {actions.map((a, i) => (
+                    <tr key={i} className="border-b border-[#1a1a1a]">
+                      <td className="py-2 pr-3">{a.task}</td>
+                      <td className="py-2 px-3">{a.owner || '—'}</td>
+                      <td className="py-2 px-3 capitalize">{a.priority || '—'}</td>
+                      <td className="py-2 px-3 whitespace-nowrap">{a.deadline || '—'}</td>
+                      <td className="py-2 pl-3 capitalize">{a.status || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState message="No actions yet" hint="Submit Action Tracker items in the Marketing form." height={120} />
+          )}
+        </Section>
+
+        <Section number={7} title="Recent Entries">
           <RecentEntries department="marketing" />
         </Section>
       </div>

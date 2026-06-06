@@ -41,6 +41,9 @@ interface FinanceMetricsData {
   cashInflow: number;
   cashOutflow: number;
   cashNet: number;
+  cashTrend: { name: string; value: number }[];
+  cashPosition: number;
+  runwayDays: number;
   forecast: { revenue: number; grossProfit: number; netProfit: number; cash: number };
   entryCount: number;
 }
@@ -189,18 +192,38 @@ export default function FinancePage() {
 
         {/* 3. Cash Flow */}
         <Section number={3} title="Cash Flow" subtitle="MTD">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
-              <div className="text-[0.65rem] text-gray-500">Cash Inflow</div>
-              <div className="text-lg font-bold text-green-400">{dash(m?.cashInflow ?? 0, fmtGHS)}</div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="space-y-3">
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                <div className="text-[0.65rem] text-gray-500">Cash Inflow</div>
+                <div className="text-lg font-bold text-green-400">{dash(m?.cashInflow ?? 0, fmtGHS)}</div>
+              </div>
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                <div className="text-[0.65rem] text-gray-500">Cash Outflow</div>
+                <div className="text-lg font-bold text-red-400">{dash(m?.cashOutflow ?? 0, fmtGHS)}</div>
+              </div>
             </div>
-            <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
-              <div className="text-[0.65rem] text-gray-500">Cash Outflow</div>
-              <div className="text-lg font-bold text-red-400">{dash(m?.cashOutflow ?? 0, fmtGHS)}</div>
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Weekly Net Cash Flow</div>
+              {(m?.cashTrend ?? []).length ? (
+                <SimpleLineChart data={m?.cashTrend ?? []} height={180} color="#22c55e" area prefix="GHS " />
+              ) : (
+                <EmptyState message="No cash-flow entries yet" hint="Submit Cash Flow Entry in the Finance form." height={180} />
+              )}
             </div>
-            <div className="bg-[#0d0d0d] border border-[#c8a951]/30 rounded-lg p-3">
-              <div className="text-[0.65rem] text-[#c8a951]">Net Cash Flow</div>
-              <div className="text-lg font-bold text-[#c8a951]">{dash(m?.cashNet ?? 0, fmtGHS)}</div>
+            <div className="space-y-3">
+              <div className="bg-[#0d0d0d] border border-[#c8a951]/30 rounded-lg p-3">
+                <div className="text-[0.65rem] text-[#c8a951]">Net Cash Position</div>
+                <div className="text-lg font-bold text-[#c8a951]">{dash(m?.cashPosition ?? 0, fmtGHS)}</div>
+                <div className="text-[0.6rem] text-gray-600 mt-1">Closing = inflows − outflows recorded</div>
+              </div>
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-[0.65rem] text-gray-500">Est. Cash Runway</span>
+                  <span className="text-xl font-bold text-[#c8a951]">{(m?.runwayDays ?? 0) ? `${m?.runwayDays} days` : '—'}</span>
+                </div>
+                <div className="text-[0.6rem] text-gray-600 mt-1">Position ÷ operating expense run-rate</div>
+              </div>
             </div>
           </div>
         </Section>

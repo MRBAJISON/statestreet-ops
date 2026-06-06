@@ -25,6 +25,15 @@ interface InventoryLive {
   byBrand: { name: string; value: number }[];
   accuracyDistribution: { name: string; value: number }[];
   valueTrend: { name: string; value: number }[];
+  movement: {
+    receivedUnits: number;
+    receivedValue: number;
+    transferredUnits: number;
+    transferredValue: number;
+    deadStockValue: number;
+    replenishmentRequests: number;
+    countedValue: number;
+  };
 }
 
 export default function InventoryPage() {
@@ -32,6 +41,8 @@ export default function InventoryPage() {
   const byBrand = m?.byBrand ?? [];
   const valueTrend = m?.valueTrend ?? [];
   const accuracyDistribution = (m?.accuracyDistribution ?? []).filter((a) => a.value > 0);
+  const mv = m?.movement ?? { receivedUnits: 0, receivedValue: 0, transferredUnits: 0, transferredValue: 0, deadStockValue: 0, replenishmentRequests: 0, countedValue: 0 };
+  const hasMovement = !!(mv.receivedUnits || mv.transferredUnits || mv.deadStockValue || mv.countedValue);
 
   return (
     <div className="bg-[#0a0a0a] min-h-screen text-white">
@@ -109,7 +120,38 @@ export default function InventoryPage() {
           </div>
         </Section>
 
-        <Section number={3} title="Recent Entries">
+        <Section number={3} title="Stock Movement">
+          {hasMovement ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Counted On-Hand</div>
+                <div className="text-base font-bold">{fmtGHS(mv.countedValue)}</div>
+              </div>
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Goods Received</div>
+                <div className="text-base font-bold text-green-400">{fmtGHS(mv.receivedValue)}</div>
+                <div className="text-[0.6rem] text-gray-600 mt-0.5">{mv.receivedUnits.toLocaleString()} units</div>
+              </div>
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Transferred</div>
+                <div className="text-base font-bold text-blue-400">{fmtGHS(mv.transferredValue)}</div>
+                <div className="text-[0.6rem] text-gray-600 mt-0.5">{mv.transferredUnits.toLocaleString()} units</div>
+              </div>
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Dead Stock</div>
+                <div className="text-base font-bold text-red-400">{fmtGHS(mv.deadStockValue)}</div>
+              </div>
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Replenishment Reqs</div>
+                <div className="text-base font-bold">{mv.replenishmentRequests}</div>
+              </div>
+            </div>
+          ) : (
+            <EmptyState message="No stock movement yet" hint="Goods Received, Stock Transfer & Dead Stock entries feed this." height={120} />
+          )}
+        </Section>
+
+        <Section number={4} title="Recent Entries">
           <RecentEntries department="inventory" />
         </Section>
       </div>

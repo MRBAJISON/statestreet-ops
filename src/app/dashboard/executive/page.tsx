@@ -20,13 +20,24 @@ const pct = (n: number) => (n ? `${n}%` : '—');
 export default function ExecutiveCommandCenter() {
   const fin = useMetrics<{ revenueMtd: number; netProfit: number; grossMargin: number; cashNet: number; revenueByBrand: { name: string; value: number }[] }>('finance').data;
   const com = useMetrics<{ groupSales: number; convRate: number; salesByStore: { name: string; value: number }[] }>('commercial').data;
-  const ops = useMetrics<{ opsScore: number; openIssues: number }>('operations').data;
+  const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[] }>('operations').data;
   const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory').data;
   const brd = useMetrics<{ healthIndex: number; sentiment: { positive: number } }>('brand').data;
   const mkt = useMetrics<{ totalLeads: number }>('marketing').data;
 
   const revenueByBrand = fin?.revenueByBrand ?? [];
   const salesByStore = com?.salesByStore ?? [];
+
+  // Merge commercial sales + operations audit scores into one store-performance view
+  const storeMap = new Map<string, { sales: number; ops: number; vm: number }>();
+  for (const s of salesByStore) storeMap.set(s.name, { sales: s.value, ops: 0, vm: 0 });
+  for (const s of ops?.storeScores ?? []) {
+    const cur = storeMap.get(s.store) ?? { sales: 0, ops: 0, vm: 0 };
+    cur.ops = s.ops;
+    cur.vm = s.vm;
+    storeMap.set(s.store, cur);
+  }
+  const storePerformance = [...storeMap].map(([store, v]) => ({ store, ...v })).sort((a, b) => b.sales - a.sales);
 
   const departments = [
     { name: 'Finance', href: '/dashboard/finance', metric: 'Revenue MTD', value: dash(fin?.revenueMtd ?? 0, fmtGHS) },
@@ -90,8 +101,38 @@ export default function ExecutiveCommandCenter() {
           </div>
         </Section>
 
+        {/* Store performance */}
+        <Section number={2} title="Store Performance">
+          {storePerformance.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                    <th className="text-left py-2 pr-3 font-medium">Store</th>
+                    <th className="text-right py-2 px-3 font-medium">Sales</th>
+                    <th className="text-right py-2 px-3 font-medium">Ops Score</th>
+                    <th className="text-right py-2 pl-3 font-medium">VM Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {storePerformance.map((s) => (
+                    <tr key={s.store} className="border-b border-[#1a1a1a]">
+                      <td className="py-2 pr-3">{s.store}</td>
+                      <td className="py-2 px-3 text-right">{s.sales ? fmtGHS(s.sales) : '—'}</td>
+                      <td className="py-2 px-3 text-right">{s.ops || '—'}</td>
+                      <td className="py-2 pl-3 text-right">{s.vm || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState message="No store data yet" hint="Store sales (Commercial) and audits (Operations) populate this." height={140} />
+          )}
+        </Section>
+
         {/* Department snapshot */}
-        <Section number={2} title="Departments">
+        <Section number={3} title="Departments">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {departments.map((d) => (
               <Link

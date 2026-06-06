@@ -19,6 +19,11 @@ interface BrandLive {
   sentimentTrend: { name: string; value: number }[];
   portfolio: { brand: string; score: number; status: string; trend: string }[];
   healthIndex: number;
+  digitalReputation: { googleRating: number; googleReviews: number; trustpilot: number; responseRate: number; nps: number };
+  social: { followers: number; sentiment: number; newReviews: number; negReviews: number };
+  risks: { text: string; tag: string }[];
+  opportunities: { text: string; tag: string }[];
+  ceoAttention: { priority: string; issue: string; impact: string; owner: string; status: string }[];
 }
 
 export default function BrandHealthPage() {
@@ -29,6 +34,12 @@ export default function BrandHealthPage() {
   const soc = m?.shareOfConversation ?? [];
   const healthIndex = m?.healthIndex ?? 0;
   const hasSentiment = !!(sentiment.positive || sentiment.neutral || sentiment.negative);
+  const dr = m?.digitalReputation ?? { googleRating: 0, googleReviews: 0, trustpilot: 0, responseRate: 0, nps: 0 };
+  const social = m?.social ?? { followers: 0, sentiment: 0, newReviews: 0, negReviews: 0 };
+  const hasDigital = !!(dr.googleRating || dr.trustpilot || dr.responseRate || social.followers);
+  const risks = m?.risks ?? [];
+  const opportunities = m?.opportunities ?? [];
+  const ceoAttention = m?.ceoAttention ?? [];
 
   return (
     <div className="bg-[#0a0a0a] min-h-screen text-white">
@@ -123,7 +134,109 @@ export default function BrandHealthPage() {
           )}
         </Section>
 
-        <Section number={4} title="Recent Entries">
+        <Section number={4} title="Digital Reputation & Social">
+          {hasDigital ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Google Rating</div>
+                <div className="text-lg font-bold">{dr.googleRating ? `${dr.googleRating}★` : '—'}</div>
+                <div className="text-[0.6rem] text-gray-600 mt-0.5">{dr.googleReviews || 0} reviews</div>
+              </div>
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Trustpilot</div>
+                <div className="text-lg font-bold">{dr.trustpilot ? `${dr.trustpilot}★` : '—'}</div>
+              </div>
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Response Rate</div>
+                <div className="text-lg font-bold">{dr.responseRate ? `${dr.responseRate}%` : '—'}</div>
+              </div>
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">IG Followers</div>
+                <div className="text-lg font-bold">{social.followers ? social.followers.toLocaleString() : '—'}</div>
+              </div>
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">New / Neg Reviews</div>
+                <div className="text-lg font-bold">
+                  <span className="text-green-400">{social.newReviews || 0}</span>
+                  <span className="text-gray-600"> / </span>
+                  <span className="text-red-400">{social.negReviews || 0}</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <EmptyState message="No digital reputation data yet" hint="Submit Digital Reputation in the Brand form." height={120} />
+          )}
+        </Section>
+
+        <Section number={5} title="Risks & Opportunities">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Risks</div>
+              {risks.length ? (
+                <div className="space-y-2">
+                  {risks.map((r, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs p-2.5 rounded-lg border border-red-500/20 bg-red-500/5">
+                      <span className="text-red-400 mt-0.5">▲</span>
+                      <span className="text-gray-300 flex-1">{r.text}</span>
+                      {r.tag && <span className="text-gray-500 text-[0.6rem]">{r.tag}</span>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState message="No risks flagged" hint="Customer Voice (frustrations) & competitor threats appear here." height={120} />
+              )}
+            </div>
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Opportunities</div>
+              {opportunities.length ? (
+                <div className="space-y-2">
+                  {opportunities.map((o, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs p-2.5 rounded-lg border border-green-500/20 bg-green-500/5">
+                      <span className="text-green-400 mt-0.5">▲</span>
+                      <span className="text-gray-300 flex-1">{o.text}</span>
+                      {o.tag && <span className="text-gray-500 text-[0.6rem]">{o.tag}</span>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState message="No opportunities flagged" hint="Customer Voice (compliments/requests) appear here." height={120} />
+              )}
+            </div>
+          </div>
+        </Section>
+
+        <Section number={6} title="CEO Attention Index">
+          {ceoAttention.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                    <th className="text-left py-2 pr-3 font-medium">Priority</th>
+                    <th className="text-left py-2 px-3 font-medium">Issue</th>
+                    <th className="text-left py-2 px-3 font-medium">Impact</th>
+                    <th className="text-left py-2 px-3 font-medium">Owner</th>
+                    <th className="text-left py-2 pl-3 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ceoAttention.map((c, i) => (
+                    <tr key={i} className="border-b border-[#1a1a1a]">
+                      <td className="py-2 pr-3 capitalize">{c.priority || '—'}</td>
+                      <td className="py-2 px-3">{c.issue}</td>
+                      <td className="py-2 px-3 capitalize">{c.impact || '—'}</td>
+                      <td className="py-2 px-3">{c.owner || '—'}</td>
+                      <td className="py-2 pl-3 capitalize">{c.status || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState message="No CEO attention items" hint="Submit CEO Attention Items in the Brand form." height={120} />
+          )}
+        </Section>
+
+        <Section number={7} title="Recent Entries">
           <RecentEntries department="brand" />
         </Section>
       </div>

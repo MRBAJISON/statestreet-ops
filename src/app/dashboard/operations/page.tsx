@@ -23,6 +23,9 @@ interface OperationsLive {
   vmByStore: { name: string; value: number }[];
   storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[];
   risk: { high: number; medium: number; low: number };
+  incidentsByType: { security: number; safety: number; operational: number };
+  topRisks: { description: string; severity: string; store: string; status: string }[];
+  priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[];
 }
 
 export default function OperationsPage() {
@@ -31,6 +34,9 @@ export default function OperationsPage() {
   const storeScores = m?.storeScores ?? [];
   const risk = m?.risk ?? { high: 0, medium: 0, low: 0 };
   const incidentsTotal = m?.incidentsTotal ?? 0;
+  const byType = m?.incidentsByType ?? { security: 0, safety: 0, operational: 0 };
+  const topRisks = m?.topRisks ?? [];
+  const priorityActions = m?.priorityActions ?? [];
 
   return (
     <div className="bg-[#0a0a0a] min-h-screen text-white">
@@ -116,7 +122,70 @@ export default function OperationsPage() {
           )}
         </Section>
 
-        <Section number={3} title="Recent Entries">
+        <Section number={3} title="Risk & Incident Monitor">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+            <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Security</div>
+              <div className="text-lg font-bold text-red-400">{byType.security}</div>
+            </div>
+            <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Safety</div>
+              <div className="text-lg font-bold text-orange-400">{byType.safety}</div>
+            </div>
+            <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Operational</div>
+              <div className="text-lg font-bold text-yellow-400">{byType.operational}</div>
+            </div>
+          </div>
+          <div className="text-xs text-gray-400 mb-2">Top Risks (High / Critical incidents)</div>
+          {topRisks.length ? (
+            <div className="space-y-2">
+              {topRisks.map((r, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs p-2.5 rounded-lg border border-red-500/20 bg-red-500/5">
+                  <span className="text-red-400 mt-0.5">▲</span>
+                  <span className="text-gray-300 flex-1">{r.description}</span>
+                  <span className="text-gray-500">{r.store}</span>
+                  <span className="text-red-400 uppercase text-[0.6rem]">{r.severity}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState message="No high-severity incidents" hint="High/critical incidents from the Incident Report form appear here." height={120} />
+          )}
+        </Section>
+
+        <Section number={4} title="Priority Actions" subtitle="Maintenance">
+          {priorityActions.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                    <th className="text-left py-2 pr-3 font-medium">Action</th>
+                    <th className="text-left py-2 px-3 font-medium">Priority</th>
+                    <th className="text-left py-2 px-3 font-medium">Owner</th>
+                    <th className="text-left py-2 px-3 font-medium">Store</th>
+                    <th className="text-left py-2 pl-3 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {priorityActions.map((a, i) => (
+                    <tr key={i} className="border-b border-[#1a1a1a]">
+                      <td className="py-2 pr-3">{a.description}</td>
+                      <td className="py-2 px-3 capitalize">{a.priority || '—'}</td>
+                      <td className="py-2 px-3">{a.owner || '—'}</td>
+                      <td className="py-2 px-3">{a.store}</td>
+                      <td className="py-2 pl-3 capitalize">{a.status || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState message="No maintenance actions yet" hint="Submit Maintenance Request in the Operations form." height={120} />
+          )}
+        </Section>
+
+        <Section number={5} title="Recent Entries">
           <RecentEntries department="operations" />
         </Section>
       </div>
