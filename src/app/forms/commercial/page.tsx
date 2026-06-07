@@ -24,10 +24,33 @@ const CATEGORIES = [
   { label: 'Accessories', value: 'accessories' }, { label: 'Others', value: 'others' },
 ];
 
+const numOf = (s: string) => Number(s) || 0;
+const fmt2 = (x: number) => (x ? x.toFixed(2) : '');
+const fmt1 = (x: number) => (x ? x.toFixed(1) : '');
+
 export default function CommercialFormsPage() {
   const [activeForm, setActiveForm] = useState('store-sales');
   const [submitted, setSubmitted] = useState(false);
   const [message, setMessage] = useState('');
+
+  // Auto-calc drivers (store sales + category performance)
+  const [ssTotalSales, setSsTotalSales] = useState('');
+  const [ssTxns, setSsTxns] = useState('');
+  const [ssFootfall, setSsFootfall] = useState('');
+  const [cpSales, setCpSales] = useState('');
+  const [cpUnits, setCpUnits] = useState('');
+
+  const ssAtv = numOf(ssTxns) ? numOf(ssTotalSales) / numOf(ssTxns) : 0;
+  const ssConv = numOf(ssFootfall) ? (numOf(ssTxns) / numOf(ssFootfall)) * 100 : 0;
+  const cpAsp = numOf(cpUnits) ? numOf(cpSales) / numOf(cpUnits) : 0;
+
+  function resetAutoCalc() {
+    setSsTotalSales('');
+    setSsTxns('');
+    setSsFootfall('');
+    setCpSales('');
+    setCpUnits('');
+  }
 
   const forms = [
     { id: 'store-sales', label: 'Daily Store Sales' },
@@ -44,6 +67,7 @@ export default function CommercialFormsPage() {
       await submitEntry('commercial', activeForm, form);
       setMessage('Saved to the live database. The dashboard reflects it now.');
       form.reset();
+      resetAutoCalc();
     } catch (err) {
       setMessage('Could not save: ' + (err as Error).message);
     }
@@ -79,13 +103,13 @@ export default function CommercialFormsPage() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
               <FormField label="Store" name="store" type="select" required options={STORES} />
-              <FormField label="Total Sales" name="totalSales" type="number" prefix="GHS" required step={0.01} />
-              <FormField label="Number of Transactions" name="transactions" type="number" required />
-              <FormField label="Footfall" name="footfall" type="number" required />
+              <FormField label="Total Sales" name="totalSales" type="number" prefix="GHS" required step={0.01} value={ssTotalSales} onChange={(e) => setSsTotalSales(e.target.value)} />
+              <FormField label="Number of Transactions" name="transactions" type="number" required value={ssTxns} onChange={(e) => setSsTxns(e.target.value)} />
+              <FormField label="Footfall" name="footfall" type="number" required value={ssFootfall} onChange={(e) => setSsFootfall(e.target.value)} />
               <FormField label="Items Sold (Units)" name="unitsSold" type="number" required />
               <FormField label="Returns Value" name="returns" type="number" prefix="GHS" step={0.01} />
-              <FormField label="Conversion Rate %" name="convRate" type="number" suffix="%" step={0.1} />
-              <FormField label="Average Transaction Value" name="atv" type="number" prefix="GHS" step={0.01} />
+              <FormField label="Conversion Rate % (auto)" name="convRate" type="number" suffix="%" value={fmt1(ssConv)} readOnly />
+              <FormField label="Avg Transaction Value (auto)" name="atv" type="number" prefix="GHS" value={fmt2(ssAtv)} readOnly />
             </div>
           </FormSection>
         )}
@@ -96,11 +120,11 @@ export default function CommercialFormsPage() {
               <FormField label="Week Ending" name="weekEnd" type="date" required />
               <FormField label="Store" name="store" type="select" required options={STORES} />
               <FormField label="Category" name="category" type="select" required options={CATEGORIES} />
-              <FormField label="Sales Value" name="sales" type="number" prefix="GHS" required step={0.01} />
-              <FormField label="Units Sold" name="units" type="number" required />
+              <FormField label="Sales Value" name="sales" type="number" prefix="GHS" required step={0.01} value={cpSales} onChange={(e) => setCpSales(e.target.value)} />
+              <FormField label="Units Sold" name="units" type="number" required value={cpUnits} onChange={(e) => setCpUnits(e.target.value)} />
               <FormField label="Gross Margin %" name="gm" type="number" suffix="%" step={0.1} />
               <FormField label="Sell Through %" name="sellThrough" type="number" suffix="%" step={0.1} />
-              <FormField label="Average Selling Price" name="asp" type="number" prefix="GHS" step={0.01} />
+              <FormField label="Avg Selling Price (auto)" name="asp" type="number" prefix="GHS" value={fmt2(cpAsp)} readOnly />
               <FormField label="Markdown %" name="markdown" type="number" suffix="%" step={0.1} />
             </div>
           </FormSection>

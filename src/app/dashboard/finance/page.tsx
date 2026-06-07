@@ -52,6 +52,7 @@ interface FinanceMetricsData {
   cashPosition: number;
   runwayDays: number;
   forecast: { revenue: number; grossProfit: number; netProfit: number; cash: number };
+  weeklyForecast: { revenue: number; grossProfit: number; netProfit: number; cash: number };
   entryCount: number;
 }
 
@@ -78,6 +79,8 @@ export default function FinancePage() {
 
   const forecast = m?.forecast ?? { revenue: 0, grossProfit: 0, netProfit: 0, cash: 0 };
   const hasForecast = !!(forecast.revenue || forecast.grossProfit || forecast.netProfit || forecast.cash);
+  const weeklyForecast = m?.weeklyForecast ?? { revenue: 0, grossProfit: 0, netProfit: 0, cash: 0 };
+  const hasWeekly = !!(weeklyForecast.revenue || weeklyForecast.grossProfit || weeklyForecast.netProfit || weeklyForecast.cash);
 
   const margins = [
     { label: 'Gross Margin', value: m?.grossMargin ?? 0 },
@@ -306,6 +309,30 @@ export default function FinancePage() {
             </div>
           </div>
         </Section>
+
+        {/* Weekly forecast (when weekly forecast data exists) */}
+        {hasWeekly && (
+          <Section title="Weekly Forecast">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-[#0d0d0d] border border-[#c8a951]/30 rounded-lg p-4">
+                <div className="text-[0.65rem] text-[#c8a951] uppercase tracking-wider">Weekly Revenue</div>
+                <div className="text-xl font-bold mt-1">{dash(weeklyForecast.revenue, fmtGHS)}</div>
+              </div>
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-4">
+                <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Weekly Gross Profit</div>
+                <div className="text-xl font-bold mt-1">{dash(weeklyForecast.grossProfit, fmtGHS)}</div>
+              </div>
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-4">
+                <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Weekly Net Profit</div>
+                <div className="text-xl font-bold mt-1">{dash(weeklyForecast.netProfit, fmtGHS)}</div>
+              </div>
+              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-4">
+                <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Weekly Cash</div>
+                <div className="text-xl font-bold mt-1">{dash(weeklyForecast.cash, fmtGHS)}</div>
+              </div>
+            </div>
+          </Section>
+        )}
 
         {/* 6. Forecast (only when forecast data exists) */}
         {hasForecast && (

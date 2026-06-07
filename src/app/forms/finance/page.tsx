@@ -320,6 +320,7 @@ export default function FinanceFormsPage() {
           <FormSection title="Forecast Update" description="Update end-of-month financial forecasts">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Forecast Period" name="period" type="select" required options={[
+                { label: 'This Week', value: 'weekly' },
                 { label: 'Current Month EOM', value: 'current' },
                 { label: 'Next Month', value: 'next' },
                 { label: 'Quarter End', value: 'quarter' },
