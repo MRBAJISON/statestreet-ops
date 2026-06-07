@@ -23,10 +23,12 @@ no forms; department managers see only their own dashboard + form (Marketing als
 ## Environment variables
 Create `.env.local` (see `.env.example`):
 
-| Name | Description |
-| --- | --- |
-| `DATABASE_URL` | Neon Postgres connection string |
-| `AUTH_SECRET` | Long random string used to sign session cookies |
+| Name | Required | Description |
+| --- | --- | --- |
+| `DATABASE_URL` | yes | Neon Postgres connection string |
+| `AUTH_SECRET` | yes | Long random string used to sign session cookies |
+| `RESEND_API_KEY` | no | Resend API key for password-reset emails. If unset, reset links are logged to the server console instead of emailed. |
+| `EMAIL_FROM` | no | From address for emails, e.g. `StateStreet Ops <no-reply@yourdomain.com>`. Sending to arbitrary recipients requires a **verified domain** in Resend. |
 
 ## Local development
 ```bash
@@ -43,8 +45,20 @@ npm run dev                     # http://localhost:3000
 
 ## Deployment (Vercel)
 1. Push to GitHub and import the repo at vercel.com/new (framework auto-detected).
-2. Set `DATABASE_URL` and `AUTH_SECRET` as Environment Variables.
+2. In **Settings → Environment Variables** (Production scope), set:
+   - `DATABASE_URL` — Neon connection string
+   - `AUTH_SECRET` — long random string (`openssl rand -hex 32`)
+   - `RESEND_API_KEY` — (optional) for password-reset emails
+   - `EMAIL_FROM` — (optional) verified sender address
 3. Deploy. The same Neon database is used in production.
+
+### Enabling password-reset emails (Resend)
+1. Create an account at resend.com → **API Keys** → create a key (`re_…`).
+2. **Domains** → add and verify your domain (DNS records) so you can email any recipient.
+   Until a domain is verified, Resend only delivers to your own account email, and the
+   default `EMAIL_FROM` (`onboarding@resend.dev`) is test-only.
+3. Set `RESEND_API_KEY` and `EMAIL_FROM` (e.g. `StateStreet Ops <no-reply@yourdomain.com>`)
+   in Vercel, then redeploy.
 
 ## Security notes
 - Sessions are HMAC-signed (tamper-proof); set a strong `AUTH_SECRET` in production.
