@@ -175,9 +175,10 @@ function financeMetrics(rows: Entry[]) {
   const cashPosition = cashInflow - cashOutflow; // closing position from recorded flows
   const runwayDays = operatingExpenses > 0 ? Math.max(0, Math.round((cashPosition / operatingExpenses) * 30)) : 0;
 
-  // Forecast (latest forecast entry)
+  // Forecast (latest forecast entry overall, and latest weekly forecast)
   const fc = payloads(rows, 'forecast');
   const lastFc = fc[fc.length - 1] ?? {};
+  const lastWeekly = [...fc].reverse().find((p) => String(p.period) === 'weekly') ?? {};
 
   return {
     revenueMtd,
@@ -226,6 +227,12 @@ function financeMetrics(rows: Entry[]) {
       grossProfit: num(lastFc.gpForecast),
       netProfit: num(lastFc.npForecast),
       cash: num(lastFc.cashForecast),
+    },
+    weeklyForecast: {
+      revenue: num(lastWeekly.revenueForecast),
+      grossProfit: num(lastWeekly.gpForecast),
+      netProfit: num(lastWeekly.npForecast),
+      cash: num(lastWeekly.cashForecast),
     },
     entryCount: rows.length,
   };

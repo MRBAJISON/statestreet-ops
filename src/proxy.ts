@@ -60,6 +60,7 @@ export async function proxy(req: NextRequest) {
   // Enforce department access on /dashboard/<segment> and /forms/<segment>.
   const match = pathname.match(/^\/(dashboard|forms)\/([^/]+)/);
   if (match) {
+    const area = match[1];
     const segment = match[2];
     const dept = SEGMENT_TO_DEPT[segment];
 
@@ -68,8 +69,11 @@ export async function proxy(req: NextRequest) {
       return NextResponse.redirect(new URL(`/dashboard/${homeFor(role, allowed)}`, req.url));
     }
 
+    // Operations manager may use every form (data entry); dashboards stay scoped.
+    const opsFormsAllowed = area === 'forms' && role === 'operations';
+
     // Known department the role may not access -> send to their own home.
-    if (dept && !allowed.includes(dept)) {
+    if (dept && !allowed.includes(dept) && !opsFormsAllowed) {
       return NextResponse.redirect(new URL(`/dashboard/${homeFor(role, allowed)}`, req.url));
     }
   }

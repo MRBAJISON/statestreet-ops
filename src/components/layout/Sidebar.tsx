@@ -20,9 +20,13 @@ const DEPT_CONFIG: Record<Department, { label: string; icon: string; color: stri
   brand: { label: 'Brand Health', icon: '🏆', color: '#ec4899' },
 };
 
+const ALL_FORM_DEPTS: Department[] = ['finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'];
+
 export default function Sidebar({ userName, userRole, departments }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  // Operations manager can use every form; others only their own department(s).
+  const formDepts = userRole === 'operations' ? ALL_FORM_DEPTS : departments.filter((d) => d !== 'executive');
 
   async function handleLogout() {
     await fetch('/api/auth', { method: 'DELETE' });
@@ -81,7 +85,7 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
         {userRole !== 'owner' && (
           <>
             <div className="text-[0.6rem] text-gray-600 uppercase tracking-wider px-3 py-2 mt-4">Data Entry</div>
-            {departments.filter(d => d !== 'executive').map(dept => {
+            {formDepts.map(dept => {
               const config = DEPT_CONFIG[dept];
               const href = `/forms/${dept === 'brand' ? 'brand-health' : dept}`;
               const isActive = pathname === href;

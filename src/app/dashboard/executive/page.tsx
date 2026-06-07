@@ -9,6 +9,7 @@ import { SimpleDonutChart, SimpleBarChart } from '@/components/charts/Charts';
 import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, type Period } from '@/lib/api';
+import { STORES } from '@/lib/config';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -22,15 +23,18 @@ const pct = (n: number) => (n ? `${n}%` : '—');
 export default function ExecutiveCommandCenter() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
-  const fin = useMetrics<{ revenueMtd: number; netProfit: number; grossMargin: number; cashNet: number; revenueByBrand: { name: string; value: number }[] }>('finance', period, anchor).data;
-  const com = useMetrics<{ groupSales: number; convRate: number; salesByStore: { name: string; value: number }[] }>('commercial', period, anchor).data;
-  const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[] }>('operations', period, anchor).data;
-  const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory', period, anchor).data;
-  const brd = useMetrics<{ healthIndex: number; sentiment: { positive: number }; ceoAttention: { priority: string; issue: string; impact: string; owner: string; status: string }[] }>('brand', period, anchor).data;
-  const mkt = useMetrics<{ totalLeads: number }>('marketing', period, anchor).data;
+  const [store, setStore] = useState('');
+  const fin = useMetrics<{ revenueMtd: number; netProfit: number; grossMargin: number; cashNet: number; revenueByBrand: { name: string; value: number }[] }>('finance', period, anchor, store).data;
+  const com = useMetrics<{ groupSales: number; convRate: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[] }>('commercial', period, anchor, store).data;
+  const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[] }>('operations', period, anchor, store).data;
+  const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory', period, anchor, store).data;
+  const brd = useMetrics<{ healthIndex: number; sentiment: { positive: number }; ceoAttention: { priority: string; issue: string; impact: string; owner: string; status: string }[] }>('brand', period, anchor, store).data;
+  const mkt = useMetrics<{ totalLeads: number }>('marketing', period, anchor, store).data;
 
   const revenueByBrand = fin?.revenueByBrand ?? [];
   const salesByStore = com?.salesByStore ?? [];
+  const categorySales = com?.categorySales ?? [];
+  const sellThroughByCategory = com?.sellThroughByCategory ?? [];
 
   // Merge commercial sales + operations audit scores into one store-performance view
   const storeMap = new Map<string, { sales: number; ops: number; vm: number }>();
@@ -64,10 +68,10 @@ export default function ExecutiveCommandCenter() {
 
       {/* GROUP KPI BAR */}
       <div className="px-6 pt-4 flex justify-end">
-        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} />
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={STORES} onStoreChange={setStore} />
       </div>
       <div className="px-6 py-3">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           <KPICard label="Group Revenue" value={dash(fin?.revenueMtd ?? 0, fmtGHS)} status="green" small />
           <KPICard label="Net Profit" value={dash(fin?.netProfit ?? 0, fmtGHS)} status={(fin?.netProfit ?? 0) >= 0 ? 'green' : 'red'} small />
           <KPICard label="Gross Margin" value={pct(fin?.grossMargin ?? 0)} small />
@@ -75,7 +79,6 @@ export default function ExecutiveCommandCenter() {
           <KPICard label="Store Sales" value={dash(com?.groupSales ?? 0, fmtGHS)} small />
           <KPICard label="Inventory Value" value={dash(inv?.inventoryValue ?? 0, fmtGHS)} small />
           <KPICard label="Ops Score" value={pct(ops?.opsScore ?? 0)} small />
-          <KPICard label="Brand Health" value={(brd?.healthIndex ?? 0) ? String(brd?.healthIndex) : '—'} small />
         </div>
       </div>
 
@@ -139,8 +142,30 @@ export default function ExecutiveCommandCenter() {
           )}
         </Section>
 
+        {/* Category performance */}
+        <Section number={3} title="Category Performance">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Sales by Category</div>
+              {categorySales.length ? (
+                <SimpleBarChart data={categorySales} height={220} color="#c8a951" prefix="GHS " />
+              ) : (
+                <EmptyState message="No category sales yet" hint="Add Category Performance in the Commercial form." height={220} />
+              )}
+            </div>
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Sell-Through by Category</div>
+              {sellThroughByCategory.length ? (
+                <SimpleBarChart data={sellThroughByCategory} height={220} color="#22c55e" />
+              ) : (
+                <EmptyState message="No sell-through data yet" hint="Add Category Performance in the Commercial form." height={220} />
+              )}
+            </div>
+          </div>
+        </Section>
+
         {/* Department snapshot */}
-        <Section number={3} title="Departments">
+        <Section number={4} title="Departments">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {departments.map((d) => (
               <Link
@@ -157,7 +182,7 @@ export default function ExecutiveCommandCenter() {
         </Section>
 
         {/* CEO Attention */}
-        <Section number={4} title="CEO Attention Index">
+        <Section number={5} title="CEO Attention Index">
           {ceoAttention.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
