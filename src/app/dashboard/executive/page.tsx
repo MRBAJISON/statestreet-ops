@@ -26,10 +26,10 @@ export default function ExecutiveCommandCenter() {
   const [store, setStore] = useState('');
   const fin = useMetrics<{ revenueMtd: number; netProfit: number; grossMargin: number; cashNet: number; revenueByBrand: { name: string; value: number }[] }>('finance', period, anchor, store).data;
   const com = useMetrics<{ groupSales: number; convRate: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[] }>('commercial', period, anchor, store).data;
-  const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[] }>('operations', period, anchor, store).data;
+  const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[]; priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[] }>('operations', period, anchor, store).data;
   const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory', period, anchor, store).data;
   const brd = useMetrics<{ healthIndex: number; sentiment: { positive: number }; ceoAttention: { priority: string; issue: string; impact: string; owner: string; status: string }[] }>('brand', period, anchor, store).data;
-  const mkt = useMetrics<{ totalLeads: number }>('marketing', period, anchor, store).data;
+  const mkt = useMetrics<{ totalLeads: number; actions: { task: string; owner: string; priority: string; status: string; deadline: string }[] }>('marketing', period, anchor, store).data;
 
   const revenueByBrand = fin?.revenueByBrand ?? [];
   const salesByStore = com?.salesByStore ?? [];
@@ -47,6 +47,12 @@ export default function ExecutiveCommandCenter() {
   }
   const storePerformance = [...storeMap].map(([store, v]) => ({ store, ...v })).sort((a, b) => b.sales - a.sales);
   const ceoAttention = brd?.ceoAttention ?? [];
+
+  // Cross-department action tracker (Marketing priorities + Operations maintenance actions)
+  const actionTracker = [
+    ...(mkt?.actions ?? []).map((a) => ({ dept: 'Marketing', task: a.task, owner: a.owner, priority: a.priority, status: a.status })),
+    ...(ops?.priorityActions ?? []).map((a) => ({ dept: 'Operations', task: a.description, owner: a.owner, priority: a.priority, status: a.status })),
+  ];
 
   const departments = [
     { name: 'Finance', href: '/dashboard/finance', metric: 'Revenue MTD', value: dash(fin?.revenueMtd ?? 0, fmtGHS) },
@@ -210,6 +216,38 @@ export default function ExecutiveCommandCenter() {
             </div>
           ) : (
             <EmptyState message="No CEO attention items" hint="Raised via the Brand → CEO Attention Items form." height={120} />
+          )}
+        </Section>
+
+        {/* Action Tracker (cross-department) */}
+        <Section number={6} title="Action Tracker">
+          {actionTracker.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                    <th className="text-left py-2 pr-3 font-medium">Dept</th>
+                    <th className="text-left py-2 px-3 font-medium">Task</th>
+                    <th className="text-left py-2 px-3 font-medium">Owner</th>
+                    <th className="text-left py-2 px-3 font-medium">Priority</th>
+                    <th className="text-left py-2 pl-3 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {actionTracker.map((a, i) => (
+                    <tr key={i} className="border-b border-[#1a1a1a]">
+                      <td className="py-2 pr-3 text-[#c8a951]">{a.dept}</td>
+                      <td className="py-2 px-3">{a.task}</td>
+                      <td className="py-2 px-3">{a.owner || '—'}</td>
+                      <td className="py-2 px-3 capitalize">{a.priority || '—'}</td>
+                      <td className="py-2 pl-3 capitalize">{a.status || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState message="No actions yet" hint="From Marketing → Action Tracker and Operations → Maintenance." height={120} />
           )}
         </Section>
       </div>
