@@ -25,6 +25,8 @@ export default function LoginPage() {
       const data = await res.json();
       if (data.user.role === 'owner') {
         router.push('/dashboard/executive');
+      } else if (data.user.role === 'store-manager') {
+        router.push('/forms/store-manager');
       } else {
         const seg = data.user.department === 'brand' ? 'brand-health' : data.user.department;
         router.push(`/dashboard/${seg}`);

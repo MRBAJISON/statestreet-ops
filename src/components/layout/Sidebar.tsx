@@ -82,7 +82,20 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
           </>
         )}
 
-        {userRole !== 'owner' && (
+        {userRole === 'store-manager' && (
+          <>
+            <div className="text-[0.6rem] text-gray-600 uppercase tracking-wider px-3 py-2 mt-4">Data Entry</div>
+            <Link href="/forms/store-manager"
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                pathname === '/forms/store-manager' ? 'bg-[#1a1a1a] text-white' : 'text-gray-500 hover:text-gray-300 hover:bg-[#111]'
+              }`}>
+              <span className="text-xs">📝</span>
+              <span>Weekly Review</span>
+            </Link>
+          </>
+        )}
+
+        {userRole !== 'owner' && userRole !== 'store-manager' && (
           <>
             <div className="text-[0.6rem] text-gray-600 uppercase tracking-wider px-3 py-2 mt-4">Data Entry</div>
             {formDepts.map(dept => {

@@ -68,10 +68,8 @@ const CEO_QUESTIONS = [
   'If this store belonged to you, what would be your first three actions?',
 ];
 
-const DECLARATIONS = [
-  'My category performance', 'My inventory position', 'My stock risks',
-  'My revenue targets', 'My execution priorities for the week',
-];
+// CEO questions auto-answered from the grid (0-indexed): Q1, Q2, Q4. The rest need judgement.
+const AUTO_Q = new Set([0, 1, 3]);
 
 const inputCls = 'w-full bg-[#111] border border-[#2a2a2a] rounded px-1.5 py-1 text-xs text-white focus:outline-none focus:border-[#c8a951]';
 const headInputCls = 'bg-[#111] border border-[#2a2a2a] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8a951]';
@@ -82,8 +80,6 @@ export default function WeeklyReview() {
   // rows[category][colKey] = value
   const [rows, setRows] = useState<Record<string, Record<string, string>>>({});
   const [ceo, setCeo] = useState<string[]>(Array(6).fill(''));
-  const [decl, setDecl] = useState<boolean[]>(Array(5).fill(false));
-  const [signoff, setSignoff] = useState({ manager: '', signature: '', date: '' });
   const [activeSection, setActiveSection] = useState('s1');
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -101,6 +97,25 @@ export default function WeeklyReview() {
     return t ? Math.round((num(cell(cat, 'actualUnits')) / t) * 1000) / 10 : 0;
   };
 
+  // Auto-generated CEO answers, recomputed live from the category grid.
+  const fmtGhc = (n: number) => `GHS ${Math.round(n).toLocaleString()}`;
+  const catStats = CATEGORIES.map((c) => ({
+    c,
+    rev: num(cell(c, 'revenue')),
+    risk: num(cell(c, 'valueAtRisk')),
+    rating: cell(c, 'rating'),
+  }));
+  const topMoney = catStats.filter((x) => x.rev > 0).sort((a, b) => b.rev - a.rev).slice(0, 3);
+  const concernsBase = catStats.filter((x) => x.rating === 'Poor' || x.risk > 0);
+  const concerns = (concernsBase.length ? concernsBase : catStats.filter((x) => x.rev > 0).sort((a, b) => a.rev - b.rev)).slice(0, 3);
+  const topRisk = catStats.filter((x) => x.risk > 0).sort((a, b) => b.risk - a.risk)[0];
+  const autoAnswers: Record<number, string> = {
+    0: topMoney.length ? `Top revenue categories last week: ${topMoney.map((x) => `${x.c} (${fmtGhc(x.rev)})`).join(', ')}.` : '',
+    1: concerns.length ? `Categories of concern: ${concerns.map((x) => `${x.c}${x.rating === 'Poor' ? ' (rated Poor)' : x.risk > 0 ? ` (${fmtGhc(x.risk)} at risk)` : ''}`).join(', ')}.` : '',
+    3: topRisk ? `Greatest stock risk: ${topRisk.c} with ${fmtGhc(topRisk.risk)} of stock value at risk.` : '',
+  };
+  const answerFor = (i: number) => (AUTO_Q.has(i) ? autoAnswers[i] ?? '' : ceo[i]);
+
   async function submit() {
     if (!header.store || !header.weekEnd) {
       setMsg({ ok: false, text: 'Store and Week Ending are required.' });
@@ -112,14 +127,12 @@ export default function WeeklyReview() {
         ...header,
         achievement: headerAchievement,
         categories: rows,
-        ceo: Object.fromEntries(ceo.map((a, i) => [`q${i + 1}`, a])),
-        declaration: { confirmed: DECLARATIONS.filter((_, i) => decl[i]), ...signoff },
+        ceo: Object.fromEntries(CEO_QUESTIONS.map((_, i) => [`q${i + 1}`, answerFor(i)])),
       };
       await postEntry('commercial', 'weekly-review', payload);
       setMsg({ ok: true, text: 'Weekly review saved to the live database.' });
-      setRows({}); setCeo(Array(6).fill('')); setDecl(Array(5).fill(false));
+      setRows({}); setCeo(Array(6).fill(''));
       setHeader({ store: '', manager: '', weekEnd: '', weeklySalesTarget: '', actualSales: '' });
-      setSignoff({ manager: '', signature: '', date: '' });
     } catch (e) {
       setMsg({ ok: false, text: 'Could not save: ' + (e as Error).message });
     }
@@ -216,33 +229,23 @@ export default function WeeklyReview() {
 
       {/* CEO questions */}
       <div>
-        <div className="text-sm font-semibold mb-2">CEO Questions <span className="text-red-400 text-xs">(mandatory)</span></div>
+        <div className="text-sm font-semibold mb-2">CEO Questions</div>
         <div className="space-y-3">
           {CEO_QUESTIONS.map((q, i) => (
             <div key={i}>
-              <label className="block text-xs text-gray-400 mb-1">{i + 1}. {q}</label>
-              <textarea value={ceo[i]} onChange={(e) => setCeo(ceo.map((v, j) => (j === i ? e.target.value : v)))} rows={2} className="w-full bg-[#111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-[#c8a951]" />
+              <label className="block text-xs text-gray-400 mb-1">
+                {i + 1}. {q}
+                {AUTO_Q.has(i) && <span className="ml-2 text-[#c8a951] text-[0.65rem]">auto-answered from the grid</span>}
+              </label>
+              {AUTO_Q.has(i) ? (
+                <div className="w-full bg-[#0d0d0d] border border-[#c8a951]/30 rounded-lg px-3 py-2 text-sm text-gray-200 min-h-[2.5rem]">
+                  {autoAnswers[i] || <span className="text-gray-600">Fill the category grid to generate this answer.</span>}
+                </div>
+              ) : (
+                <textarea value={ceo[i]} onChange={(e) => setCeo(ceo.map((v, j) => (j === i ? e.target.value : v)))} rows={2} className="w-full bg-[#111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-[#c8a951]" />
+              )}
             </div>
           ))}
-        </div>
-      </div>
-
-      {/* Declaration */}
-      <div>
-        <div className="text-sm font-semibold mb-2">Store Manager Declaration</div>
-        <p className="text-xs text-gray-500 mb-2">I confirm that I understand:</p>
-        <div className="space-y-1.5 mb-3">
-          {DECLARATIONS.map((d, i) => (
-            <label key={i} className="flex items-center gap-2 text-xs text-gray-300">
-              <input type="checkbox" checked={decl[i]} onChange={(e) => setDecl(decl.map((v, j) => (j === i ? e.target.checked : v)))} />
-              {d}
-            </label>
-          ))}
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <input placeholder="Store Manager" value={signoff.manager} onChange={(e) => setSignoff({ ...signoff, manager: e.target.value })} className={headInputCls} />
-          <input placeholder="Signature" value={signoff.signature} onChange={(e) => setSignoff({ ...signoff, signature: e.target.value })} className={headInputCls} />
-          <input type="date" value={signoff.date} onChange={(e) => setSignoff({ ...signoff, date: e.target.value })} className={headInputCls} />
         </div>
       </div>
 

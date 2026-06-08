@@ -10,6 +10,7 @@ const ROLE_DEPARTMENTS: Record<string, string[]> = {
   operations: ['operations'],
   inventory: ['inventory'],
   brand: ['brand'],
+  'store-manager': ['commercial'],
 };
 
 // URL segment -> department key.
@@ -21,6 +22,7 @@ const SEGMENT_TO_DEPT: Record<string, string> = {
   operations: 'operations',
   inventory: 'inventory',
   'brand-health': 'brand',
+  'store-manager': 'commercial',
 };
 
 async function getRoleFromSession(req: NextRequest): Promise<string | null> {
@@ -34,6 +36,12 @@ async function getRoleFromSession(req: NextRequest): Promise<string | null> {
 function homeFor(role: string, allowed: string[]): string {
   if (role === 'owner') return 'executive';
   return allowed[0] === 'brand' ? 'brand-health' : allowed[0];
+}
+
+// Where each role lands by default (store managers land on their form, not a dashboard).
+function landingPath(role: string, allowed: string[]): string {
+  if (role === 'store-manager') return '/forms/store-manager';
+  return `/dashboard/${homeFor(role, allowed)}`;
 }
 
 export async function proxy(req: NextRequest) {
@@ -54,7 +62,7 @@ export async function proxy(req: NextRequest) {
 
   // Admin area is owner-only.
   if (pathname.startsWith('/dashboard/admin') && role !== 'owner') {
-    return NextResponse.redirect(new URL(`/dashboard/${homeFor(role, allowed)}`, req.url));
+    return NextResponse.redirect(new URL(landingPath(role, allowed), req.url));
   }
 
   // Enforce department access on /dashboard/<segment> and /forms/<segment>.
@@ -66,7 +74,17 @@ export async function proxy(req: NextRequest) {
 
     // Executive area is owner-only.
     if (segment === 'executive' && role !== 'owner') {
-      return NextResponse.redirect(new URL(`/dashboard/${homeFor(role, allowed)}`, req.url));
+      return NextResponse.redirect(new URL(landingPath(role, allowed), req.url));
+    }
+
+    // The store-manager form is store-manager-only; store managers get no other forms.
+    if (area === 'forms') {
+      if (segment === 'store-manager' && role !== 'store-manager') {
+        return NextResponse.redirect(new URL(landingPath(role, allowed), req.url));
+      }
+      if (role === 'store-manager' && segment !== 'store-manager') {
+        return NextResponse.redirect(new URL('/forms/store-manager', req.url));
+      }
     }
 
     // Operations manager may use every form (data entry); dashboards stay scoped.
@@ -74,7 +92,7 @@ export async function proxy(req: NextRequest) {
 
     // Known department the role may not access -> send to their own home.
     if (dept && !allowed.includes(dept) && !opsFormsAllowed) {
-      return NextResponse.redirect(new URL(`/dashboard/${homeFor(role, allowed)}`, req.url));
+      return NextResponse.redirect(new URL(landingPath(role, allowed), req.url));
     }
   }
 

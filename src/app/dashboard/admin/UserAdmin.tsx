@@ -10,7 +10,7 @@ interface User {
   department: string;
 }
 
-const ROLES = ['owner', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'];
+const ROLES = ['owner', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand', 'store-manager'];
 const DEPARTMENTS = ['executive', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'];
 const selectClass = 'bg-[#111] border border-[#2a2a2a] text-xs text-white rounded px-2 py-1 focus:outline-none focus:border-[#c8a951]';
 const inputClass = 'bg-[#111] border border-[#2a2a2a] text-sm text-white rounded-lg px-3 py-2 focus:outline-none focus:border-[#c8a951]';
