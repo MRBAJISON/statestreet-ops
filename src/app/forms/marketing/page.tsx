@@ -11,6 +11,21 @@ export default function MarketingFormsPage() {
   const [activeForm, setActiveForm] = useState('campaign');
   const [submitted, setSubmitted] = useState(false);
   const [message, setMessage] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  // Public survey link (resolved from the current origin at runtime).
+  const surveyUrl = typeof window !== 'undefined' ? `${window.location.origin}/survey/customer-experience` : '/survey/customer-experience';
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(surveyUrl)}`;
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(surveyUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
 
   const forms = [
     { id: 'campaign', label: 'Campaign Performance' },
@@ -152,7 +167,29 @@ export default function MarketingFormsPage() {
         )}
 
         {activeForm === 'customer-experience' && (
-          <FormSection title="Customer Experience" description="Customer feedback, intelligence and experience scores (also fed by the public survey)">
+          <>
+          {/* Public survey share panel */}
+          <div className="bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg p-4 mb-4">
+            <div className="flex flex-col md:flex-row md:items-center gap-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qrUrl} alt="Customer survey QR code" width={110} height={110} className="rounded bg-white p-1 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold mb-1">Customer Survey Link</div>
+                <p className="text-xs text-gray-500 mb-2">Share this public link (or QR) with customers. Their responses appear here and on the Marketing dashboard — no login needed.</p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input readOnly value={surveyUrl} onFocus={(e) => e.currentTarget.select()} className="flex-1 bg-[var(--c-hover)] border border-[var(--c-border)] rounded px-3 py-2 text-xs text-[var(--c-fg)]" />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={copyLink} className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold rounded px-3 py-2 text-xs whitespace-nowrap">
+                      {copied ? 'Copied!' : 'Copy link'}
+                    </button>
+                    <a href={surveyUrl} target="_blank" rel="noopener noreferrer" className="border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)] rounded px-3 py-2 text-xs whitespace-nowrap">Open</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <FormSection title="Customer Experience" description="Log feedback manually here, or let customers self-serve via the survey link above">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
               <FormField label="Source" name="source" type="select" options={[
@@ -184,6 +221,7 @@ export default function MarketingFormsPage() {
               <FormField label="Action Needed" name="action" type="textarea" placeholder="Suggested action" />
             </div>
           </FormSection>
+          </>
         )}
 
         {activeForm === 'priorities' && (
