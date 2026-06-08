@@ -5,7 +5,7 @@ import { getSession } from '@/lib/auth';
 import { hashPassword } from '@/lib/password';
 import { eq } from 'drizzle-orm';
 
-const ROLES = ['owner', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'];
+const ROLES = ['owner', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand', 'store-manager'];
 const DEPARTMENTS = ['executive', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'];
 
 async function requireOwner() {
