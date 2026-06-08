@@ -6,6 +6,7 @@ import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
 import WeeklyReview from './WeeklyReview';
 import { submitEntry } from '@/lib/api';
+import { PRODUCT_CATEGORIES } from '@/lib/config';
 
 const STORES = [
   { label: 'Dzorwulu Men', value: 'dzorwulu-men' },
@@ -17,13 +18,7 @@ const STORES = [
   { label: 'Woodpeckers', value: 'woodpeckers' },
 ];
 
-const CATEGORIES = [
-  { label: 'Suits', value: 'suits' }, { label: 'Shoes', value: 'shoes' },
-  { label: 'Shirts', value: 'shirts' }, { label: 'Blazers', value: 'blazers' },
-  { label: 'Bags', value: 'bags' }, { label: 'Belts', value: 'belts' },
-  { label: 'Ties', value: 'ties' }, { label: 'Trousers', value: 'trousers' },
-  { label: 'Accessories', value: 'accessories' }, { label: 'Others', value: 'others' },
-];
+const CATEGORIES = PRODUCT_CATEGORIES;
 
 const numOf = (s: string) => Number(s) || 0;
 const fmt2 = (x: number) => (x ? x.toFixed(2) : '');

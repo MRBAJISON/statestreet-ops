@@ -48,6 +48,15 @@ interface CommercialLive {
   newArrivals: { date: string; brand: string; category: string; qty: number; stockValue: number; store: string; supplier: string }[];
   deploymentByStore: { name: string; value: number }[];
   accountability: { member: string; role: string; kpi: string; target: string; actual: string; status: string }[];
+  weeklyReview: {
+    count: number;
+    revenueByCategory: { name: string; value: number }[];
+    ratingCounts: { name: string; value: number }[];
+    stockAtRisk: number;
+    atRiskCategories: number;
+    latest: { store: string; weekEnd: string; manager: string; achievement: number; actualSales: number; salesTarget: number } | null;
+    ceo: Record<string, string> | null;
+  };
 }
 
 export default function CommercialPage() {
@@ -64,6 +73,7 @@ export default function CommercialPage() {
   const newArrivals = m?.newArrivals ?? [];
   const deploymentByStore = m?.deploymentByStore ?? [];
   const accountability = m?.accountability ?? [];
+  const wr = m?.weeklyReview;
 
   const skuTable = (title: string, rows: SkuRow[], hint: string) => (
     <div>
@@ -262,7 +272,40 @@ export default function CommercialPage() {
           )}
         </Section>
 
-        <Section number={6} title="Recent Entries">
+        <Section number={6} title="Store Manager Weekly Review" subtitle={wr?.latest ? `Latest: ${wr.latest.store} · week ending ${wr.latest.weekEnd}` : undefined}>
+          {wr && wr.count > 0 ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <KPICard label="Reviews Submitted" value={String(wr.count)} small />
+                <KPICard label="Latest Achievement" value={wr.latest?.achievement ? `${wr.latest.achievement}%` : '—'} status={ragStatus(wr.latest?.achievement ?? 0, 100) ?? 'green'} small />
+                <KPICard label="Stock at Risk" value={dash(wr.stockAtRisk, fmtGHS)} small />
+                <KPICard label="At-Risk Categories" value={wr.atRiskCategories ? String(wr.atRiskCategories) : '—'} small />
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2">
+                  <div className="text-xs text-gray-400 mb-2">Revenue by Category (top 12)</div>
+                  {wr.revenueByCategory.length ? (
+                    <SimpleBarChart data={wr.revenueByCategory} height={260} color="#c8a951" prefix="GHS " />
+                  ) : (
+                    <EmptyState message="No category revenue captured yet" height={260} />
+                  )}
+                </div>
+                <div>
+                  <div className="text-xs text-gray-400 mb-2">Category Ratings</div>
+                  {wr.ratingCounts.some((r) => r.value > 0) ? (
+                    <SimpleDonutChart data={wr.ratingCounts} height={200} innerRadius={45} outerRadius={65} centerLabel="Rated" centerValue={String(wr.ratingCounts.reduce((s, r) => s + r.value, 0))} />
+                  ) : (
+                    <EmptyState message="No ratings yet" height={200} />
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <EmptyState message="No weekly reviews yet" hint="Submit a Weekly Review in the Commercial form." height={160} />
+          )}
+        </Section>
+
+        <Section number={7} title="Recent Entries">
           <RecentEntries department="commercial" />
         </Section>
       </div>

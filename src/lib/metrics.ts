@@ -247,6 +247,50 @@ function commercialMetrics(rows: Entry[]) {
   const na = payloads(rows, 'new-arrivals');
   const acc = payloads(rows, 'accountability');
 
+  // Store Manager Weekly Review aggregation
+  const wr = payloads(rows, 'weekly-review');
+  const wrCatRev = new Map<string, number>();
+  const wrRatings: Record<string, number> = { Good: 0, Fair: 0, Poor: 0 };
+  let wrStockAtRisk = 0;
+  let wrAtRiskCats = 0;
+  for (const r of wr) {
+    const cats = (r.categories ?? {}) as Record<string, Record<string, unknown>>;
+    for (const [name, f] of Object.entries(cats)) {
+      wrCatRev.set(name, (wrCatRev.get(name) ?? 0) + num(f.revenue));
+      const rt = String(f.rating ?? '');
+      if (rt in wrRatings) wrRatings[rt] += 1;
+      wrStockAtRisk += num(f.valueAtRisk);
+      if (String(f.overstocked) === 'Y' || String(f.slowMoving) === 'Y' || num(f.valueAtRisk) > 0) wrAtRiskCats += 1;
+    }
+  }
+  const wrLast = wr[wr.length - 1];
+  const weeklyReview = {
+    count: wr.length,
+    revenueByCategory: [...wrCatRev]
+      .map(([name, value]) => ({ name, value }))
+      .filter((x) => x.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 12),
+    ratingCounts: [
+      { name: 'Good', value: wrRatings.Good },
+      { name: 'Fair', value: wrRatings.Fair },
+      { name: 'Poor', value: wrRatings.Poor },
+    ],
+    stockAtRisk: wrStockAtRisk,
+    atRiskCategories: wrAtRiskCats,
+    latest: wrLast
+      ? {
+          store: labelFor(STORE_LABELS, wrLast.store),
+          weekEnd: String(wrLast.weekEnd ?? ''),
+          manager: String(wrLast.manager ?? ''),
+          achievement: num(wrLast.achievement),
+          actualSales: num(wrLast.actualSales),
+          salesTarget: num(wrLast.weeklySalesTarget),
+        }
+      : null,
+    ceo: (wrLast?.ceo as Record<string, string>) ?? null,
+  };
+
   const groupSales = ss.reduce((s, p) => s + num(p.totalSales), 0);
   const tx = ss.reduce((s, p) => s + num(p.transactions), 0);
   const units = ss.reduce((s, p) => s + num(p.unitsSold), 0);
@@ -322,6 +366,7 @@ function commercialMetrics(rows: Entry[]) {
       actual: String(p.actual || ''),
       status: String(p.status || ''),
     })),
+    weeklyReview,
     entryCount: rows.length,
   };
 }
