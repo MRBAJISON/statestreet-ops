@@ -21,8 +21,8 @@ export default function UserAdmin() {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'finance', department: 'finance' });
-  // Row action menu + modal state.
-  const [menuFor, setMenuFor] = useState<number | null>(null);
+  // Row action menu (fixed-positioned so it escapes the table's overflow clip) + modal state.
+  const [menu, setMenu] = useState<{ id: number; top: number; right: number } | null>(null);
   const [modal, setModal] = useState<{ type: 'password' | 'delete'; user: User } | null>(null);
   const [newPw, setNewPw] = useState('');
   const [busy, setBusy] = useState(false);
@@ -68,7 +68,7 @@ export default function UserAdmin() {
   }
 
   function openModal(type: 'password' | 'delete', user: User) {
-    setMenuFor(null);
+    setMenu(null);
     setNewPw('');
     setModal({ type, user });
   }
@@ -161,23 +161,17 @@ export default function UserAdmin() {
                         {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
                       </select>
                     </td>
-                    <td className="py-2 text-right whitespace-nowrap relative">
+                    <td className="py-2 text-right whitespace-nowrap">
                       <button
-                        onClick={() => setMenuFor(menuFor === u.id ? null : u.id)}
+                        onClick={(ev) => {
+                          const r = ev.currentTarget.getBoundingClientRect();
+                          setMenu(menu?.id === u.id ? null : { id: u.id, top: r.bottom + 4, right: window.innerWidth - r.right });
+                        }}
                         aria-label="User actions"
                         className="px-2 py-1 rounded hover:bg-[var(--c-hover)] text-gray-400 hover:text-[var(--c-fg)] text-base leading-none"
                       >
                         ⋯
                       </button>
-                      {menuFor === u.id && (
-                        <>
-                          <div className="fixed inset-0 z-10" onClick={() => setMenuFor(null)} aria-hidden="true" />
-                          <div className="absolute right-0 z-20 mt-1 w-40 bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg shadow-xl py-1 text-left">
-                            <button onClick={() => openModal('password', u)} className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-[var(--c-hover)] hover:text-[#c8a951]">Edit password</button>
-                            <button onClick={() => openModal('delete', u)} className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-[var(--c-hover)] hover:text-red-400">Delete user</button>
-                          </div>
-                        </>
-                      )}
                     </td>
                   </tr>
                 ))}
@@ -186,6 +180,21 @@ export default function UserAdmin() {
           </div>
         )}
       </div>
+
+      {/* Row action menu (fixed; escapes table overflow clipping) */}
+      {menu && (() => {
+        const u = users.find((x) => x.id === menu.id);
+        if (!u) return null;
+        return (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setMenu(null)} aria-hidden="true" />
+            <div className="fixed z-50 w-40 bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg shadow-xl py-1 text-left" style={{ top: menu.top, right: menu.right }}>
+              <button onClick={() => openModal('password', u)} className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-[var(--c-hover)] hover:text-[#c8a951]">Edit password</button>
+              <button onClick={() => openModal('delete', u)} className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-[var(--c-hover)] hover:text-red-400">Delete user</button>
+            </div>
+          </>
+        );
+      })()}
 
       {/* Edit password modal */}
       <Modal

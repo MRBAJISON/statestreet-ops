@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { Department } from '@/lib/types';
-import ThemeToggle from '@/components/ui/ThemeToggle';
 
 interface SidebarProps {
   userName: string;
@@ -40,8 +39,9 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
 
   return (
     <>
-    {/* Mobile top bar */}
-    <div className="md:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-3 bg-[var(--c-card2)] border-b border-[var(--c-border)]">
+    {/* Mobile top bar (hamburger left; theme toggle floats top-right globally) */}
+    <div className="md:hidden sticky top-0 z-30 flex items-center gap-3 px-4 py-3 bg-[var(--c-card2)] border-b border-[var(--c-border)]">
+      <button onClick={() => setOpen(true)} aria-label="Open menu" className="text-2xl leading-none">☰</button>
       <div className="flex items-center gap-2">
         <div className="w-7 h-7 bg-[#c8a951] rounded flex items-center justify-center">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round">
@@ -50,7 +50,6 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
         </div>
         <span className="text-sm font-bold tracking-wider">STATESTREET</span>
       </div>
-      <button onClick={() => setOpen(true)} aria-label="Open menu" className="text-2xl leading-none px-2">☰</button>
     </div>
 
     {/* Mobile overlay */}
@@ -148,7 +147,6 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
             <div className="text-[0.6rem] text-gray-500 capitalize">{userRole}</div>
           </div>
         </div>
-        <ThemeToggle />
         <button onClick={handleLogout}
           className="w-full mt-1 text-xs text-gray-500 hover:text-red-400 py-1.5 rounded transition-colors">
           Sign Out
