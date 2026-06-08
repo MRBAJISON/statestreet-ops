@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Modal from '@/components/ui/Modal';
 
 interface User {
   id: number;
@@ -20,6 +21,11 @@ export default function UserAdmin() {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'finance', department: 'finance' });
+  // Row action menu + modal state.
+  const [menuFor, setMenuFor] = useState<number | null>(null);
+  const [modal, setModal] = useState<{ type: 'password' | 'delete'; user: User } | null>(null);
+  const [newPw, setNewPw] = useState('');
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -61,18 +67,36 @@ export default function UserAdmin() {
     if (res.ok) load();
   }
 
-  async function resetPassword(u: User) {
-    const pw = window.prompt(`New password for ${u.name} (min 6 chars):`);
-    if (!pw) return;
-    patchUser(u.id, { password: pw });
+  function openModal(type: 'password' | 'delete', user: User) {
+    setMenuFor(null);
+    setNewPw('');
+    setModal({ type, user });
   }
 
-  async function removeUser(u: User) {
-    if (!window.confirm(`Delete ${u.name}? This cannot be undone.`)) return;
-    const res = await fetch(`/api/users/${u.id}`, { method: 'DELETE' });
+  function closeModal() {
+    setModal(null);
+    setNewPw('');
+    setBusy(false);
+  }
+
+  async function savePassword() {
+    if (!modal || newPw.trim().length < 6) {
+      setMsg({ ok: false, text: 'Password must be at least 6 characters.' });
+      return;
+    }
+    setBusy(true);
+    await patchUser(modal.user.id, { password: newPw.trim() });
+    closeModal();
+  }
+
+  async function confirmDelete() {
+    if (!modal) return;
+    setBusy(true);
+    const res = await fetch(`/api/users/${modal.user.id}`, { method: 'DELETE' });
     const json = await res.json();
-    setMsg(res.ok ? { ok: true, text: `Deleted ${u.name}` } : { ok: false, text: json.error || 'Failed' });
+    setMsg(res.ok ? { ok: true, text: `Deleted ${modal.user.name}` } : { ok: false, text: json.error || 'Failed' });
     if (res.ok) load();
+    closeModal();
   }
 
   return (
@@ -137,9 +161,23 @@ export default function UserAdmin() {
                         {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
                       </select>
                     </td>
-                    <td className="py-2 text-right whitespace-nowrap">
-                      <button onClick={() => resetPassword(u)} className="text-gray-400 hover:text-[#c8a951] mr-3">Reset password</button>
-                      <button onClick={() => removeUser(u)} className="text-gray-400 hover:text-red-400">Delete</button>
+                    <td className="py-2 text-right whitespace-nowrap relative">
+                      <button
+                        onClick={() => setMenuFor(menuFor === u.id ? null : u.id)}
+                        aria-label="User actions"
+                        className="px-2 py-1 rounded hover:bg-[var(--c-hover)] text-gray-400 hover:text-[var(--c-fg)] text-base leading-none"
+                      >
+                        ⋯
+                      </button>
+                      {menuFor === u.id && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setMenuFor(null)} aria-hidden="true" />
+                          <div className="absolute right-0 z-20 mt-1 w-40 bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg shadow-xl py-1 text-left">
+                            <button onClick={() => openModal('password', u)} className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-[var(--c-hover)] hover:text-[#c8a951]">Edit password</button>
+                            <button onClick={() => openModal('delete', u)} className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-[var(--c-hover)] hover:text-red-400">Delete user</button>
+                          </div>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -148,6 +186,38 @@ export default function UserAdmin() {
           </div>
         )}
       </div>
+
+      {/* Edit password modal */}
+      <Modal open={modal?.type === 'password'} onClose={closeModal} title={`Edit password — ${modal?.user.name ?? ''}`}>
+        <p className="text-xs text-gray-500 mb-3">Set a new password for {modal?.user.email}. Minimum 6 characters.</p>
+        <input
+          type="password"
+          autoFocus
+          value={newPw}
+          onChange={(e) => setNewPw(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') savePassword(); }}
+          placeholder="New password"
+          className={`${inputClass} w-full mb-4`}
+        />
+        <div className="flex justify-end gap-2">
+          <button onClick={closeModal} className="px-4 py-2 text-sm rounded-lg border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)]">Cancel</button>
+          <button onClick={savePassword} disabled={busy || newPw.trim().length < 6} className="px-4 py-2 text-sm rounded-lg bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold disabled:opacity-50">
+            {busy ? 'Saving…' : 'Save password'}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Delete confirmation modal */}
+      <Modal open={modal?.type === 'delete'} onClose={closeModal} title="Delete user">
+        <p className="text-sm text-gray-300 mb-1">Delete <span className="font-semibold">{modal?.user.name}</span>?</p>
+        <p className="text-xs text-gray-500 mb-4">{modal?.user.email} — this cannot be undone.</p>
+        <div className="flex justify-end gap-2">
+          <button onClick={closeModal} className="px-4 py-2 text-sm rounded-lg border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)]">Cancel</button>
+          <button onClick={confirmDelete} disabled={busy} className="px-4 py-2 text-sm rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold disabled:opacity-50">
+            {busy ? 'Deleting…' : 'Delete user'}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }
