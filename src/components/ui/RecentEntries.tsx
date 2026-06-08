@@ -46,7 +46,7 @@ function EditRow({ entry, onDone }: { entry: EntryRow; onDone: () => void }) {
   };
 
   return (
-    <tr className="border-b border-[#1a1a1a] bg-[#0d0d0d]">
+    <tr className="border-b border-[var(--c-hover)] bg-[var(--c-card2)]">
       <td colSpan={4} className="py-3 px-3">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
           {Object.keys(draft).map((k) => (
@@ -55,7 +55,7 @@ function EditRow({ entry, onDone }: { entry: EntryRow; onDone: () => void }) {
               <input
                 value={draft[k]}
                 onChange={(e) => setDraft({ ...draft, [k]: e.target.value })}
-                className="w-full mt-0.5 bg-[#111] border border-[#2a2a2a] rounded px-2 py-1 text-xs text-white"
+                className="w-full mt-0.5 bg-[var(--c-card)] border border-[var(--c-border)] rounded px-2 py-1 text-xs text-[var(--c-fg)]"
               />
             </label>
           ))}
@@ -95,7 +95,7 @@ export default function RecentEntries({ department }: { department: string }) {
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
-          <tr className="border-b border-[#2a2a2a] text-gray-500">
+          <tr className="border-b border-[var(--c-border)] text-gray-500">
             <th className="text-left py-2 pr-3 font-medium">Form</th>
             <th className="text-left py-2 pr-3 font-medium">Details</th>
             <th className="text-right py-2 px-3 font-medium whitespace-nowrap">When</th>
@@ -107,7 +107,7 @@ export default function RecentEntries({ department }: { department: string }) {
             editing === e.id ? (
               <EditRow key={e.id} entry={e} onDone={() => { setEditing(null); refresh(); }} />
             ) : (
-              <tr key={e.id} className="border-b border-[#1a1a1a]">
+              <tr key={e.id} className="border-b border-[var(--c-hover)]">
                 <td className="py-2 pr-3 capitalize text-[#c8a951] whitespace-nowrap">{e.formType.replace(/-/g, ' ')}</td>
                 <td className="py-2 pr-3 text-gray-300">{summarize(e.payload)}</td>
                 <td className="py-2 px-3 text-right text-gray-500 whitespace-nowrap">{timeAgo(e.createdAt)}</td>

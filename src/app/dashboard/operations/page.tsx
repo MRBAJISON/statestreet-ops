@@ -49,7 +49,7 @@ export default function OperationsPage() {
   const cx = m?.cxFeedback ?? { avgRating: 0, avgNps: 0, recommendRate: 0, count: 0 };
 
   return (
-    <div className="bg-[#0a0a0a] min-h-screen text-white">
+    <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)]">
       <DashboardHeader
         title="OPERATIONS COMMAND CENTER"
         subtitle="EXECUTION EXCELLENCE. OPERATIONAL DISCIPLINE. CUSTOMER EXPERIENCE."
@@ -109,7 +109,7 @@ export default function OperationsPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                  <tr className="border-b border-[var(--c-border)] text-gray-500">
                     <th className="text-left py-2 pr-3 font-medium">Store</th>
                     <th className="text-right py-2 px-3 font-medium">Ops</th>
                     <th className="text-right py-2 px-3 font-medium">VM</th>
@@ -119,7 +119,7 @@ export default function OperationsPage() {
                 </thead>
                 <tbody>
                   {storeScores.map((s) => (
-                    <tr key={s.store} className="border-b border-[#1a1a1a]">
+                    <tr key={s.store} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3">{s.store}</td>
                       <td className="py-2 px-3 text-right">{s.ops || '—'}</td>
                       <td className="py-2 px-3 text-right">{s.vm || '—'}</td>
@@ -137,15 +137,15 @@ export default function OperationsPage() {
 
         <Section number={3} title="Risk & Incident Monitor">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-            <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+            <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
               <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Security</div>
               <div className="text-lg font-bold text-red-400">{byType.security}</div>
             </div>
-            <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+            <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
               <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Safety</div>
               <div className="text-lg font-bold text-orange-400">{byType.safety}</div>
             </div>
-            <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+            <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
               <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Operational</div>
               <div className="text-lg font-bold text-yellow-400">{byType.operational}</div>
             </div>
@@ -172,7 +172,7 @@ export default function OperationsPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                  <tr className="border-b border-[var(--c-border)] text-gray-500">
                     <th className="text-left py-2 pr-3 font-medium">Action</th>
                     <th className="text-left py-2 px-3 font-medium">Priority</th>
                     <th className="text-left py-2 px-3 font-medium">Owner</th>
@@ -182,7 +182,7 @@ export default function OperationsPage() {
                 </thead>
                 <tbody>
                   {priorityActions.map((a, i) => (
-                    <tr key={i} className="border-b border-[#1a1a1a]">
+                    <tr key={i} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3">{a.description}</td>
                       <td className="py-2 px-3 capitalize">{a.priority || '—'}</td>
                       <td className="py-2 px-3">{a.owner || '—'}</td>
@@ -204,15 +204,15 @@ export default function OperationsPage() {
               <div className="text-xs text-gray-400 mb-2">Customer Experience</div>
               {cx.count ? (
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                  <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                     <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Avg Rating</div>
                     <div className="text-lg font-bold">{cx.avgRating || '—'}</div>
                   </div>
-                  <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                  <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                     <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">NPS</div>
                     <div className="text-lg font-bold">{cx.avgNps || '—'}</div>
                   </div>
-                  <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                  <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                     <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Recommend</div>
                     <div className="text-lg font-bold">{cx.recommendRate ? `${cx.recommendRate}%` : '—'}</div>
                   </div>

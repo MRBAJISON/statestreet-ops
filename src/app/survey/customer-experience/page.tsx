@@ -18,7 +18,7 @@ const RECOMMEND = [
   { label: 'No', value: 'detractor' },
 ];
 
-const inputCls = 'w-full bg-[#111] border border-[#2a2a2a] rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#c8a951]';
+const inputCls = 'w-full bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg px-3 py-2.5 text-sm text-[var(--c-fg)] focus:outline-none focus:border-[#c8a951]';
 
 export default function CustomerExperienceSurvey() {
   const [form, setForm] = useState({ store: '', category: '', nps: '', recommend: '', detail: '', name: '', contact: '', company: '' });
@@ -50,7 +50,7 @@ export default function CustomerExperienceSurvey() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[var(--c-bg)] text-[var(--c-fg)] flex items-center justify-center p-4">
       <div className="w-full max-w-lg">
         <div className="text-center mb-6">
           <div className="flex items-center justify-center gap-3 mb-3">
@@ -69,13 +69,13 @@ export default function CustomerExperienceSurvey() {
         </div>
 
         {state === 'done' ? (
-          <div className="bg-[#111] border border-green-500/30 rounded-xl p-8 text-center">
+          <div className="bg-[var(--c-card)] border border-green-500/30 rounded-xl p-8 text-center">
             <div className="text-3xl mb-2">🙏</div>
             <div className="text-lg font-semibold text-green-400">Thank you!</div>
             <p className="text-sm text-gray-400 mt-1">Your feedback has been received.</p>
           </div>
         ) : (
-          <form onSubmit={submit} className="bg-[#111] border border-[#2a2a2a] rounded-xl p-6 space-y-4">
+          <form onSubmit={submit} className="bg-[var(--c-card)] border border-[var(--c-border)] rounded-xl p-6 space-y-4">
             {error && <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm p-3 rounded-lg">{error}</div>}
 
             <div>

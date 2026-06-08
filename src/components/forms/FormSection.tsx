@@ -13,11 +13,11 @@ export default function FormSection({ title, description, children, defaultOpen 
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="bg-[#111] border border-[#2a2a2a] rounded-lg overflow-hidden">
+    <div className="bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-5 py-3 hover:bg-[#1a1a1a] transition-colors"
+        className="w-full flex items-center justify-between px-5 py-3 hover:bg-[var(--c-hover)] transition-colors"
       >
         <div>
           <h3 className="text-sm font-semibold text-left">{title}</h3>
@@ -26,7 +26,7 @@ export default function FormSection({ title, description, children, defaultOpen 
         <span className={`text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
       </button>
       {open && (
-        <div className="px-5 pb-5 pt-2 border-t border-[#2a2a2a]">
+        <div className="px-5 pb-5 pt-2 border-t border-[var(--c-border)]">
           {children}
         </div>
       )}

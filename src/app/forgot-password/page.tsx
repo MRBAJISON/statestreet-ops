@@ -28,11 +28,11 @@ export default function ForgotPasswordPage() {
           <h2 className="text-lg font-semibold text-gray-300 mt-4">Reset your password</h2>
         </div>
 
-        <div className="bg-[#111] border border-[#2a2a2a] rounded-xl p-6">
+        <div className="bg-[var(--c-card)] border border-[var(--c-border)] rounded-xl p-6">
           {sent ? (
             <div className="text-center space-y-4">
               <p className="text-sm text-gray-300">
-                If an account exists for <span className="text-white">{email}</span>, a reset link has been sent.
+                If an account exists for <span className="text-[var(--c-fg)]">{email}</span>, a reset link has been sent.
                 The link expires in 1 hour.
               </p>
               <a href="/login" className="inline-block text-sm text-[#c8a951] hover:underline">Back to sign in</a>

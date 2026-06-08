@@ -12,8 +12,8 @@ interface User {
 
 const ROLES = ['owner', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand', 'store-manager'];
 const DEPARTMENTS = ['executive', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'];
-const selectClass = 'bg-[#111] border border-[#2a2a2a] text-xs text-white rounded px-2 py-1 focus:outline-none focus:border-[#c8a951]';
-const inputClass = 'bg-[#111] border border-[#2a2a2a] text-sm text-white rounded-lg px-3 py-2 focus:outline-none focus:border-[#c8a951]';
+const selectClass = 'bg-[var(--c-card)] border border-[var(--c-border)] text-xs text-[var(--c-fg)] rounded px-2 py-1 focus:outline-none focus:border-[#c8a951]';
+const inputClass = 'bg-[var(--c-card)] border border-[var(--c-border)] text-sm text-[var(--c-fg)] rounded-lg px-3 py-2 focus:outline-none focus:border-[#c8a951]';
 
 export default function UserAdmin() {
   const [users, setUsers] = useState<User[]>([]);
@@ -76,7 +76,7 @@ export default function UserAdmin() {
   }
 
   return (
-    <div className="bg-[#0a0a0a] min-h-screen text-white p-6">
+    <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)] p-6">
       <div className="mb-6">
         <h1 className="text-xl font-bold">User Administration</h1>
         <p className="text-sm text-gray-500 mt-1">Add, edit, reset passwords, and remove user accounts.</p>
@@ -89,7 +89,7 @@ export default function UserAdmin() {
       )}
 
       {/* Add user */}
-      <div className="bg-[#111] border border-[#2a2a2a] rounded-lg p-4 mb-6 max-w-4xl">
+      <div className="bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg p-4 mb-6 max-w-4xl">
         <h2 className="text-sm font-bold uppercase tracking-wide mb-3">Add User</h2>
         <form onSubmit={addUser} className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <input className={inputClass} placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
@@ -106,7 +106,7 @@ export default function UserAdmin() {
       </div>
 
       {/* User list */}
-      <div className="bg-[#111] border border-[#2a2a2a] rounded-lg p-4 max-w-4xl">
+      <div className="bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg p-4 max-w-4xl">
         <h2 className="text-sm font-bold uppercase tracking-wide mb-3">Users</h2>
         {loading ? (
           <div className="text-xs text-gray-600 py-4">Loading…</div>
@@ -114,7 +114,7 @@ export default function UserAdmin() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-[#2a2a2a] text-gray-500">
+                <tr className="border-b border-[var(--c-border)] text-gray-500">
                   <th className="text-left py-2 pr-3 font-medium">Name</th>
                   <th className="text-left py-2 pr-3 font-medium">Email</th>
                   <th className="text-left py-2 pr-3 font-medium">Role</th>
@@ -124,7 +124,7 @@ export default function UserAdmin() {
               </thead>
               <tbody>
                 {users.map((u) => (
-                  <tr key={u.id} className="border-b border-[#1a1a1a]">
+                  <tr key={u.id} className="border-b border-[var(--c-hover)]">
                     <td className="py-2 pr-3">{u.name}</td>
                     <td className="py-2 pr-3 text-gray-400">{u.email}</td>
                     <td className="py-2 pr-3">

@@ -71,8 +71,8 @@ const CEO_QUESTIONS = [
 // CEO questions auto-answered from the grid (0-indexed): Q1, Q2, Q4. The rest need judgement.
 const AUTO_Q = new Set([0, 1, 3]);
 
-const inputCls = 'w-full bg-[#111] border border-[#2a2a2a] rounded px-1.5 py-1 text-xs text-white focus:outline-none focus:border-[#c8a951]';
-const headInputCls = 'bg-[#111] border border-[#2a2a2a] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8a951]';
+const inputCls = 'w-full bg-[var(--c-card)] border border-[var(--c-border)] rounded px-1.5 py-1 text-xs text-[var(--c-fg)] focus:outline-none focus:border-[#c8a951]';
+const headInputCls = 'bg-[var(--c-card)] border border-[var(--c-border)] rounded px-3 py-2 text-sm text-[var(--c-fg)] focus:outline-none focus:border-[#c8a951]';
 const num = (s: string) => Number(s) || 0;
 
 export default function WeeklyReview() {
@@ -175,17 +175,17 @@ export default function WeeklyReview() {
           <input type="number" value={header.actualSales} onChange={(e) => setHeader({ ...header, actualSales: e.target.value })} className={`${headInputCls} w-full mt-1`} />
         </label>
         <div className="text-xs text-gray-400">Achievement %
-          <div className="mt-1 bg-[#0d0d0d] border border-[#c8a951]/30 rounded px-3 py-2 text-sm font-bold text-[#c8a951]">
+          <div className="mt-1 bg-[var(--c-card2)] border border-[#c8a951]/30 rounded px-3 py-2 text-sm font-bold text-[#c8a951]">
             {headerAchievement ? `${headerAchievement}%` : '—'}
           </div>
         </div>
       </div>
 
       {/* Section switcher */}
-      <div className="flex gap-2 flex-wrap border-b border-[#2a2a2a] pb-2">
+      <div className="flex gap-2 flex-wrap border-b border-[var(--c-border)] pb-2">
         {SECTIONS.map((s) => (
           <button key={s.id} type="button" onClick={() => setActiveSection(s.id)}
-            className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${activeSection === s.id ? 'bg-[#c8a951] text-black font-semibold' : 'bg-[#111] border border-[#2a2a2a] text-gray-400 hover:text-white'}`}>
+            className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${activeSection === s.id ? 'bg-[#c8a951] text-black font-semibold' : 'bg-[var(--c-card)] border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
             {s.title.split('·')[0].trim()}
           </button>
         ))}
@@ -195,18 +195,18 @@ export default function WeeklyReview() {
       <div>
         <div className="text-sm font-semibold mb-1">{section.title}</div>
         {section.note && <div className="text-xs text-gray-500 mb-2">{section.note}</div>}
-        <div className="overflow-x-auto border border-[#2a2a2a] rounded-lg">
+        <div className="overflow-x-auto border border-[var(--c-border)] rounded-lg">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-[#0d0d0d] text-gray-500">
-                <th className="text-left p-2 sticky left-0 bg-[#0d0d0d] min-w-[9rem]">SKU Category</th>
+              <tr className="bg-[var(--c-card2)] text-gray-500">
+                <th className="text-left p-2 sticky left-0 bg-[var(--c-card2)] min-w-[9rem]">SKU Category</th>
                 {section.cols.map((c) => <th key={c.key} className="text-left p-2 font-medium min-w-[7rem]">{c.label}</th>)}
               </tr>
             </thead>
             <tbody>
               {CATEGORIES.map((cat) => (
-                <tr key={cat} className="border-t border-[#1a1a1a]">
-                  <td className="p-1.5 sticky left-0 bg-[#0a0a0a] text-gray-300 whitespace-nowrap">{cat}</td>
+                <tr key={cat} className="border-t border-[var(--c-hover)]">
+                  <td className="p-1.5 sticky left-0 bg-[var(--c-bg)] text-gray-300 whitespace-nowrap">{cat}</td>
                   {section.cols.map((c) => (
                     <td key={c.key} className="p-1">
                       {c.key === 'achievement' ? (
@@ -238,11 +238,11 @@ export default function WeeklyReview() {
                 {AUTO_Q.has(i) && <span className="ml-2 text-[#c8a951] text-[0.65rem]">auto-answered from the grid</span>}
               </label>
               {AUTO_Q.has(i) ? (
-                <div className="w-full bg-[#0d0d0d] border border-[#c8a951]/30 rounded-lg px-3 py-2 text-sm text-gray-200 min-h-[2.5rem]">
+                <div className="w-full bg-[var(--c-card2)] border border-[#c8a951]/30 rounded-lg px-3 py-2 text-sm text-gray-200 min-h-[2.5rem]">
                   {autoAnswers[i] || <span className="text-gray-600">Fill the category grid to generate this answer.</span>}
                 </div>
               ) : (
-                <textarea value={ceo[i]} onChange={(e) => setCeo(ceo.map((v, j) => (j === i ? e.target.value : v)))} rows={2} className="w-full bg-[#111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-[#c8a951]" />
+                <textarea value={ceo[i]} onChange={(e) => setCeo(ceo.map((v, j) => (j === i ? e.target.value : v)))} rows={2} className="w-full bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg px-3 py-2 text-sm text-[var(--c-fg)] resize-none focus:outline-none focus:border-[#c8a951]" />
               )}
             </div>
           ))}
