@@ -4,6 +4,7 @@ import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
+import WeeklyReview from './WeeklyReview';
 import { submitEntry } from '@/lib/api';
 
 const STORES = [
@@ -53,6 +54,7 @@ export default function CommercialFormsPage() {
   }
 
   const forms = [
+    { id: 'weekly-review', label: 'Weekly Review' },
     { id: 'store-sales', label: 'Daily Store Sales' },
     { id: 'category-perf', label: 'Category Performance' },
     { id: 'sku-entry', label: 'SKU Performance' },
@@ -97,6 +99,9 @@ export default function CommercialFormsPage() {
         </div>
       )}
 
+      {activeForm === 'weekly-review' && <WeeklyReview />}
+
+      {activeForm !== 'weekly-review' && (
       <form onSubmit={handleSubmit} className="space-y-4 max-w-4xl">
         {activeForm === 'store-sales' && (
           <FormSection title="Daily Store Sales" description="Record daily sales metrics per store">
@@ -197,6 +202,7 @@ export default function CommercialFormsPage() {
           <button type="reset" className="bg-[#1a1a1a] border border-[#333] text-gray-400 hover:text-white px-6 py-2.5 rounded-lg transition-colors text-sm">Clear Form</button>
         </div>
       </form>
+      )}
 
       <div className="mt-8 max-w-4xl">
         <h2 className="text-sm font-bold uppercase tracking-wide mb-3">Your Submissions</h2>
