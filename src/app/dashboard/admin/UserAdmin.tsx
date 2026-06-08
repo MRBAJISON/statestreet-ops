@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import Modal from '@/components/ui/Modal';
+import Modal, { ConfirmModal } from '@/components/ui/Modal';
 
 interface User {
   id: number;
@@ -188,7 +188,19 @@ export default function UserAdmin() {
       </div>
 
       {/* Edit password modal */}
-      <Modal open={modal?.type === 'password'} onClose={closeModal} title={`Edit password — ${modal?.user.name ?? ''}`}>
+      <Modal
+        open={modal?.type === 'password'}
+        onClose={closeModal}
+        title={`Edit password — ${modal?.user.name ?? ''}`}
+        footer={
+          <>
+            <button onClick={closeModal} className="px-4 py-2 text-sm rounded-lg border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)]">Cancel</button>
+            <button onClick={savePassword} disabled={busy || newPw.trim().length < 6} className="px-4 py-2 text-sm rounded-lg bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold disabled:opacity-50">
+              {busy ? 'Saving…' : 'Save password'}
+            </button>
+          </>
+        }
+      >
         <p className="text-xs text-gray-500 mb-3">Set a new password for {modal?.user.email}. Minimum 6 characters.</p>
         <input
           type="password"
@@ -197,27 +209,21 @@ export default function UserAdmin() {
           onChange={(e) => setNewPw(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') savePassword(); }}
           placeholder="New password"
-          className={`${inputClass} w-full mb-4`}
+          className={`${inputClass} w-full`}
         />
-        <div className="flex justify-end gap-2">
-          <button onClick={closeModal} className="px-4 py-2 text-sm rounded-lg border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)]">Cancel</button>
-          <button onClick={savePassword} disabled={busy || newPw.trim().length < 6} className="px-4 py-2 text-sm rounded-lg bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold disabled:opacity-50">
-            {busy ? 'Saving…' : 'Save password'}
-          </button>
-        </div>
       </Modal>
 
       {/* Delete confirmation modal */}
-      <Modal open={modal?.type === 'delete'} onClose={closeModal} title="Delete user">
-        <p className="text-sm text-gray-300 mb-1">Delete <span className="font-semibold">{modal?.user.name}</span>?</p>
-        <p className="text-xs text-gray-500 mb-4">{modal?.user.email} — this cannot be undone.</p>
-        <div className="flex justify-end gap-2">
-          <button onClick={closeModal} className="px-4 py-2 text-sm rounded-lg border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)]">Cancel</button>
-          <button onClick={confirmDelete} disabled={busy} className="px-4 py-2 text-sm rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold disabled:opacity-50">
-            {busy ? 'Deleting…' : 'Delete user'}
-          </button>
-        </div>
-      </Modal>
+      <ConfirmModal
+        open={modal?.type === 'delete'}
+        onClose={closeModal}
+        onConfirm={confirmDelete}
+        title="Delete user"
+        danger
+        busy={busy}
+        confirmLabel="Delete user"
+        message={<>Delete <span className="font-semibold">{modal?.user.name}</span> ({modal?.user.email})? This cannot be undone.</>}
+      />
     </div>
   );
 }
