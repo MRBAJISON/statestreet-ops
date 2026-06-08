@@ -50,6 +50,7 @@ interface CommercialLive {
   accountability: { member: string; role: string; kpi: string; target: string; actual: string; status: string }[];
   weeklyReview: {
     count: number;
+    reviews: WeeklyReviewRecord[];
     revenueByCategory: { name: string; value: number }[];
     ratingCounts: { name: string; value: number }[];
     stockAtRisk: number;
@@ -57,6 +58,21 @@ interface CommercialLive {
     latest: { store: string; weekEnd: string; manager: string; achievement: number; actualSales: number; salesTarget: number } | null;
     ceo: Record<string, string> | null;
   };
+}
+interface WeeklyReviewRecord {
+  id: number;
+  store: string;
+  weekEnd: string;
+  manager: string;
+  achievement: number;
+  actualSales: number;
+  salesTarget: number;
+  submittedAt: string;
+  ceo: Record<string, string> | null;
+  revenueByCategory: { name: string; value: number }[];
+  ratingCounts: { name: string; value: number }[];
+  stockAtRisk: number;
+  atRiskCategories: number;
 }
 
 export default function CommercialPage() {
@@ -74,6 +90,29 @@ export default function CommercialPage() {
   const deploymentByStore = m?.deploymentByStore ?? [];
   const accountability = m?.accountability ?? [];
   const wr = m?.weeklyReview;
+  const wrReviews = wr?.reviews ?? [];
+  const [wrWeek, setWrWeek] = useState<number | 'all'>('all');
+  const wrSel = typeof wrWeek === 'number' ? wrReviews.find((r) => r.id === wrWeek) : undefined;
+  // Displayed slice: a single week when selected, else the all-weeks aggregate.
+  const wrView = wrSel
+    ? {
+        revenueByCategory: wrSel.revenueByCategory,
+        ratingCounts: wrSel.ratingCounts,
+        stockAtRisk: wrSel.stockAtRisk,
+        atRiskCategories: wrSel.atRiskCategories,
+        achievement: wrSel.achievement,
+        heading: `${wrSel.store} · week ending ${wrSel.weekEnd}`,
+      }
+    : wr
+    ? {
+        revenueByCategory: wr.revenueByCategory,
+        ratingCounts: wr.ratingCounts,
+        stockAtRisk: wr.stockAtRisk,
+        atRiskCategories: wr.atRiskCategories,
+        achievement: wr.latest?.achievement ?? 0,
+        heading: `All weeks · ${wr.count} review${wr.count === 1 ? '' : 's'}`,
+      }
+    : null;
 
   const skuTable = (title: string, rows: SkuRow[], hint: string) => (
     <div>
@@ -272,31 +311,58 @@ export default function CommercialPage() {
           )}
         </Section>
 
-        <Section number={6} title="Store Manager Weekly Review" subtitle={wr?.latest ? `Latest: ${wr.latest.store} · week ending ${wr.latest.weekEnd}` : undefined}>
-          {wr && wr.count > 0 ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <KPICard label="Reviews Submitted" value={String(wr.count)} small />
-                <KPICard label="Latest Achievement" value={wr.latest?.achievement ? `${wr.latest.achievement}%` : '—'} status={ragStatus(wr.latest?.achievement ?? 0, 100) ?? 'green'} small />
-                <KPICard label="Stock at Risk" value={dash(wr.stockAtRisk, fmtGHS)} small />
-                <KPICard label="At-Risk Categories" value={wr.atRiskCategories ? String(wr.atRiskCategories) : '—'} small />
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-2">
-                  <div className="text-xs text-gray-400 mb-2">Revenue by Category (top 12)</div>
-                  {wr.revenueByCategory.length ? (
-                    <SimpleBarChart data={wr.revenueByCategory} height={260} color="#c8a951" prefix="GHS " />
-                  ) : (
-                    <EmptyState message="No category revenue captured yet" height={260} />
-                  )}
+        <Section number={6} title="Store Manager Weekly Review" subtitle={wrView ? wrView.heading : undefined}>
+          {wr && wr.count > 0 && wrView ? (
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+              {/* Week history list */}
+              <div className="lg:col-span-1">
+                <div className="text-xs text-gray-400 mb-2">History</div>
+                <div className="space-y-1 max-h-[360px] overflow-y-auto pr-1">
+                  <button
+                    onClick={() => setWrWeek('all')}
+                    className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${wrWeek === 'all' ? 'bg-[#c8a951] text-black border-[#c8a951] font-semibold' : 'bg-[#0d0d0d] border-[#2a2a2a] text-gray-300 hover:border-[#c8a951]'}`}
+                  >
+                    <div>All weeks</div>
+                    <div className={wrWeek === 'all' ? 'text-black/70' : 'text-gray-500'}>{wr.count} review{wr.count === 1 ? '' : 's'}</div>
+                  </button>
+                  {wrReviews.map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => setWrWeek(r.id)}
+                      className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${wrWeek === r.id ? 'bg-[#c8a951] text-black border-[#c8a951] font-semibold' : 'bg-[#0d0d0d] border-[#2a2a2a] text-gray-300 hover:border-[#c8a951]'}`}
+                    >
+                      <div>Week ending {r.weekEnd || '—'}</div>
+                      <div className={wrWeek === r.id ? 'text-black/70' : 'text-gray-500'}>{r.store}{r.achievement ? ` · ${r.achievement}%` : ''}</div>
+                    </button>
+                  ))}
                 </div>
-                <div>
-                  <div className="text-xs text-gray-400 mb-2">Category Ratings</div>
-                  {wr.ratingCounts.some((r) => r.value > 0) ? (
-                    <SimpleDonutChart data={wr.ratingCounts} height={200} innerRadius={45} outerRadius={65} centerLabel="Rated" centerValue={String(wr.ratingCounts.reduce((s, r) => s + r.value, 0))} />
-                  ) : (
-                    <EmptyState message="No ratings yet" height={200} />
-                  )}
+              </div>
+
+              {/* Selected week / aggregate detail */}
+              <div className="lg:col-span-3 space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <KPICard label={wrSel ? 'Selected Week' : 'Reviews Submitted'} value={wrSel ? '1' : String(wr.count)} small />
+                  <KPICard label="Achievement" value={wrView.achievement ? `${wrView.achievement}%` : '—'} status={ragStatus(wrView.achievement, 100) ?? 'green'} small />
+                  <KPICard label="Stock at Risk" value={dash(wrView.stockAtRisk, fmtGHS)} small />
+                  <KPICard label="At-Risk Categories" value={wrView.atRiskCategories ? String(wrView.atRiskCategories) : '—'} small />
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <div className="lg:col-span-2">
+                    <div className="text-xs text-gray-400 mb-2">Revenue by Category (top 12)</div>
+                    {wrView.revenueByCategory.length ? (
+                      <SimpleBarChart data={wrView.revenueByCategory} height={260} color="#c8a951" prefix="GHS " />
+                    ) : (
+                      <EmptyState message="No category revenue captured" height={260} />
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400 mb-2">Category Ratings</div>
+                    {wrView.ratingCounts.some((r) => r.value > 0) ? (
+                      <SimpleDonutChart data={wrView.ratingCounts} height={200} innerRadius={45} outerRadius={65} centerLabel="Rated" centerValue={String(wrView.ratingCounts.reduce((s, r) => s + r.value, 0))} />
+                    ) : (
+                      <EmptyState message="No ratings yet" height={200} />
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

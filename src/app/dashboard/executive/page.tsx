@@ -25,7 +25,7 @@ export default function ExecutiveCommandCenter() {
   const [anchor, setAnchor] = useState('');
   const [store, setStore] = useState('');
   const fin = useMetrics<{ revenueMtd: number; netProfit: number; grossMargin: number; cashNet: number; revenueByBrand: { name: string; value: number }[] }>('finance', period, anchor, store).data;
-  const com = useMetrics<{ groupSales: number; convRate: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null } }>('commercial', period, anchor, store).data;
+  const com = useMetrics<{ groupSales: number; convRate: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null }[] } }>('commercial', period, anchor, store).data;
   const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[]; priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[] }>('operations', period, anchor, store).data;
   const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory', period, anchor, store).data;
   const brd = useMetrics<{ healthIndex: number; sentiment: { positive: number }; ceoAttention: { priority: string; issue: string; impact: string; owner: string; status: string }[] }>('brand', period, anchor, store).data;
@@ -48,6 +48,19 @@ export default function ExecutiveCommandCenter() {
   const storePerformance = [...storeMap].map(([store, v]) => ({ store, ...v })).sort((a, b) => b.sales - a.sales);
   const ceoAttention = brd?.ceoAttention ?? [];
   const wr = com?.weeklyReview;
+  const wrReviews = wr?.reviews ?? [];
+  const [wrWeek, setWrWeek] = useState<number | 'all'>('all');
+  const wrSel = typeof wrWeek === 'number' ? wrReviews.find((r) => r.id === wrWeek) : undefined;
+  // 'All weeks' falls back to the latest review for the narrative CEO answers.
+  const wrCeo = wrSel ? wrSel.ceo : wr?.ceo ?? null;
+  const wrAchievement = wrSel ? wrSel.achievement : wr?.latest?.achievement ?? 0;
+  const wrStockAtRisk = wrSel ? wrSel.stockAtRisk : wr?.stockAtRisk ?? 0;
+  const wrAtRiskCats = wrSel ? wrSel.atRiskCategories : wr?.atRiskCategories ?? 0;
+  const wrHeading = wrSel
+    ? `${wrSel.store} · week ending ${wrSel.weekEnd}${wrSel.manager ? ` · ${wrSel.manager}` : ''}`
+    : wr?.latest
+    ? `Latest · ${wr.latest.store} · week ending ${wr.latest.weekEnd}`
+    : undefined;
   const CEO_QUESTIONS = [
     'Which 3 categories generated the most money last week and why?',
     'Which 3 categories concern you the most and why?',
@@ -56,8 +69,8 @@ export default function ExecutiveCommandCenter() {
     'What will you do differently this week to increase sales?',
     'If this store belonged to you, what would be your first three actions?',
   ];
-  const ceoAnswers = wr?.ceo
-    ? CEO_QUESTIONS.map((q, i) => ({ q, a: wr.ceo?.[`q${i + 1}`] ?? '' })).filter((x) => x.a.trim())
+  const ceoAnswers = wrCeo
+    ? CEO_QUESTIONS.map((q, i) => ({ q, a: wrCeo?.[`q${i + 1}`] ?? '' })).filter((x) => x.a.trim())
     : [];
 
   // Cross-department action tracker (Marketing priorities + Operations maintenance actions)
@@ -263,28 +276,55 @@ export default function ExecutiveCommandCenter() {
           )}
         </Section>
 
-        {/* Store Manager CEO Answers (from latest Weekly Review) */}
-        <Section number={7} title="Store Manager — CEO Questions" subtitle={wr?.latest ? `${wr.latest.store} · week ending ${wr.latest.weekEnd}${wr.latest.manager ? ` · ${wr.latest.manager}` : ''}` : undefined}>
+        {/* Store Manager CEO Answers (from selected Weekly Review) */}
+        <Section number={7} title="Store Manager — CEO Questions" subtitle={wrHeading}>
           {wr && wr.count > 0 ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <KPICard label="Weekly Reviews" value={String(wr.count)} small />
-                <KPICard label="Latest Achievement" value={wr.latest?.achievement ? `${wr.latest.achievement}%` : '—'} small />
-                <KPICard label="Stock at Risk" value={dash(wr.stockAtRisk, fmtGHS)} small />
-                <KPICard label="At-Risk Categories" value={wr.atRiskCategories ? String(wr.atRiskCategories) : '—'} small />
-              </div>
-              {ceoAnswers.length ? (
-                <div className="space-y-3">
-                  {ceoAnswers.map((x, i) => (
-                    <div key={i} className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
-                      <div className="text-xs text-[#c8a951] mb-1">{x.q}</div>
-                      <div className="text-sm text-gray-200 whitespace-pre-wrap">{x.a}</div>
-                    </div>
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+              {/* Week history list */}
+              <div className="lg:col-span-1">
+                <div className="text-xs text-gray-400 mb-2">History</div>
+                <div className="space-y-1 max-h-[360px] overflow-y-auto pr-1">
+                  <button
+                    onClick={() => setWrWeek('all')}
+                    className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${wrWeek === 'all' ? 'bg-[#c8a951] text-black border-[#c8a951] font-semibold' : 'bg-[#0d0d0d] border-[#2a2a2a] text-gray-300 hover:border-[#c8a951]'}`}
+                  >
+                    <div>Latest / All</div>
+                    <div className={wrWeek === 'all' ? 'text-black/70' : 'text-gray-500'}>{wr.count} review{wr.count === 1 ? '' : 's'}</div>
+                  </button>
+                  {wrReviews.map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => setWrWeek(r.id)}
+                      className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${wrWeek === r.id ? 'bg-[#c8a951] text-black border-[#c8a951] font-semibold' : 'bg-[#0d0d0d] border-[#2a2a2a] text-gray-300 hover:border-[#c8a951]'}`}
+                    >
+                      <div>Week ending {r.weekEnd || '—'}</div>
+                      <div className={wrWeek === r.id ? 'text-black/70' : 'text-gray-500'}>{r.store}{r.achievement ? ` · ${r.achievement}%` : ''}</div>
+                    </button>
                   ))}
                 </div>
-              ) : (
-                <EmptyState message="No CEO answers in the latest review" height={120} />
-              )}
+              </div>
+
+              {/* CEO answers for the selected week */}
+              <div className="lg:col-span-3 space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <KPICard label="Weekly Reviews" value={String(wr.count)} small />
+                  <KPICard label="Achievement" value={wrAchievement ? `${wrAchievement}%` : '—'} small />
+                  <KPICard label="Stock at Risk" value={dash(wrStockAtRisk, fmtGHS)} small />
+                  <KPICard label="At-Risk Categories" value={wrAtRiskCats ? String(wrAtRiskCats) : '—'} small />
+                </div>
+                {ceoAnswers.length ? (
+                  <div className="space-y-3">
+                    {ceoAnswers.map((x, i) => (
+                      <div key={i} className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                        <div className="text-xs text-[#c8a951] mb-1">{x.q}</div>
+                        <div className="text-sm text-gray-200 whitespace-pre-wrap">{x.a}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState message="No CEO answers in this review" height={120} />
+                )}
+              </div>
             </div>
           ) : (
             <EmptyState message="No weekly reviews yet" hint="Store managers submit these via Commercial → Weekly Review." height={120} />
