@@ -5,6 +5,7 @@ import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry } from '@/lib/api';
+import { STORES } from '@/lib/config';
 
 export default function MarketingFormsPage() {
   const [activeForm, setActiveForm] = useState('campaign');
@@ -174,10 +175,7 @@ export default function MarketingFormsPage() {
                 { label: 'Yes - Promoter', value: 'promoter' }, { label: 'Maybe - Passive', value: 'passive' },
                 { label: 'No - Detractor', value: 'detractor' },
               ]} />
-              <FormField label="Store" name="store" type="select" options={[
-                { label: 'Dzorwulu Men', value: 'dzorwulu-men' }, { label: 'East Legon Men', value: 'east-legon-men' },
-                { label: 'Labone Men', value: 'labone-men' }, { label: 'All Stores', value: 'all' },
-              ]} />
+              <FormField label="Store" name="store" type="select" options={[...STORES, { label: 'All Stores', value: 'all' }]} />
               <FormField label="Frequency (How often heard)" name="frequency" type="select" options={[
                 { label: 'Very Frequent', value: 'very-frequent' }, { label: 'Frequent', value: 'frequent' },
                 { label: 'Occasional', value: 'occasional' }, { label: 'Rare', value: 'rare' },
