@@ -48,7 +48,7 @@ export default function BrandHealthPage() {
   const ceoAttention = m?.ceoAttention ?? [];
 
   return (
-    <div className="bg-[#0a0a0a] min-h-screen text-white">
+    <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)]">
       <DashboardHeader
         title="BRAND HEALTH COMMAND CENTER"
         subtitle="MEASURE BRAND EQUITY. DRIVE DEMAND. GROW VALUE."
@@ -71,7 +71,7 @@ export default function BrandHealthPage() {
       <div className="px-6 pb-8 space-y-6">
         <Section number={1} title="Brand Health Index & Portfolio">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="bg-[#111] border border-[#2a2a2a] rounded-lg p-4 flex flex-col items-center justify-center">
+            <div className="bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg p-4 flex flex-col items-center justify-center">
               {healthIndex ? (
                 <>
                   <ScoreGauge score={healthIndex} size="lg" color="#c8a951" />
@@ -154,24 +154,24 @@ export default function BrandHealthPage() {
         <Section number={5} title="Digital Reputation & Social">
           {hasDigital ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Google Rating</div>
                 <div className="text-lg font-bold">{dr.googleRating ? `${dr.googleRating}★` : '—'}</div>
                 <div className="text-[0.6rem] text-gray-600 mt-0.5">{dr.googleReviews || 0} reviews</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Trustpilot</div>
                 <div className="text-lg font-bold">{dr.trustpilot ? `${dr.trustpilot}★` : '—'}</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Response Rate</div>
                 <div className="text-lg font-bold">{dr.responseRate ? `${dr.responseRate}%` : '—'}</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">IG Followers</div>
                 <div className="text-lg font-bold">{social.followers ? social.followers.toLocaleString() : '—'}</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">New / Neg Reviews</div>
                 <div className="text-lg font-bold">
                   <span className="text-green-400">{social.newReviews || 0}</span>
@@ -227,7 +227,7 @@ export default function BrandHealthPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                  <tr className="border-b border-[var(--c-border)] text-gray-500">
                     <th className="text-left py-2 pr-3 font-medium">Priority</th>
                     <th className="text-left py-2 px-3 font-medium">Issue</th>
                     <th className="text-left py-2 px-3 font-medium">Impact</th>
@@ -237,7 +237,7 @@ export default function BrandHealthPage() {
                 </thead>
                 <tbody>
                   {ceoAttention.map((c, i) => (
-                    <tr key={i} className="border-b border-[#1a1a1a]">
+                    <tr key={i} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3 capitalize">{c.priority || '—'}</td>
                       <td className="py-2 px-3">{c.issue}</td>
                       <td className="py-2 px-3 capitalize">{c.impact || '—'}</td>

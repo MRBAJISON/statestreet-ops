@@ -12,7 +12,7 @@ export default function ProgressBar({ value, max = 100, color, height = 6, showL
 
   return (
     <div className="flex items-center gap-2 w-full">
-      <div className="flex-1 bg-[#2a2a2a] rounded-full overflow-hidden" style={{ height }}>
+      <div className="flex-1 bg-[var(--c-border)] rounded-full overflow-hidden" style={{ height }}>
         <div
           className="h-full rounded-full transition-all duration-700"
           style={{ width: `${pct}%`, backgroundColor: barColor }}

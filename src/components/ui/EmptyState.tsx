@@ -8,7 +8,7 @@ interface EmptyStateProps {
 export default function EmptyState({ message = 'No data yet', hint, height = 160 }: EmptyStateProps) {
   return (
     <div
-      className="flex flex-col items-center justify-center text-center rounded-lg border border-dashed border-[#2a2a2a] bg-[#0d0d0d]"
+      className="flex flex-col items-center justify-center text-center rounded-lg border border-dashed border-[var(--c-border)] bg-[var(--c-card2)]"
       style={{ minHeight: height }}
     >
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

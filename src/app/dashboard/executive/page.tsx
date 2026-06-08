@@ -89,7 +89,7 @@ export default function ExecutiveCommandCenter() {
   ];
 
   return (
-    <div className="bg-[#0a0a0a] min-h-screen text-white">
+    <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)]">
       <DashboardHeader
         title="EXECUTIVE COMMAND CENTER"
         subtitle="ONE VISION. ONE TEAM. ONE DESTINATION."
@@ -149,7 +149,7 @@ export default function ExecutiveCommandCenter() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                  <tr className="border-b border-[var(--c-border)] text-gray-500">
                     <th className="text-left py-2 pr-3 font-medium">Store</th>
                     <th className="text-right py-2 px-3 font-medium">Sales</th>
                     <th className="text-right py-2 px-3 font-medium">Ops Score</th>
@@ -158,7 +158,7 @@ export default function ExecutiveCommandCenter() {
                 </thead>
                 <tbody>
                   {storePerformance.map((s) => (
-                    <tr key={s.store} className="border-b border-[#1a1a1a]">
+                    <tr key={s.store} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3">{s.store}</td>
                       <td className="py-2 px-3 text-right">{s.sales ? fmtGHS(s.sales) : '—'}</td>
                       <td className="py-2 px-3 text-right">{s.ops || '—'}</td>
@@ -202,9 +202,9 @@ export default function ExecutiveCommandCenter() {
               <Link
                 key={d.name}
                 href={d.href}
-                className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-4 hover:border-[#c8a951]/40 transition-colors"
+                className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-4 hover:border-[#c8a951]/40 transition-colors"
               >
-                <div className="text-sm font-semibold text-white">{d.name}</div>
+                <div className="text-sm font-semibold text-[var(--c-fg)]">{d.name}</div>
                 <div className="text-[0.65rem] text-gray-500 mt-2 uppercase tracking-wider">{d.metric}</div>
                 <div className="text-lg font-bold text-[#c8a951] mt-0.5">{d.value}</div>
               </Link>
@@ -218,7 +218,7 @@ export default function ExecutiveCommandCenter() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                  <tr className="border-b border-[var(--c-border)] text-gray-500">
                     <th className="text-left py-2 pr-3 font-medium">Priority</th>
                     <th className="text-left py-2 px-3 font-medium">Issue</th>
                     <th className="text-left py-2 px-3 font-medium">Impact</th>
@@ -228,7 +228,7 @@ export default function ExecutiveCommandCenter() {
                 </thead>
                 <tbody>
                   {ceoAttention.map((c, i) => (
-                    <tr key={i} className="border-b border-[#1a1a1a]">
+                    <tr key={i} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3 capitalize">{c.priority || '—'}</td>
                       <td className="py-2 px-3">{c.issue}</td>
                       <td className="py-2 px-3 capitalize">{c.impact || '—'}</td>
@@ -250,7 +250,7 @@ export default function ExecutiveCommandCenter() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                  <tr className="border-b border-[var(--c-border)] text-gray-500">
                     <th className="text-left py-2 pr-3 font-medium">Dept</th>
                     <th className="text-left py-2 px-3 font-medium">Task</th>
                     <th className="text-left py-2 px-3 font-medium">Owner</th>
@@ -260,7 +260,7 @@ export default function ExecutiveCommandCenter() {
                 </thead>
                 <tbody>
                   {actionTracker.map((a, i) => (
-                    <tr key={i} className="border-b border-[#1a1a1a]">
+                    <tr key={i} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3 text-[#c8a951]">{a.dept}</td>
                       <td className="py-2 px-3">{a.task}</td>
                       <td className="py-2 px-3">{a.owner || '—'}</td>
@@ -286,7 +286,7 @@ export default function ExecutiveCommandCenter() {
                 <div className="space-y-1 max-h-[360px] overflow-y-auto pr-1">
                   <button
                     onClick={() => setWrWeek('all')}
-                    className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${wrWeek === 'all' ? 'bg-[#c8a951] text-black border-[#c8a951] font-semibold' : 'bg-[#0d0d0d] border-[#2a2a2a] text-gray-300 hover:border-[#c8a951]'}`}
+                    className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${wrWeek === 'all' ? 'bg-[#c8a951] text-black border-[#c8a951] font-semibold' : 'bg-[var(--c-card2)] border-[var(--c-border)] text-gray-300 hover:border-[#c8a951]'}`}
                   >
                     <div>Latest / All</div>
                     <div className={wrWeek === 'all' ? 'text-black/70' : 'text-gray-500'}>{wr.count} review{wr.count === 1 ? '' : 's'}</div>
@@ -295,7 +295,7 @@ export default function ExecutiveCommandCenter() {
                     <button
                       key={r.id}
                       onClick={() => setWrWeek(r.id)}
-                      className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${wrWeek === r.id ? 'bg-[#c8a951] text-black border-[#c8a951] font-semibold' : 'bg-[#0d0d0d] border-[#2a2a2a] text-gray-300 hover:border-[#c8a951]'}`}
+                      className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${wrWeek === r.id ? 'bg-[#c8a951] text-black border-[#c8a951] font-semibold' : 'bg-[var(--c-card2)] border-[var(--c-border)] text-gray-300 hover:border-[#c8a951]'}`}
                     >
                       <div>Week ending {r.weekEnd || '—'}</div>
                       <div className={wrWeek === r.id ? 'text-black/70' : 'text-gray-500'}>{r.store}{r.achievement ? ` · ${r.achievement}%` : ''}</div>
@@ -315,7 +315,7 @@ export default function ExecutiveCommandCenter() {
                 {ceoAnswers.length ? (
                   <div className="space-y-3">
                     {ceoAnswers.map((x, i) => (
-                      <div key={i} className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                      <div key={i} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                         <div className="text-xs text-[#c8a951] mb-1">{x.q}</div>
                         <div className="text-sm text-gray-200 whitespace-pre-wrap">{x.a}</div>
                       </div>

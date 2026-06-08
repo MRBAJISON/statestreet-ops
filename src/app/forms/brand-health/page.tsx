@@ -16,7 +16,6 @@ export default function BrandFormsPage() {
     { id: 'sentiment', label: 'Brand Sentiment' },
     { id: 'competitor', label: 'Competitor Analysis' },
     { id: 'digital', label: 'Digital Reputation' },
-    { id: 'voice', label: 'Customer Voice' },
     { id: 'attention', label: 'CEO Attention Items' },
   ];
 
@@ -24,12 +23,6 @@ export default function BrandFormsPage() {
     { label: 'Boulevard Men', value: 'boulevard-men' }, { label: 'Boulevard Women', value: 'boulevard-women' },
     { label: "D'Angelo", value: 'dangelo' }, { label: 'Woodpeckers', value: 'woodpeckers' },
     { label: 'Carbon Shoes', value: 'carbon-shoes' },
-  ];
-
-  const MERCH_BRANDS = [
-    { label: 'Arbiter', value: 'arbiter' }, { label: 'Gianfranco Butteri', value: 'butteri' },
-    { label: 'Oliver Scotts', value: 'oliver-scotts' }, { label: 'Gianni Gallucci', value: 'gallucci' },
-    { label: 'Cucinera Fiorentina', value: 'cucinera' }, { label: 'Zecca Milano', value: 'zecca' },
   ];
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -56,7 +49,7 @@ export default function BrandFormsPage() {
       <div className="flex gap-2 mb-6 flex-wrap">
         {forms.map(f => (
           <button key={f.id} onClick={() => setActiveForm(f.id)}
-            className={`px-4 py-2 rounded-lg text-sm transition-colors ${activeForm === f.id ? 'bg-[#c8a951] text-black font-semibold' : 'bg-[#111] border border-[#2a2a2a] text-gray-400 hover:text-white'}`}>
+            className={`px-4 py-2 rounded-lg text-sm transition-colors ${activeForm === f.id ? 'bg-[#c8a951] text-black font-semibold' : 'bg-[var(--c-card)] border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
             {f.label}
           </button>
         ))}
@@ -73,7 +66,7 @@ export default function BrandFormsPage() {
           <FormSection title="Brand Health Score Update" description="Update brand equity scores">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Assessment Date" name="date" type="date" required />
-              <FormField label="Brand" name="brand" type="select" required options={[...BRANDS, ...MERCH_BRANDS]} />
+              <FormField label="Brand" name="brand" type="select" required options={BRANDS} />
               <FormField label="Brand Type" name="type" type="select" required options={[
                 { label: 'Retail Brand', value: 'retail' }, { label: 'Merchandise Brand', value: 'merchandise' },
               ]} />
@@ -116,12 +109,7 @@ export default function BrandFormsPage() {
           <FormSection title="Competitor Analysis" description="Track competitor activity and share of voice">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
-              <FormField label="Competitor" name="competitor" type="select" required options={[
-                { label: 'Boggi', value: 'boggi' }, { label: 'Zara', value: 'zara' },
-                { label: 'Hugo Boss', value: 'hugo-boss' }, { label: 'LC Waikiki', value: 'lc-waikiki' },
-                { label: 'Nike', value: 'nike' }, { label: 'Adidas', value: 'adidas' },
-                { label: 'Other', value: 'other' },
-              ]} />
+              <FormField label="Competitor" name="competitor" required placeholder="Type the competitor / local business" />
               <FormField label="Share of Voice %" name="sov" type="number" suffix="%" step={0.1} />
               <FormField label="Activity Type" name="activity" type="select" options={[
                 { label: 'New Campaign', value: 'campaign' }, { label: 'Price Change', value: 'price' },
@@ -155,30 +143,6 @@ export default function BrandFormsPage() {
           </FormSection>
         )}
 
-        {activeForm === 'voice' && (
-          <FormSection title="Customer Voice Entry" description="Record what customers are saying">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
-              <FormField label="Date" name="date" type="date" required />
-              <FormField label="Type" name="type" type="select" required options={[
-                { label: 'Compliment', value: 'compliment' }, { label: 'Frustration', value: 'frustration' },
-                { label: 'Emerging Theme', value: 'emerging' }, { label: 'Product Request', value: 'request' },
-              ]} />
-              <FormField label="Brand (if specific)" name="brand" type="select" options={BRANDS} />
-              <FormField label="Detail" name="detail" type="textarea" required placeholder="What is the customer saying?" />
-              <FormField label="Frequency" name="frequency" type="select" options={[
-                { label: 'Very Common (heard daily)', value: 'very-common' },
-                { label: 'Common (heard weekly)', value: 'common' },
-                { label: 'Occasional', value: 'occasional' },
-                { label: 'New / First time', value: 'new' },
-              ]} />
-              <FormField label="Source" name="source" type="select" options={[
-                { label: 'In-Store Staff', value: 'staff' }, { label: 'Social Media', value: 'social' },
-                { label: 'Review Site', value: 'review' }, { label: 'WhatsApp', value: 'whatsapp' },
-              ]} />
-            </div>
-          </FormSection>
-        )}
-
         {activeForm === 'attention' && (
           <FormSection title="CEO Attention Item" description="Flag critical issues for CEO attention">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
@@ -205,7 +169,7 @@ export default function BrandFormsPage() {
 
         <div className="flex gap-3 pt-2">
           <button type="submit" className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg transition-colors text-sm">Submit Entry</button>
-          <button type="reset" className="bg-[#1a1a1a] border border-[#333] text-gray-400 hover:text-white px-6 py-2.5 rounded-lg transition-colors text-sm">Clear Form</button>
+          <button type="reset" className="bg-[var(--c-hover)] border border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)] px-6 py-2.5 rounded-lg transition-colors text-sm">Clear Form</button>
         </div>
       </form>
 

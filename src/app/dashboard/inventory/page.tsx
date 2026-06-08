@@ -55,7 +55,7 @@ export default function InventoryPage() {
   const replenishments = m?.replenishments ?? [];
 
   return (
-    <div className="bg-[#0a0a0a] min-h-screen text-white">
+    <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)]">
       <DashboardHeader
         title="INVENTORY COMMAND CENTER"
         subtitle="RIGHT STOCK. RIGHT PLACE. RIGHT TIME. MAXIMUM RETURNS."
@@ -119,10 +119,10 @@ export default function InventoryPage() {
               {accuracyDistribution.length ? (
                 <div className="grid grid-cols-2 gap-2">
                   {accuracyDistribution.map((a, i) => (
-                    <div key={a.name} className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3 flex items-center gap-2">
+                    <div key={a.name} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3 flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ['#22c55e', '#eab308', '#f97316', '#ef4444'][i % 4] }} />
                       <span className="text-xs text-gray-400">{a.name}</span>
-                      <span className="text-sm font-bold text-white ml-auto">{a.value}%</span>
+                      <span className="text-sm font-bold text-[var(--c-fg)] ml-auto">{a.value}%</span>
                     </div>
                   ))}
                 </div>
@@ -136,25 +136,25 @@ export default function InventoryPage() {
         <Section number={3} title="Stock Movement">
           {hasMovement ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Counted On-Hand</div>
                 <div className="text-base font-bold">{fmtGHS(mv.countedValue)}</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Goods Received</div>
                 <div className="text-base font-bold text-green-400">{fmtGHS(mv.receivedValue)}</div>
                 <div className="text-[0.6rem] text-gray-600 mt-0.5">{mv.receivedUnits.toLocaleString()} units</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Transferred</div>
                 <div className="text-base font-bold text-blue-400">{fmtGHS(mv.transferredValue)}</div>
                 <div className="text-[0.6rem] text-gray-600 mt-0.5">{mv.transferredUnits.toLocaleString()} units</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Dead Stock</div>
                 <div className="text-base font-bold text-red-400">{fmtGHS(mv.deadStockValue)}</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Replenishment Reqs</div>
                 <div className="text-base font-bold">{mv.replenishmentRequests}</div>
               </div>
@@ -180,7 +180,7 @@ export default function InventoryPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-[#2a2a2a] text-gray-500">
+                      <tr className="border-b border-[var(--c-border)] text-gray-500">
                         <th className="text-left py-2 pr-3 font-medium">SKU</th>
                         <th className="text-right py-2 px-2 font-medium">In Stock</th>
                         <th className="text-right py-2 px-2 font-medium">Reorder</th>
@@ -189,7 +189,7 @@ export default function InventoryPage() {
                     </thead>
                     <tbody>
                       {replenishments.map((r, i) => (
-                        <tr key={i} className="border-b border-[#1a1a1a]">
+                        <tr key={i} className="border-b border-[var(--c-hover)]">
                           <td className="py-2 pr-3 truncate max-w-[10rem]">{r.description || r.sku}</td>
                           <td className="py-2 px-2 text-right">{r.currentStock}</td>
                           <td className="py-2 px-2 text-right">{r.reorderQty}</td>

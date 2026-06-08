@@ -14,7 +14,8 @@ export type UserRole =
   | 'marketing'
   | 'operations'
   | 'inventory'
-  | 'brand';
+  | 'brand'
+  | 'store-manager';
 
 export interface User {
   id: string;

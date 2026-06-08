@@ -25,6 +25,8 @@ export default function LoginPage() {
       const data = await res.json();
       if (data.user.role === 'owner') {
         router.push('/dashboard/executive');
+      } else if (data.user.role === 'store-manager') {
+        router.push('/forms/store-manager');
       } else {
         const seg = data.user.department === 'brand' ? 'brand-health' : data.user.department;
         router.push(`/dashboard/${seg}`);
@@ -56,7 +58,7 @@ export default function LoginPage() {
           <p className="text-sm text-gray-500 mt-1">Sign in to access your dashboard</p>
         </div>
 
-        <form onSubmit={handleLogin} className="bg-[#111] border border-[#2a2a2a] rounded-xl p-6 space-y-4">
+        <form onSubmit={handleLogin} className="bg-[var(--c-card)] border border-[var(--c-border)] rounded-xl p-6 space-y-4">
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm p-3 rounded-lg">{error}</div>
           )}

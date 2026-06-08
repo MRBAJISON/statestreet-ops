@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import type { Department } from '@/lib/types';
 
 interface SidebarProps {
@@ -25,6 +26,9 @@ const ALL_FORM_DEPTS: Department[] = ['finance', 'commercial', 'marketing', 'ope
 export default function Sidebar({ userName, userRole, departments }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [open, setOpen] = useState(false);
+  // Close the mobile drawer whenever the route changes.
+  useEffect(() => { setOpen(false); }, [pathname]);
   // Operations manager can use every form; others only their own department(s).
   const formDepts = userRole === 'operations' ? ALL_FORM_DEPTS : departments.filter((d) => d !== 'executive');
 
@@ -34,8 +38,25 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
   }
 
   return (
-    <aside className="w-56 bg-[#0d0d0d] border-r border-[#1a1a1a] flex flex-col h-screen sticky top-0">
-      <div className="p-4 border-b border-[#1a1a1a]">
+    <>
+    {/* Mobile top bar (hamburger left; theme toggle floats top-right globally) */}
+    <div className="md:hidden sticky top-0 z-30 flex items-center gap-3 px-4 py-3 bg-[var(--c-card2)] border-b border-[var(--c-border)]">
+      <button onClick={() => setOpen(true)} aria-label="Open menu" className="text-2xl leading-none">☰</button>
+      <div className="flex items-center gap-2">
+        <div className="w-7 h-7 bg-[#c8a951] rounded flex items-center justify-center">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
+          </svg>
+        </div>
+        <span className="text-sm font-bold tracking-wider">STATESTREET</span>
+      </div>
+    </div>
+
+    {/* Mobile overlay */}
+    {open && <div className="md:hidden fixed inset-0 bg-black/50 z-40" onClick={() => setOpen(false)} />}
+
+    <aside className={`w-56 bg-[var(--c-card2)] border-r border-[var(--c-border)] flex flex-col h-screen fixed inset-y-0 left-0 z-50 transform transition-transform md:sticky md:top-0 md:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className="p-4 border-b border-[var(--c-hover)]">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-[#c8a951] rounded flex items-center justify-center">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round">
@@ -60,7 +81,7 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
           return (
             <Link key={dept} href={href}
               className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                isActive ? 'bg-[#1a1a1a] text-white' : 'text-gray-500 hover:text-gray-300 hover:bg-[#111]'
+                isActive ? 'bg-[var(--c-hover)] text-[var(--c-fg)]' : 'text-gray-500 hover:text-gray-300 hover:bg-[var(--c-card)]'
               }`}>
               <span>{config.icon}</span>
               <span>{config.label}</span>
@@ -74,7 +95,7 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
             <div className="text-[0.6rem] text-gray-600 uppercase tracking-wider px-3 py-2 mt-4">Administration</div>
             <Link href="/dashboard/admin"
               className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                pathname === '/dashboard/admin' ? 'bg-[#1a1a1a] text-white' : 'text-gray-500 hover:text-gray-300 hover:bg-[#111]'
+                pathname === '/dashboard/admin' ? 'bg-[var(--c-hover)] text-[var(--c-fg)]' : 'text-gray-500 hover:text-gray-300 hover:bg-[var(--c-card)]'
               }`}>
               <span>👤</span>
               <span>User Admin</span>
@@ -82,7 +103,20 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
           </>
         )}
 
-        {userRole !== 'owner' && (
+        {userRole === 'store-manager' && (
+          <>
+            <div className="text-[0.6rem] text-gray-600 uppercase tracking-wider px-3 py-2 mt-4">Data Entry</div>
+            <Link href="/forms/store-manager"
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                pathname === '/forms/store-manager' ? 'bg-[var(--c-hover)] text-[var(--c-fg)]' : 'text-gray-500 hover:text-gray-300 hover:bg-[var(--c-card)]'
+              }`}>
+              <span className="text-xs">📝</span>
+              <span>Weekly Review</span>
+            </Link>
+          </>
+        )}
+
+        {userRole !== 'owner' && userRole !== 'store-manager' && (
           <>
             <div className="text-[0.6rem] text-gray-600 uppercase tracking-wider px-3 py-2 mt-4">Data Entry</div>
             {formDepts.map(dept => {
@@ -92,7 +126,7 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
               return (
                 <Link key={`form-${dept}`} href={href}
                   className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    isActive ? 'bg-[#1a1a1a] text-white' : 'text-gray-500 hover:text-gray-300 hover:bg-[#111]'
+                    isActive ? 'bg-[var(--c-hover)] text-[var(--c-fg)]' : 'text-gray-500 hover:text-gray-300 hover:bg-[var(--c-card)]'
                   }`}>
                   <span className="text-xs">📝</span>
                   <span>{config.label} Forms</span>
@@ -103,7 +137,7 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
         )}
       </nav>
 
-      <div className="p-3 border-t border-[#1a1a1a]">
+      <div className="p-3 border-t border-[var(--c-hover)]">
         <div className="flex items-center gap-2 px-3 py-2">
           <div className="w-7 h-7 bg-[#c8a951]/20 rounded-full flex items-center justify-center text-[#c8a951] text-xs font-bold">
             {userName.charAt(0)}
@@ -119,5 +153,6 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
         </button>
       </div>
     </aside>
+    </>
   );
 }

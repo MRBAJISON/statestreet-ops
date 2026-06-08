@@ -33,7 +33,13 @@ interface MarketingLive {
   campaignByBrand: { brand: string; revenue: number; spend: number; roas: number }[];
   campaigns: { name: string; platform: string; reach: number; engagement: number; leads: number; revenue: number; spend: number; roas: number; status: string }[];
   clienteling: { contacted: number; responses: number; appointments: number; estRevenue: number; responseRate: number };
-  customerIntel: { type: string; detail: string; frequency: string; store: string }[];
+  customerExperience: {
+    count: number;
+    avgNps: number;
+    recommendRate: number;
+    byType: { name: string; value: number }[];
+    recent: { type: string; detail: string; frequency: string; store: string; source: string }[];
+  };
   actions: { task: string; owner: string; priority: string; status: string; deadline: string }[];
 }
 
@@ -48,7 +54,7 @@ export default function MarketingPage() {
   const webVisits = m?.webVisits ?? 0;
   const campaigns = m?.campaigns ?? [];
   const cl = m?.clienteling ?? { contacted: 0, responses: 0, appointments: 0, estRevenue: 0, responseRate: 0 };
-  const customerIntel = m?.customerIntel ?? [];
+  const cx = m?.customerExperience ?? { count: 0, avgNps: 0, recommendRate: 0, byType: [], recent: [] };
   const actions = m?.actions ?? [];
   const hasFunnel = !!(funnel.reach || funnel.engagement || funnel.leads || funnel.storeVisits);
   const hasClienteling = !!(cl.contacted || cl.responses || cl.appointments || cl.estRevenue);
@@ -62,7 +68,7 @@ export default function MarketingPage() {
   ];
 
   return (
-    <div className="bg-[#0a0a0a] min-h-screen text-white">
+    <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)]">
       <DashboardHeader
         title="MARKETING COMMAND CENTER"
         subtitle="DEMAND GENERATION. BRAND BUILDING. CUSTOMER ACQUISITION."
@@ -100,7 +106,7 @@ export default function MarketingPage() {
               {hasFunnel ? (
                 <div className="space-y-2">
                   {funnelSteps.map((s) => (
-                    <div key={s.label} className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3 flex justify-between items-center">
+                    <div key={s.label} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3 flex justify-between items-center">
                       <span className="text-xs text-gray-400">{s.label}</span>
                       <span className="text-sm font-bold text-[#c8a951]">{s.value}</span>
                     </div>
@@ -118,7 +124,7 @@ export default function MarketingPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                  <tr className="border-b border-[var(--c-border)] text-gray-500">
                     <th className="text-left py-2 pr-3 font-medium">Campaign</th>
                     <th className="text-left py-2 px-2 font-medium">Platform</th>
                     <th className="text-right py-2 px-2 font-medium">Reach</th>
@@ -131,7 +137,7 @@ export default function MarketingPage() {
                 </thead>
                 <tbody>
                   {campaigns.map((c, i) => (
-                    <tr key={i} className="border-b border-[#1a1a1a]">
+                    <tr key={i} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3">{c.name}</td>
                       <td className="py-2 px-2 capitalize">{c.platform || '—'}</td>
                       <td className="py-2 px-2 text-right">{numOrDash(c.reach)}</td>
@@ -153,7 +159,7 @@ export default function MarketingPage() {
               <div className="text-xs text-gray-400 mb-2">Campaign ROI by Brand</div>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
                 {campaignByBrand.map((b) => (
-                  <div key={b.brand} className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                  <div key={b.brand} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                     <div className="text-[0.65rem] text-gray-500 truncate">{b.brand}</div>
                     <div className="text-base font-bold text-[#c8a951]">{b.roas ? `${b.roas}x` : '—'}</div>
                     <div className="text-[0.6rem] text-gray-600">{fmtGHS(b.revenue)} rev</div>
@@ -169,7 +175,7 @@ export default function MarketingPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                  <tr className="border-b border-[var(--c-border)] text-gray-500">
                     <th className="text-left py-2 pr-3 font-medium">Channel</th>
                     <th className="text-right py-2 px-2 font-medium">Followers</th>
                     <th className="text-right py-2 px-2 font-medium">Reach</th>
@@ -180,7 +186,7 @@ export default function MarketingPage() {
                 </thead>
                 <tbody>
                   {socialByChannel.map((s) => (
-                    <tr key={s.platform} className="border-b border-[#1a1a1a]">
+                    <tr key={s.platform} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3 capitalize text-[#c8a951]">{s.platform}</td>
                       <td className="py-2 px-2 text-right">{numOrDash(s.followers)}</td>
                       <td className="py-2 px-2 text-right">{numOrDash(s.reach)}</td>
@@ -205,23 +211,23 @@ export default function MarketingPage() {
         <Section number={4} title="Clienteling">
           {hasClienteling ? (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Contacted</div>
                 <div className="text-lg font-bold">{numOrDash(cl.contacted)}</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Responses</div>
                 <div className="text-lg font-bold">{numOrDash(cl.responses)}</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Response Rate</div>
                 <div className="text-lg font-bold">{cl.responseRate ? `${cl.responseRate}%` : '—'}</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Appointments</div>
                 <div className="text-lg font-bold">{numOrDash(cl.appointments)}</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#c8a951]/30 rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[#c8a951]/30 rounded-lg p-3">
                 <div className="text-[0.65rem] text-[#c8a951] uppercase tracking-wider">Est. Revenue</div>
                 <div className="text-lg font-bold text-[#c8a951]">{dash(cl.estRevenue, fmtGHS)}</div>
               </div>
@@ -231,20 +237,29 @@ export default function MarketingPage() {
           )}
         </Section>
 
-        <Section number={5} title="Customer Intelligence">
-          {customerIntel.length ? (
-            <div className="space-y-2">
-              {customerIntel.map((c, i) => (
-                <div key={i} className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3 flex items-start gap-2 text-xs">
-                  <span className="text-[#c8a951] capitalize whitespace-nowrap">{c.type || 'note'}</span>
-                  <span className="text-gray-300 flex-1">{c.detail}</span>
-                  {c.frequency && <span className="text-gray-500">{c.frequency}</span>}
-                  {c.store && <span className="text-gray-600">{c.store}</span>}
-                </div>
-              ))}
+        <Section number={5} title="Customer Experience">
+          {cx.count ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <KPICard label="Responses" value={String(cx.count)} small />
+                <KPICard label="Avg NPS" value={cx.avgNps ? String(cx.avgNps) : '—'} small />
+                <KPICard label="Recommend Rate" value={cx.recommendRate ? `${cx.recommendRate}%` : '—'} small />
+                <KPICard label="Feedback Types" value={cx.byType.length ? String(cx.byType.length) : '—'} small />
+              </div>
+              <div className="space-y-2">
+                {cx.recent.map((c, i) => (
+                  <div key={i} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3 flex items-start gap-2 text-xs">
+                    <span className="text-[#c8a951] capitalize whitespace-nowrap">{c.type || 'feedback'}</span>
+                    <span className="text-gray-300 flex-1">{c.detail}</span>
+                    {c.source && <span className="text-gray-500 capitalize">{c.source}</span>}
+                    {c.frequency && <span className="text-gray-500">{c.frequency}</span>}
+                    {c.store && <span className="text-gray-600">{c.store}</span>}
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
-            <EmptyState message="No customer intelligence yet" hint="Submit Customer Intelligence in the Marketing form." height={120} />
+            <EmptyState message="No customer experience feedback yet" hint="Submitted via the Marketing form or the public Customer Experience survey." height={120} />
           )}
         </Section>
 
@@ -253,7 +268,7 @@ export default function MarketingPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                  <tr className="border-b border-[var(--c-border)] text-gray-500">
                     <th className="text-left py-2 pr-3 font-medium">Task</th>
                     <th className="text-left py-2 px-3 font-medium">Owner</th>
                     <th className="text-left py-2 px-3 font-medium">Priority</th>
@@ -263,7 +278,7 @@ export default function MarketingPage() {
                 </thead>
                 <tbody>
                   {actions.map((a, i) => (
-                    <tr key={i} className="border-b border-[#1a1a1a]">
+                    <tr key={i} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3">{a.task}</td>
                       <td className="py-2 px-3">{a.owner || '—'}</td>
                       <td className="py-2 px-3 capitalize">{a.priority || '—'}</td>

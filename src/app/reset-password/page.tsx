@@ -47,7 +47,7 @@ export default function ResetPasswordPage() {
           <h2 className="text-lg font-semibold text-gray-300 mt-4">Set a new password</h2>
         </div>
 
-        <div className="bg-[#111] border border-[#2a2a2a] rounded-xl p-6">
+        <div className="bg-[var(--c-card)] border border-[var(--c-border)] rounded-xl p-6">
           {done ? (
             <p className="text-sm text-green-400 text-center">Password updated. Redirecting to sign in…</p>
           ) : !token ? (

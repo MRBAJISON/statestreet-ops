@@ -121,7 +121,7 @@ export default function CommercialPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-[#2a2a2a] text-gray-500">
+              <tr className="border-b border-[var(--c-border)] text-gray-500">
                 <th className="text-left py-2 pr-3 font-medium">SKU</th>
                 <th className="text-right py-2 px-2 font-medium">Sales</th>
                 <th className="text-right py-2 px-2 font-medium">Units</th>
@@ -130,7 +130,7 @@ export default function CommercialPage() {
             </thead>
             <tbody>
               {rows.map((s) => (
-                <tr key={s.sku + s.name} className="border-b border-[#1a1a1a]">
+                <tr key={s.sku + s.name} className="border-b border-[var(--c-hover)]">
                   <td className="py-2 pr-3 truncate max-w-[10rem]">{s.name || s.sku}</td>
                   <td className="py-2 px-2 text-right">{fmtGHS(s.salesValue)}</td>
                   <td className="py-2 px-2 text-right">{s.unitsSold || '—'}</td>
@@ -147,7 +147,7 @@ export default function CommercialPage() {
   );
 
   return (
-    <div className="bg-[#0a0a0a] min-h-screen text-white">
+    <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)]">
       <DashboardHeader
         title="COMMERCIAL COMMAND CENTER"
         subtitle="RIGHT PRODUCT, RIGHT STORE. RIGHT PRICE, RIGHT TIME."
@@ -211,7 +211,7 @@ export default function CommercialPage() {
               {sellThroughCat.length ? (
                 <div className="grid grid-cols-2 gap-2">
                   {sellThroughCat.map((c) => (
-                    <div key={c.name} className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3 flex justify-between items-center">
+                    <div key={c.name} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3 flex justify-between items-center">
                       <span className="text-xs text-gray-400 capitalize">{c.name}</span>
                       <span className="text-sm font-bold text-[#c8a951]">{c.value}%</span>
                     </div>
@@ -240,7 +240,7 @@ export default function CommercialPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-[#2a2a2a] text-gray-500">
+                      <tr className="border-b border-[var(--c-border)] text-gray-500">
                         <th className="text-left py-2 pr-3 font-medium">Date</th>
                         <th className="text-left py-2 pr-3 font-medium">Brand</th>
                         <th className="text-left py-2 pr-3 font-medium">Category</th>
@@ -251,7 +251,7 @@ export default function CommercialPage() {
                     </thead>
                     <tbody>
                       {newArrivals.map((a, i) => (
-                        <tr key={i} className="border-b border-[#1a1a1a]">
+                        <tr key={i} className="border-b border-[var(--c-hover)]">
                           <td className="py-2 pr-3 whitespace-nowrap">{a.date || '—'}</td>
                           <td className="py-2 pr-3">{a.brand}</td>
                           <td className="py-2 pr-3">{a.category}</td>
@@ -283,7 +283,7 @@ export default function CommercialPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-[#2a2a2a] text-gray-500">
+                  <tr className="border-b border-[var(--c-border)] text-gray-500">
                     <th className="text-left py-2 pr-3 font-medium">Member</th>
                     <th className="text-left py-2 px-3 font-medium">Role</th>
                     <th className="text-left py-2 px-3 font-medium">KPI</th>
@@ -294,7 +294,7 @@ export default function CommercialPage() {
                 </thead>
                 <tbody>
                   {accountability.map((a, i) => (
-                    <tr key={i} className="border-b border-[#1a1a1a]">
+                    <tr key={i} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3">{a.member}</td>
                       <td className="py-2 px-3 capitalize">{a.role || '—'}</td>
                       <td className="py-2 px-3">{a.kpi}</td>
@@ -320,7 +320,7 @@ export default function CommercialPage() {
                 <div className="space-y-1 max-h-[360px] overflow-y-auto pr-1">
                   <button
                     onClick={() => setWrWeek('all')}
-                    className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${wrWeek === 'all' ? 'bg-[#c8a951] text-black border-[#c8a951] font-semibold' : 'bg-[#0d0d0d] border-[#2a2a2a] text-gray-300 hover:border-[#c8a951]'}`}
+                    className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${wrWeek === 'all' ? 'bg-[#c8a951] text-black border-[#c8a951] font-semibold' : 'bg-[var(--c-card2)] border-[var(--c-border)] text-gray-300 hover:border-[#c8a951]'}`}
                   >
                     <div>All weeks</div>
                     <div className={wrWeek === 'all' ? 'text-black/70' : 'text-gray-500'}>{wr.count} review{wr.count === 1 ? '' : 's'}</div>
@@ -329,7 +329,7 @@ export default function CommercialPage() {
                     <button
                       key={r.id}
                       onClick={() => setWrWeek(r.id)}
-                      className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${wrWeek === r.id ? 'bg-[#c8a951] text-black border-[#c8a951] font-semibold' : 'bg-[#0d0d0d] border-[#2a2a2a] text-gray-300 hover:border-[#c8a951]'}`}
+                      className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${wrWeek === r.id ? 'bg-[#c8a951] text-black border-[#c8a951] font-semibold' : 'bg-[var(--c-card2)] border-[var(--c-border)] text-gray-300 hover:border-[#c8a951]'}`}
                     >
                       <div>Week ending {r.weekEnd || '—'}</div>
                       <div className={wrWeek === r.id ? 'text-black/70' : 'text-gray-500'}>{r.store}{r.achievement ? ` · ${r.achievement}%` : ''}</div>

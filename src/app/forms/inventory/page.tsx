@@ -53,7 +53,7 @@ export default function InventoryFormsPage() {
       <div className="flex gap-2 mb-6 flex-wrap">
         {forms.map(f => (
           <button key={f.id} onClick={() => setActiveForm(f.id)}
-            className={`px-4 py-2 rounded-lg text-sm transition-colors ${activeForm === f.id ? 'bg-[#c8a951] text-black font-semibold' : 'bg-[#111] border border-[#2a2a2a] text-gray-400 hover:text-white'}`}>
+            className={`px-4 py-2 rounded-lg text-sm transition-colors ${activeForm === f.id ? 'bg-[#c8a951] text-black font-semibold' : 'bg-[var(--c-card)] border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
             {f.label}
           </button>
         ))}
@@ -89,11 +89,7 @@ export default function InventoryFormsPage() {
               <FormField label="Receipt Date" name="date" type="date" required />
               <FormField label="PO Number" name="poNumber" required placeholder="PO-XXXX" />
               <FormField label="Supplier" name="supplier" required />
-              <FormField label="Brand" name="brand" type="select" options={[
-                { label: 'Arbiter', value: 'arbiter' }, { label: 'Gianfranco Butteri', value: 'butteri' },
-                { label: 'Oliver Scotts', value: 'oliver-scotts' }, { label: 'Gianni Gallucci', value: 'gallucci' },
-                { label: 'Cucinera Fiorentina', value: 'cucinera' }, { label: 'Zecca Milano', value: 'zecca' },
-              ]} />
+              <FormField label="Brand" name="brand" placeholder="Type the brand" />
               <FormField label="Category" name="category" type="select" required options={CATEGORIES} />
               <FormField label="Total Units Received" name="units" type="number" required />
               <FormField label="Total Value" name="totalValue" type="number" prefix="GHS" required step={0.01} />
@@ -173,7 +169,7 @@ export default function InventoryFormsPage() {
 
         <div className="flex gap-3 pt-2">
           <button type="submit" className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg transition-colors text-sm">Submit Entry</button>
-          <button type="reset" className="bg-[#1a1a1a] border border-[#333] text-gray-400 hover:text-white px-6 py-2.5 rounded-lg transition-colors text-sm">Clear Form</button>
+          <button type="reset" className="bg-[var(--c-hover)] border border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)] px-6 py-2.5 rounded-lg transition-colors text-sm">Clear Form</button>
         </div>
       </form>
 

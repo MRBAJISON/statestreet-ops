@@ -96,7 +96,7 @@ export default function FinancePage() {
   ];
 
   return (
-    <div className="bg-[#0a0a0a] min-h-screen text-white">
+    <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)]">
       <DashboardHeader
         title="FINANCE COMMAND CENTER"
         subtitle="FINANCIAL DISCIPLINE. PROFITABLE GROWTH. CASH CONFIDENCE."
@@ -169,7 +169,7 @@ export default function FinancePage() {
                       <div key={b.name} className="flex items-center gap-1.5 text-[0.65rem]">
                         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: ['#c8a951', '#22c55e', '#3b82f6', '#ef4444', '#eab308', '#8b5cf6'][i % 6] }} />
                         <span className="text-gray-400 truncate">{b.name}</span>
-                        <span className="text-white ml-auto">{fmtGHS(b.value)}</span>
+                        <span className="text-[var(--c-fg)] ml-auto">{fmtGHS(b.value)}</span>
                       </div>
                     ))}
                   </div>
@@ -195,7 +195,7 @@ export default function FinancePage() {
             <div className="space-y-3">
               <div className="text-xs text-gray-400 mb-1 font-medium uppercase tracking-wider">Key Margins</div>
               {margins.map((mg) => (
-                <div key={mg.label} className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                <div key={mg.label} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                   <div className="flex justify-between items-center">
                     <span className="text-[0.65rem] text-gray-500">{mg.label}</span>
                     <span className="text-sm font-bold text-[#c8a951]">{mg.value ? `${mg.value}%` : '—'}</span>
@@ -211,11 +211,11 @@ export default function FinancePage() {
         <Section number={3} title="Cash Flow" subtitle="MTD">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="space-y-3">
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                 <div className="text-[0.65rem] text-gray-500">Cash Inflow</div>
                 <div className="text-lg font-bold text-green-400">{dash(m?.cashInflow ?? 0, fmtGHS)}</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                 <div className="text-[0.65rem] text-gray-500">Cash Outflow</div>
                 <div className="text-lg font-bold text-red-400">{dash(m?.cashOutflow ?? 0, fmtGHS)}</div>
               </div>
@@ -229,12 +229,12 @@ export default function FinancePage() {
               )}
             </div>
             <div className="space-y-3">
-              <div className="bg-[#0d0d0d] border border-[#c8a951]/30 rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[#c8a951]/30 rounded-lg p-3">
                 <div className="text-[0.65rem] text-[#c8a951]">Net Cash Position</div>
                 <div className="text-lg font-bold text-[#c8a951]">{dash(m?.cashPosition ?? 0, fmtGHS)}</div>
                 <div className="text-[0.6rem] text-gray-600 mt-1">Closing = inflows − outflows recorded</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                 <div className="flex justify-between items-center">
                   <span className="text-[0.65rem] text-gray-500">Est. Cash Runway</span>
                   <span className="text-xl font-bold text-[#c8a951]">{(m?.runwayDays ?? 0) ? `${m?.runwayDays} days` : '—'}</span>
@@ -249,7 +249,7 @@ export default function FinancePage() {
         <Section number={4} title="Expense Control" subtitle="MTD">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="space-y-3">
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                 <div className="text-[0.65rem] text-gray-500">Total OpEx</div>
                 <div className="text-lg font-bold">{dash(expensesTotal, fmtGHS)}</div>
                 {budgetTotal > 0 && (
@@ -314,19 +314,19 @@ export default function FinancePage() {
         {hasWeekly && (
           <Section title="Weekly Forecast">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-[#0d0d0d] border border-[#c8a951]/30 rounded-lg p-4">
+              <div className="bg-[var(--c-card2)] border border-[#c8a951]/30 rounded-lg p-4">
                 <div className="text-[0.65rem] text-[#c8a951] uppercase tracking-wider">Weekly Revenue</div>
                 <div className="text-xl font-bold mt-1">{dash(weeklyForecast.revenue, fmtGHS)}</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-4">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-4">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Weekly Gross Profit</div>
                 <div className="text-xl font-bold mt-1">{dash(weeklyForecast.grossProfit, fmtGHS)}</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-4">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-4">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Weekly Net Profit</div>
                 <div className="text-xl font-bold mt-1">{dash(weeklyForecast.netProfit, fmtGHS)}</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-4">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-4">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Weekly Cash</div>
                 <div className="text-xl font-bold mt-1">{dash(weeklyForecast.cash, fmtGHS)}</div>
               </div>
@@ -338,19 +338,19 @@ export default function FinancePage() {
         {hasForecast && (
           <Section number={6} title="Forecast & Outlook">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-[#0d0d0d] border border-[#c8a951]/30 rounded-lg p-4">
+              <div className="bg-[var(--c-card2)] border border-[#c8a951]/30 rounded-lg p-4">
                 <div className="text-[0.65rem] text-[#c8a951] uppercase tracking-wider">Revenue Forecast</div>
                 <div className="text-xl font-bold mt-1">{dash(forecast.revenue, fmtGHS)}</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-4">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-4">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Gross Profit Forecast</div>
                 <div className="text-xl font-bold mt-1">{dash(forecast.grossProfit, fmtGHS)}</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-4">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-4">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Net Profit Forecast</div>
                 <div className="text-xl font-bold mt-1">{dash(forecast.netProfit, fmtGHS)}</div>
               </div>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-4">
+              <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-4">
                 <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Cash Forecast</div>
                 <div className="text-xl font-bold mt-1">{dash(forecast.cash, fmtGHS)}</div>
               </div>

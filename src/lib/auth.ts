@@ -14,6 +14,7 @@ const ROLE_DEPARTMENTS: Record<UserRole, Department[]> = {
   operations: ['operations'],
   inventory: ['inventory'],
   brand: ['brand'],
+  'store-manager': ['commercial'],
 };
 
 export interface AppUser {

@@ -14,11 +14,11 @@ interface KPICardProps {
 }
 
 export default function KPICard({ label, value, target, change, changeLabel, prefix, suffix, status, icon, small }: KPICardProps) {
-  const statusColor = status === 'green' ? 'text-green-500' : status === 'yellow' ? 'text-yellow-500' : status === 'red' ? 'text-red-500' : 'text-white';
-  const statusBorder = status === 'green' ? 'border-green-500/30' : status === 'yellow' ? 'border-yellow-500/30' : status === 'red' ? 'border-red-500/30' : 'border-[#2a2a2a]';
+  const statusColor = status === 'green' ? 'text-green-500' : status === 'yellow' ? 'text-yellow-500' : status === 'red' ? 'text-red-500' : 'text-[var(--c-fg)]';
+  const statusBorder = status === 'green' ? 'border-green-500/30' : status === 'yellow' ? 'border-yellow-500/30' : status === 'red' ? 'border-red-500/30' : 'border-[var(--c-border)]';
 
   return (
-    <div className={`bg-[#111] border ${statusBorder} rounded-lg ${small ? 'p-3' : 'p-4'} flex flex-col gap-1`}>
+    <div className={`bg-[var(--c-card)] border ${statusBorder} rounded-lg ${small ? 'p-3' : 'p-4'} flex flex-col gap-1`}>
       <div className="flex items-center justify-between">
         <span className="text-[0.7rem] text-gray-400 uppercase tracking-wider">{label}</span>
         {icon && <span className="text-[#c8a951]">{icon}</span>}

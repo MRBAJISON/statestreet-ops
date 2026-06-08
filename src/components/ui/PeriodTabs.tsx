@@ -27,7 +27,7 @@ interface Props {
 }
 
 const selectClass =
-  'bg-[#0d0d0d] border border-[#2a2a2a] text-xs text-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#c8a951]';
+  'bg-[var(--c-card2)] border border-[var(--c-border)] text-xs text-[var(--c-fg)] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#c8a951]';
 
 // Filter bar: period dropdown + calendar date picker + optional store dropdown.
 export default function PeriodTabs({ value, date, onChange, onDateChange, store, stores, onStoreChange }: Props) {
