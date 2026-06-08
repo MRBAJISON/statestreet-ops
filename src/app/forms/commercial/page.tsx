@@ -4,7 +4,9 @@ import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
+import WeeklyReview from './WeeklyReview';
 import { submitEntry } from '@/lib/api';
+import { PRODUCT_CATEGORIES } from '@/lib/config';
 
 const STORES = [
   { label: 'Dzorwulu Men', value: 'dzorwulu-men' },
@@ -16,13 +18,7 @@ const STORES = [
   { label: 'Woodpeckers', value: 'woodpeckers' },
 ];
 
-const CATEGORIES = [
-  { label: 'Suits', value: 'suits' }, { label: 'Shoes', value: 'shoes' },
-  { label: 'Shirts', value: 'shirts' }, { label: 'Blazers', value: 'blazers' },
-  { label: 'Bags', value: 'bags' }, { label: 'Belts', value: 'belts' },
-  { label: 'Ties', value: 'ties' }, { label: 'Trousers', value: 'trousers' },
-  { label: 'Accessories', value: 'accessories' }, { label: 'Others', value: 'others' },
-];
+const CATEGORIES = PRODUCT_CATEGORIES;
 
 const numOf = (s: string) => Number(s) || 0;
 const fmt2 = (x: number) => (x ? x.toFixed(2) : '');
@@ -53,6 +49,7 @@ export default function CommercialFormsPage() {
   }
 
   const forms = [
+    { id: 'weekly-review', label: 'Weekly Review' },
     { id: 'store-sales', label: 'Daily Store Sales' },
     { id: 'category-perf', label: 'Category Performance' },
     { id: 'sku-entry', label: 'SKU Performance' },
@@ -97,6 +94,9 @@ export default function CommercialFormsPage() {
         </div>
       )}
 
+      {activeForm === 'weekly-review' && <WeeklyReview />}
+
+      {activeForm !== 'weekly-review' && (
       <form onSubmit={handleSubmit} className="space-y-4 max-w-4xl">
         {activeForm === 'store-sales' && (
           <FormSection title="Daily Store Sales" description="Record daily sales metrics per store">
@@ -197,6 +197,7 @@ export default function CommercialFormsPage() {
           <button type="reset" className="bg-[#1a1a1a] border border-[#333] text-gray-400 hover:text-white px-6 py-2.5 rounded-lg transition-colors text-sm">Clear Form</button>
         </div>
       </form>
+      )}
 
       <div className="mt-8 max-w-4xl">
         <h2 className="text-sm font-bold uppercase tracking-wide mb-3">Your Submissions</h2>

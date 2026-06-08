@@ -247,6 +247,108 @@ function commercialMetrics(rows: Entry[]) {
   const na = payloads(rows, 'new-arrivals');
   const acc = payloads(rows, 'accountability');
 
+  // Store Manager Weekly Review aggregation
+  const wrRows = rows.filter((r) => r.formType === 'weekly-review');
+
+  // Reduce one review's category grid into the dashboard shapes.
+  const reviewDetail = (p: P) => {
+    const cats = (p.categories ?? {}) as Record<string, Record<string, unknown>>;
+    const catRev = new Map<string, number>();
+    const ratings: Record<string, number> = { Good: 0, Fair: 0, Poor: 0 };
+    let stockAtRisk = 0;
+    let atRiskCats = 0;
+    for (const [name, f] of Object.entries(cats)) {
+      catRev.set(name, (catRev.get(name) ?? 0) + num(f.revenue));
+      const rt = String(f.rating ?? '');
+      if (rt in ratings) ratings[rt] += 1;
+      stockAtRisk += num(f.valueAtRisk);
+      if (String(f.overstocked) === 'Y' || String(f.slowMoving) === 'Y' || num(f.valueAtRisk) > 0) atRiskCats += 1;
+    }
+    return {
+      revenueByCategory: [...catRev]
+        .map(([name, value]) => ({ name, value }))
+        .filter((x) => x.value > 0)
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 12),
+      ratingCounts: [
+        { name: 'Good', value: ratings.Good },
+        { name: 'Fair', value: ratings.Fair },
+        { name: 'Poor', value: ratings.Poor },
+      ],
+      stockAtRisk,
+      atRiskCategories: atRiskCats,
+    };
+  };
+
+  // One record per submitted review, newest week first — drives the history picker.
+  const reviews = wrRows
+    .map((r) => {
+      const p = r.payload as P;
+      return {
+        id: r.id,
+        store: labelFor(STORE_LABELS, p.store),
+        weekEnd: String(p.weekEnd ?? ''),
+        manager: String(p.manager ?? ''),
+        achievement: num(p.achievement),
+        actualSales: num(p.actualSales),
+        salesTarget: num(p.weeklySalesTarget),
+        submittedAt: entryDate(r).toISOString().slice(0, 10),
+        ceo: (p.ceo as Record<string, string>) ?? null,
+        ...reviewDetail(p),
+      };
+    })
+    .sort((a, b) => (a.weekEnd < b.weekEnd ? 1 : a.weekEnd > b.weekEnd ? -1 : b.id - a.id));
+
+  // Aggregate across every review in scope ("All weeks" view).
+  const wrCatRev = new Map<string, number>();
+  const wrRatings: Record<string, number> = { Good: 0, Fair: 0, Poor: 0 };
+  let wrStockAtRisk = 0;
+  let wrAtRiskCats = 0;
+  for (const r of wrRows) {
+    const cats = ((r.payload as P).categories ?? {}) as Record<string, Record<string, unknown>>;
+    for (const [name, f] of Object.entries(cats)) {
+      wrCatRev.set(name, (wrCatRev.get(name) ?? 0) + num(f.revenue));
+      const rt = String(f.rating ?? '');
+      if (rt in wrRatings) wrRatings[rt] += 1;
+      wrStockAtRisk += num(f.valueAtRisk);
+      if (String(f.overstocked) === 'Y' || String(f.slowMoving) === 'Y' || num(f.valueAtRisk) > 0) wrAtRiskCats += 1;
+    }
+  }
+  const wrAgg = {
+    revenueByCategory: [...wrCatRev]
+      .map(([name, value]) => ({ name, value }))
+      .filter((x) => x.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 12),
+    ratingCounts: [
+      { name: 'Good', value: wrRatings.Good },
+      { name: 'Fair', value: wrRatings.Fair },
+      { name: 'Poor', value: wrRatings.Poor },
+    ],
+    stockAtRisk: wrStockAtRisk,
+    atRiskCategories: wrAtRiskCats,
+  };
+  const wrLatest = reviews[0] ?? null;
+  const weeklyReview = {
+    count: reviews.length,
+    reviews,
+    revenueByCategory: wrAgg.revenueByCategory,
+    ratingCounts: wrAgg.ratingCounts,
+    stockAtRisk: wrAgg.stockAtRisk,
+    atRiskCategories: wrAgg.atRiskCategories,
+    latest: wrLatest
+      ? {
+          store: wrLatest.store,
+          weekEnd: wrLatest.weekEnd,
+          manager: wrLatest.manager,
+          achievement: wrLatest.achievement,
+          actualSales: wrLatest.actualSales,
+          salesTarget: wrLatest.salesTarget,
+        }
+      : null,
+    ceo: wrLatest?.ceo ?? null,
+  };
+
   const groupSales = ss.reduce((s, p) => s + num(p.totalSales), 0);
   const tx = ss.reduce((s, p) => s + num(p.transactions), 0);
   const units = ss.reduce((s, p) => s + num(p.unitsSold), 0);
@@ -322,6 +424,7 @@ function commercialMetrics(rows: Entry[]) {
       actual: String(p.actual || ''),
       status: String(p.status || ''),
     })),
+    weeklyReview,
     entryCount: rows.length,
   };
 }

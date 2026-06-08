@@ -5,6 +5,7 @@ import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry } from '@/lib/api';
+import { PRODUCT_CATEGORIES } from '@/lib/config';
 
 const STORES = [
   { label: 'Dzorwulu Men', value: 'dzorwulu-men' }, { label: 'East Legon Men', value: 'east-legon-men' },
@@ -13,12 +14,7 @@ const STORES = [
   { label: 'Woodpeckers', value: 'woodpeckers' },
 ];
 
-const CATEGORIES = [
-  { label: 'Suits', value: 'suits' }, { label: 'Shoes', value: 'shoes' },
-  { label: 'Shirts', value: 'shirts' }, { label: 'Blazers', value: 'blazers' },
-  { label: 'Bags', value: 'bags' }, { label: 'Denim & Casual', value: 'denim' },
-  { label: 'Accessories', value: 'accessories' }, { label: 'Others', value: 'others' },
-];
+const CATEGORIES = PRODUCT_CATEGORIES;
 
 export default function InventoryFormsPage() {
   const [activeForm, setActiveForm] = useState('stock-count');
