@@ -89,11 +89,7 @@ export default function InventoryFormsPage() {
               <FormField label="Receipt Date" name="date" type="date" required />
               <FormField label="PO Number" name="poNumber" required placeholder="PO-XXXX" />
               <FormField label="Supplier" name="supplier" required />
-              <FormField label="Brand" name="brand" type="select" options={[
-                { label: 'Arbiter', value: 'arbiter' }, { label: 'Gianfranco Butteri', value: 'butteri' },
-                { label: 'Oliver Scotts', value: 'oliver-scotts' }, { label: 'Gianni Gallucci', value: 'gallucci' },
-                { label: 'Cucinera Fiorentina', value: 'cucinera' }, { label: 'Zecca Milano', value: 'zecca' },
-              ]} />
+              <FormField label="Brand" name="brand" placeholder="Type the brand" />
               <FormField label="Category" name="category" type="select" required options={CATEGORIES} />
               <FormField label="Total Units Received" name="units" type="number" required />
               <FormField label="Total Value" name="totalValue" type="number" prefix="GHS" required step={0.01} />

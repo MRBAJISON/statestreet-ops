@@ -18,6 +18,25 @@ export default function OperationsFormsPage() {
   const [submitted, setSubmitted] = useState(false);
   const [message, setMessage] = useState('');
 
+  const num = (s: string) => Number(s) || 0;
+  const avgOf = (vals: number[]) => (vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : 0);
+
+  // Store Audit — Overall Status auto-derived from the average of the score fields.
+  const [audit, setAudit] = useState({ opsScore: '', vmScore: '', readinessScore: '', cxScore: '', cleanScore: '', safetyScore: '' });
+  const setA = (k: keyof typeof audit) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setAudit((s) => ({ ...s, [k]: e.target.value }));
+  const auditAvg = avgOf(Object.values(audit).map(num).filter((n) => n > 0));
+  const auditStatus = !auditAvg ? '' : auditAvg > 90 ? `Pass (${auditAvg}%)` : auditAvg >= 70 ? `Watch (${auditAvg}%)` : `Fail (${auditAvg}%)`;
+
+  // VM Compliance — Overall VM Score auto-derived from the average of the sub-scores.
+  const [vm, setVm] = useState({ windowDisplay: '', mannequin: '', productPresentation: '', signage: '', cleanliness: '' });
+  const setV = (k: keyof typeof vm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setVm((s) => ({ ...s, [k]: e.target.value }));
+  const vmAvg = avgOf(Object.values(vm).map(num).filter((n) => n > 0));
+
+  function resetAuto() {
+    setAudit({ opsScore: '', vmScore: '', readinessScore: '', cxScore: '', cleanScore: '', safetyScore: '' });
+    setVm({ windowDisplay: '', mannequin: '', productPresentation: '', signage: '', cleanliness: '' });
+  }
+
   const forms = [
     { id: 'store-audit', label: 'Store Audit' },
     { id: 'vm-check', label: 'VM Compliance' },
@@ -34,6 +53,7 @@ export default function OperationsFormsPage() {
       await submitEntry('operations', activeForm, form);
       setMessage('Saved to the live database. The dashboard reflects it now.');
       form.reset();
+      resetAuto();
     } catch (err) {
       setMessage('Could not save: ' + (err as Error).message);
     }
@@ -70,16 +90,14 @@ export default function OperationsFormsPage() {
               <FormField label="Date" name="date" type="date" required />
               <FormField label="Store" name="store" type="select" required options={STORES} />
               <FormField label="Auditor" name="auditor" required />
-              <FormField label="Operations Score %" name="opsScore" type="number" suffix="%" required min={0} max={100} />
-              <FormField label="VM Score %" name="vmScore" type="number" suffix="%" required min={0} max={100} />
-              <FormField label="Readiness Score %" name="readinessScore" type="number" suffix="%" required min={0} max={100} />
-              <FormField label="CX Score %" name="cxScore" type="number" suffix="%" required min={0} max={100} />
-              <FormField label="Cleanliness Score %" name="cleanScore" type="number" suffix="%" min={0} max={100} />
-              <FormField label="Safety Score %" name="safetyScore" type="number" suffix="%" min={0} max={100} />
+              <FormField label="Operations Score %" name="opsScore" type="number" suffix="%" required min={0} max={100} value={audit.opsScore} onChange={setA('opsScore')} />
+              <FormField label="VM Score %" name="vmScore" type="number" suffix="%" required min={0} max={100} value={audit.vmScore} onChange={setA('vmScore')} />
+              <FormField label="Readiness Score %" name="readinessScore" type="number" suffix="%" required min={0} max={100} value={audit.readinessScore} onChange={setA('readinessScore')} />
+              <FormField label="CX Score %" name="cxScore" type="number" suffix="%" required min={0} max={100} value={audit.cxScore} onChange={setA('cxScore')} />
+              <FormField label="Cleanliness Score %" name="cleanScore" type="number" suffix="%" min={0} max={100} value={audit.cleanScore} onChange={setA('cleanScore')} />
+              <FormField label="Safety Score %" name="safetyScore" type="number" suffix="%" min={0} max={100} value={audit.safetyScore} onChange={setA('safetyScore')} />
               <FormField label="Key Issues Found" name="issues" type="textarea" placeholder="List any issues found during audit" />
-              <FormField label="Overall Status" name="status" type="select" options={[
-                { label: 'Pass (>90%)', value: 'pass' }, { label: 'Watch (70-89%)', value: 'watch' }, { label: 'Fail (<70%)', value: 'fail' },
-              ]} />
+              <FormField label="Overall Status (auto)" name="status" value={auditStatus} readOnly placeholder="Fill scores above" />
             </div>
           </FormSection>
         )}
@@ -89,12 +107,12 @@ export default function OperationsFormsPage() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
               <FormField label="Store" name="store" type="select" required options={STORES} />
-              <FormField label="Window Display Compliance %" name="windowDisplay" type="number" suffix="%" min={0} max={100} />
-              <FormField label="Mannequin Styling %" name="mannequin" type="number" suffix="%" min={0} max={100} />
-              <FormField label="Product Presentation %" name="productPresentation" type="number" suffix="%" min={0} max={100} />
-              <FormField label="Signage & POS %" name="signage" type="number" suffix="%" min={0} max={100} />
-              <FormField label="Cleanliness & Lighting %" name="cleanliness" type="number" suffix="%" min={0} max={100} />
-              <FormField label="Overall VM Score %" name="overallVM" type="number" suffix="%" required min={0} max={100} />
+              <FormField label="Window Display Compliance %" name="windowDisplay" type="number" suffix="%" min={0} max={100} value={vm.windowDisplay} onChange={setV('windowDisplay')} />
+              <FormField label="Mannequin Styling %" name="mannequin" type="number" suffix="%" min={0} max={100} value={vm.mannequin} onChange={setV('mannequin')} />
+              <FormField label="Product Presentation %" name="productPresentation" type="number" suffix="%" min={0} max={100} value={vm.productPresentation} onChange={setV('productPresentation')} />
+              <FormField label="Signage & POS %" name="signage" type="number" suffix="%" min={0} max={100} value={vm.signage} onChange={setV('signage')} />
+              <FormField label="Cleanliness & Lighting %" name="cleanliness" type="number" suffix="%" min={0} max={100} value={vm.cleanliness} onChange={setV('cleanliness')} />
+              <FormField label="Overall VM Score % (auto)" name="overallVM" type="number" suffix="%" value={vmAvg ? String(vmAvg) : ''} readOnly />
               <FormField label="Needs Improvement" name="improvements" type="textarea" placeholder="Areas needing improvement" />
             </div>
           </FormSection>

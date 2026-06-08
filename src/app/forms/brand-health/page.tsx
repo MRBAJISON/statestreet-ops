@@ -26,12 +26,6 @@ export default function BrandFormsPage() {
     { label: 'Carbon Shoes', value: 'carbon-shoes' },
   ];
 
-  const MERCH_BRANDS = [
-    { label: 'Arbiter', value: 'arbiter' }, { label: 'Gianfranco Butteri', value: 'butteri' },
-    { label: 'Oliver Scotts', value: 'oliver-scotts' }, { label: 'Gianni Gallucci', value: 'gallucci' },
-    { label: 'Cucinera Fiorentina', value: 'cucinera' }, { label: 'Zecca Milano', value: 'zecca' },
-  ];
-
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
@@ -73,7 +67,7 @@ export default function BrandFormsPage() {
           <FormSection title="Brand Health Score Update" description="Update brand equity scores">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Assessment Date" name="date" type="date" required />
-              <FormField label="Brand" name="brand" type="select" required options={[...BRANDS, ...MERCH_BRANDS]} />
+              <FormField label="Brand" name="brand" type="select" required options={BRANDS} />
               <FormField label="Brand Type" name="type" type="select" required options={[
                 { label: 'Retail Brand', value: 'retail' }, { label: 'Merchandise Brand', value: 'merchandise' },
               ]} />
@@ -116,12 +110,7 @@ export default function BrandFormsPage() {
           <FormSection title="Competitor Analysis" description="Track competitor activity and share of voice">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
-              <FormField label="Competitor" name="competitor" type="select" required options={[
-                { label: 'Boggi', value: 'boggi' }, { label: 'Zara', value: 'zara' },
-                { label: 'Hugo Boss', value: 'hugo-boss' }, { label: 'LC Waikiki', value: 'lc-waikiki' },
-                { label: 'Nike', value: 'nike' }, { label: 'Adidas', value: 'adidas' },
-                { label: 'Other', value: 'other' },
-              ]} />
+              <FormField label="Competitor" name="competitor" required placeholder="Type the competitor / local business" />
               <FormField label="Share of Voice %" name="sov" type="number" suffix="%" step={0.1} />
               <FormField label="Activity Type" name="activity" type="select" options={[
                 { label: 'New Campaign', value: 'campaign' }, { label: 'Price Change', value: 'price' },
