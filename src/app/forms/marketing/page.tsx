@@ -16,7 +16,7 @@ export default function MarketingFormsPage() {
     { id: 'leads', label: 'Lead Entry' },
     { id: 'social', label: 'Social Media Metrics' },
     { id: 'clienteling', label: 'Clienteling Activity' },
-    { id: 'customer-intel', label: 'Customer Intelligence' },
+    { id: 'customer-experience', label: 'Customer Experience' },
     { id: 'priorities', label: 'Action Tracker' },
   ];
 
@@ -150,24 +150,39 @@ export default function MarketingFormsPage() {
           </FormSection>
         )}
 
-        {activeForm === 'customer-intel' && (
-          <FormSection title="Customer Intelligence" description="Record customer feedback and objections">
+        {activeForm === 'customer-experience' && (
+          <FormSection title="Customer Experience" description="Customer feedback, intelligence and experience scores (also fed by the public survey)">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
+              <FormField label="Source" name="source" type="select" options={[
+                { label: 'In-Store', value: 'in-store' }, { label: 'Survey Link', value: 'survey' },
+                { label: 'Social Media', value: 'social' }, { label: 'Online Review', value: 'reviews' },
+                { label: 'Customer Service', value: 'cs' },
+              ]} />
               <FormField label="Type" name="type" type="select" required options={[
                 { label: 'Customer Objection', value: 'objection' }, { label: 'Competitor Mention', value: 'competitor' },
                 { label: 'Product Request', value: 'request' }, { label: 'Compliment', value: 'compliment' },
-                { label: 'Complaint', value: 'complaint' },
+                { label: 'Complaint', value: 'complaint' }, { label: 'General Feedback', value: 'feedback' },
               ]} />
-              <FormField label="Detail" name="detail" required placeholder="What did the customer say?" />
+              <FormField label="Feedback Category" name="category" type="select" options={[
+                { label: 'Store Cleanliness', value: 'cleanliness' }, { label: 'Staff Knowledge', value: 'staff-knowledge' },
+                { label: 'Product Availability', value: 'availability' }, { label: 'Fitting Room', value: 'fitting-room' },
+                { label: 'Checkout Speed', value: 'checkout' }, { label: 'Overall Experience', value: 'overall' },
+              ]} />
+              <FormField label="NPS Score (-100 to 100)" name="nps" type="number" min={-100} max={100} />
+              <FormField label="Would Recommend" name="recommend" type="select" options={[
+                { label: 'Yes - Promoter', value: 'promoter' }, { label: 'Maybe - Passive', value: 'passive' },
+                { label: 'No - Detractor', value: 'detractor' },
+              ]} />
               <FormField label="Store" name="store" type="select" options={[
                 { label: 'Dzorwulu Men', value: 'dzorwulu-men' }, { label: 'East Legon Men', value: 'east-legon-men' },
-                { label: 'All Stores', value: 'all' },
+                { label: 'Labone Men', value: 'labone-men' }, { label: 'All Stores', value: 'all' },
               ]} />
               <FormField label="Frequency (How often heard)" name="frequency" type="select" options={[
                 { label: 'Very Frequent', value: 'very-frequent' }, { label: 'Frequent', value: 'frequent' },
                 { label: 'Occasional', value: 'occasional' }, { label: 'Rare', value: 'rare' },
               ]} />
+              <FormField label="Detail / Comments" name="detail" required placeholder="What did the customer say?" />
               <FormField label="Action Needed" name="action" type="textarea" placeholder="Suggested action" />
             </div>
           </FormSection>

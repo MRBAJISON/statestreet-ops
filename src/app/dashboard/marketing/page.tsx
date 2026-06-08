@@ -33,7 +33,13 @@ interface MarketingLive {
   campaignByBrand: { brand: string; revenue: number; spend: number; roas: number }[];
   campaigns: { name: string; platform: string; reach: number; engagement: number; leads: number; revenue: number; spend: number; roas: number; status: string }[];
   clienteling: { contacted: number; responses: number; appointments: number; estRevenue: number; responseRate: number };
-  customerIntel: { type: string; detail: string; frequency: string; store: string }[];
+  customerExperience: {
+    count: number;
+    avgNps: number;
+    recommendRate: number;
+    byType: { name: string; value: number }[];
+    recent: { type: string; detail: string; frequency: string; store: string; source: string }[];
+  };
   actions: { task: string; owner: string; priority: string; status: string; deadline: string }[];
 }
 
@@ -48,7 +54,7 @@ export default function MarketingPage() {
   const webVisits = m?.webVisits ?? 0;
   const campaigns = m?.campaigns ?? [];
   const cl = m?.clienteling ?? { contacted: 0, responses: 0, appointments: 0, estRevenue: 0, responseRate: 0 };
-  const customerIntel = m?.customerIntel ?? [];
+  const cx = m?.customerExperience ?? { count: 0, avgNps: 0, recommendRate: 0, byType: [], recent: [] };
   const actions = m?.actions ?? [];
   const hasFunnel = !!(funnel.reach || funnel.engagement || funnel.leads || funnel.storeVisits);
   const hasClienteling = !!(cl.contacted || cl.responses || cl.appointments || cl.estRevenue);
@@ -231,20 +237,29 @@ export default function MarketingPage() {
           )}
         </Section>
 
-        <Section number={5} title="Customer Intelligence">
-          {customerIntel.length ? (
-            <div className="space-y-2">
-              {customerIntel.map((c, i) => (
-                <div key={i} className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3 flex items-start gap-2 text-xs">
-                  <span className="text-[#c8a951] capitalize whitespace-nowrap">{c.type || 'note'}</span>
-                  <span className="text-gray-300 flex-1">{c.detail}</span>
-                  {c.frequency && <span className="text-gray-500">{c.frequency}</span>}
-                  {c.store && <span className="text-gray-600">{c.store}</span>}
-                </div>
-              ))}
+        <Section number={5} title="Customer Experience">
+          {cx.count ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <KPICard label="Responses" value={String(cx.count)} small />
+                <KPICard label="Avg NPS" value={cx.avgNps ? String(cx.avgNps) : '—'} small />
+                <KPICard label="Recommend Rate" value={cx.recommendRate ? `${cx.recommendRate}%` : '—'} small />
+                <KPICard label="Feedback Types" value={cx.byType.length ? String(cx.byType.length) : '—'} small />
+              </div>
+              <div className="space-y-2">
+                {cx.recent.map((c, i) => (
+                  <div key={i} className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3 flex items-start gap-2 text-xs">
+                    <span className="text-[#c8a951] capitalize whitespace-nowrap">{c.type || 'feedback'}</span>
+                    <span className="text-gray-300 flex-1">{c.detail}</span>
+                    {c.source && <span className="text-gray-500 capitalize">{c.source}</span>}
+                    {c.frequency && <span className="text-gray-500">{c.frequency}</span>}
+                    {c.store && <span className="text-gray-600">{c.store}</span>}
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
-            <EmptyState message="No customer intelligence yet" hint="Submit Customer Intelligence in the Marketing form." height={120} />
+            <EmptyState message="No customer experience feedback yet" hint="Submitted via the Marketing form or the public Customer Experience survey." height={120} />
           )}
         </Section>
 

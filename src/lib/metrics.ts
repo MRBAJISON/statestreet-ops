@@ -807,15 +807,31 @@ function marketingMetrics(rows: Entry[]) {
     responseRate: contacted ? round1((responses / contacted) * 100) : 0,
   };
 
-  // Customer intelligence
-  const customerIntel = payloads(rows, 'customer-intel')
-    .map((p) => ({
-      type: String(p.type || ''),
-      detail: String(p.detail || ''),
-      frequency: String(p.frequency || ''),
-      store: labelFor(STORE_LABELS, p.store),
-    }))
-    .slice(0, 10);
+  // Customer Experience — merges the new survey/CX form with legacy customer-intel.
+  const cxRows = [...payloads(rows, 'customer-experience'), ...payloads(rows, 'customer-intel')];
+  const cxNps = cxRows.map((p) => num(p.nps)).filter((n) => n !== 0);
+  const cxTypes = new Map<string, number>();
+  for (const p of cxRows) {
+    const t = String(p.type || p.category || 'feedback');
+    cxTypes.set(t, (cxTypes.get(t) ?? 0) + 1);
+  }
+  const customerExperience = {
+    count: cxRows.length,
+    avgNps: cxNps.length ? Math.round(avg(cxNps)) : 0,
+    recommendRate: cxRows.length
+      ? round1((cxRows.filter((p) => /yes|promoter|recommend|likely/i.test(String(p.recommend))).length / cxRows.length) * 100)
+      : 0,
+    byType: [...cxTypes].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value),
+    recent: cxRows
+      .map((p) => ({
+        type: String(p.type || p.category || ''),
+        detail: String(p.detail || p.comments || ''),
+        frequency: String(p.frequency || ''),
+        store: labelFor(STORE_LABELS, p.store),
+        source: String(p.source || ''),
+      }))
+      .slice(0, 12),
+  };
 
   // Action tracker (priorities form)
   const actions = payloads(rows, 'priorities')
@@ -848,7 +864,7 @@ function marketingMetrics(rows: Entry[]) {
     campaignByBrand,
     campaigns,
     clienteling,
-    customerIntel,
+    customerExperience,
     actions,
     entryCount: rows.length,
   };

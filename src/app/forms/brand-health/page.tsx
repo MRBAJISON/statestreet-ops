@@ -16,7 +16,6 @@ export default function BrandFormsPage() {
     { id: 'sentiment', label: 'Brand Sentiment' },
     { id: 'competitor', label: 'Competitor Analysis' },
     { id: 'digital', label: 'Digital Reputation' },
-    { id: 'voice', label: 'Customer Voice' },
     { id: 'attention', label: 'CEO Attention Items' },
   ];
 
@@ -140,30 +139,6 @@ export default function BrandFormsPage() {
               <FormField label="Trustpilot Score" name="trustpilot" type="number" step={0.1} min={1} max={5} />
               <FormField label="New Reviews This Week" name="newReviews" type="number" />
               <FormField label="Negative Reviews Requiring Response" name="negReviews" type="number" />
-            </div>
-          </FormSection>
-        )}
-
-        {activeForm === 'voice' && (
-          <FormSection title="Customer Voice Entry" description="Record what customers are saying">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
-              <FormField label="Date" name="date" type="date" required />
-              <FormField label="Type" name="type" type="select" required options={[
-                { label: 'Compliment', value: 'compliment' }, { label: 'Frustration', value: 'frustration' },
-                { label: 'Emerging Theme', value: 'emerging' }, { label: 'Product Request', value: 'request' },
-              ]} />
-              <FormField label="Brand (if specific)" name="brand" type="select" options={BRANDS} />
-              <FormField label="Detail" name="detail" type="textarea" required placeholder="What is the customer saying?" />
-              <FormField label="Frequency" name="frequency" type="select" options={[
-                { label: 'Very Common (heard daily)', value: 'very-common' },
-                { label: 'Common (heard weekly)', value: 'common' },
-                { label: 'Occasional', value: 'occasional' },
-                { label: 'New / First time', value: 'new' },
-              ]} />
-              <FormField label="Source" name="source" type="select" options={[
-                { label: 'In-Store Staff', value: 'staff' }, { label: 'Social Media', value: 'social' },
-                { label: 'Review Site', value: 'review' }, { label: 'WhatsApp', value: 'whatsapp' },
-              ]} />
             </div>
           </FormSection>
         )}

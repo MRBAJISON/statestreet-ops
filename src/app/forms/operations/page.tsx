@@ -41,7 +41,6 @@ export default function OperationsFormsPage() {
     { id: 'store-audit', label: 'Store Audit' },
     { id: 'vm-check', label: 'VM Compliance' },
     { id: 'maintenance', label: 'Maintenance Request' },
-    { id: 'cx-feedback', label: 'Customer Experience' },
     { id: 'incident', label: 'Incident Report' },
     { id: 'sop-check', label: 'SOP Compliance' },
   ];
@@ -140,28 +139,6 @@ export default function OperationsFormsPage() {
               <FormField label="Status" name="status" type="select" options={[
                 { label: 'Open', value: 'open' }, { label: 'In Progress', value: 'in-progress' },
                 { label: 'Completed', value: 'completed' }, { label: 'Overdue', value: 'overdue' },
-              ]} />
-            </div>
-          </FormSection>
-        )}
-
-        {activeForm === 'cx-feedback' && (
-          <FormSection title="Customer Experience Feedback" description="Record customer feedback and scores">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
-              <FormField label="Date" name="date" type="date" required />
-              <FormField label="Store" name="store" type="select" required options={STORES} />
-              <FormField label="Feedback Category" name="category" type="select" required options={[
-                { label: 'Store Cleanliness', value: 'cleanliness' }, { label: 'Staff Knowledge', value: 'staff-knowledge' },
-                { label: 'Product Availability', value: 'availability' }, { label: 'Fitting Room Experience', value: 'fitting-room' },
-                { label: 'Checkout Speed', value: 'checkout' }, { label: 'Overall Experience', value: 'overall' },
-              ]} />
-              <FormField label="Rating (1-10)" name="rating" type="number" required min={1} max={10} />
-              <FormField label="Customer Comment" name="comment" type="textarea" placeholder="What did the customer say?" />
-              <FormField label="Action Taken" name="action" type="textarea" placeholder="Resolution or follow-up action" />
-              <FormField label="NPS Score" name="nps" type="number" min={-100} max={100} />
-              <FormField label="Would Recommend" name="recommend" type="select" options={[
-                { label: 'Yes - Promoter', value: 'promoter' }, { label: 'Maybe - Passive', value: 'passive' },
-                { label: 'No - Detractor', value: 'detractor' },
               ]} />
             </div>
           </FormSection>
