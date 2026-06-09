@@ -30,6 +30,7 @@ export interface SessionData {
   name: string;
   role: string;
   department: string;
+  store?: string;
   ts: number;
 }
 
@@ -38,10 +39,11 @@ export async function signSession(user: {
   name: string;
   role: string;
   department: string;
+  store?: string | null;
 }): Promise<string> {
   const payload = toB64url(
     enc.encode(
-      JSON.stringify({ userId: String(user.id), name: user.name, role: user.role, department: user.department, ts: Date.now() })
+      JSON.stringify({ userId: String(user.id), name: user.name, role: user.role, department: user.department, store: user.store ?? '', ts: Date.now() })
     )
   );
   const sig = await hmac(payload);
