@@ -25,7 +25,7 @@ export default function ExecutiveCommandCenter() {
   const [anchor, setAnchor] = useState('');
   const [store, setStore] = useState('');
   const fin = useMetrics<{ revenueMtd: number; netProfit: number; grossMargin: number; cashNet: number; revenueByBrand: { name: string; value: number }[] }>('finance', period, anchor, store).data;
-  const com = useMetrics<{ groupSales: number; convRate: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null }[] } }>('commercial', period, anchor, store).data;
+  const com = useMetrics<{ groupSales: number; convRate: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null; insights: { best: string[]; concern: string[]; risk: string[] } }[] } }>('commercial', period, anchor, store).data;
   const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[]; priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[] }>('operations', period, anchor, store).data;
   const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory', period, anchor, store).data;
   const brd = useMetrics<{ healthIndex: number; sentiment: { positive: number }; ceoAttention: { priority: string; issue: string; impact: string; owner: string; status: string }[] }>('brand', period, anchor, store).data;
@@ -51,8 +51,6 @@ export default function ExecutiveCommandCenter() {
   const wrReviews = wr?.reviews ?? [];
   const [wrWeek, setWrWeek] = useState<number | 'all'>('all');
   const wrSel = typeof wrWeek === 'number' ? wrReviews.find((r) => r.id === wrWeek) : undefined;
-  // 'All weeks' falls back to the latest review for the narrative CEO answers.
-  const wrCeo = wrSel ? wrSel.ceo : wr?.ceo ?? null;
   const wrAchievement = wrSel ? wrSel.achievement : wr?.latest?.achievement ?? 0;
   const wrStockAtRisk = wrSel ? wrSel.stockAtRisk : wr?.stockAtRisk ?? 0;
   const wrAtRiskCats = wrSel ? wrSel.atRiskCategories : wr?.atRiskCategories ?? 0;
@@ -61,17 +59,20 @@ export default function ExecutiveCommandCenter() {
     : wr?.latest
     ? `Latest · ${wr.latest.store} · week ending ${wr.latest.weekEnd}`
     : undefined;
-  const CEO_QUESTIONS = [
-    'Which 3 categories generated the most money last week and why?',
-    'Which 3 categories concern you the most and why?',
-    'Which category should Marketing amplify this week?',
-    'What stock currently represents the greatest commercial risk?',
-    'What will you do differently this week to increase sales?',
-    'If this store belonged to you, what would be your first three actions?',
+  // Statement-style insights derived from the selected week (falls back to latest for 'all').
+  const wrInsightSrc = wrSel ?? wrReviews[0];
+  const wrInsights: { label: string; items: string[] }[] = [
+    { label: 'Best performing categories', items: wrInsightSrc?.insights?.best ?? [] },
+    { label: 'Categories needing attention', items: wrInsightSrc?.insights?.concern ?? [] },
+    { label: 'Greatest commercial / stock risk', items: wrInsightSrc?.insights?.risk ?? [] },
   ];
-  const ceoAnswers = wrCeo
-    ? CEO_QUESTIONS.map((q, i) => ({ q, a: wrCeo?.[`q${i + 1}`] ?? '' })).filter((x) => x.a.trim())
-    : [];
+  // The store manager's judgement answers for the selected week.
+  const MANAGER_QUESTIONS = [
+    { key: 'q3', text: 'Which category should Marketing amplify this week?' },
+    { key: 'q5', text: 'What will you do differently this week to increase sales?' },
+    { key: 'q6', text: 'If this store belonged to you, what would be your first three actions?' },
+  ];
+  const wrAnswers = MANAGER_QUESTIONS.map((q) => ({ q: q.text, a: wrInsightSrc?.ceo?.[q.key] ?? '' })).filter((x) => x.a.trim());
 
   // Cross-department action tracker (Marketing priorities + Operations maintenance actions)
   const actionTracker = [
@@ -277,7 +278,7 @@ export default function ExecutiveCommandCenter() {
         </Section>
 
         {/* Store Manager CEO Answers (from selected Weekly Review) */}
-        <Section number={7} title="Store Manager — CEO Questions" subtitle={wrHeading}>
+        <Section number={7} title="Store Manager — Key Insights" subtitle={wrHeading}>
           {wr && wr.count > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
               {/* Week history list */}
@@ -312,17 +313,34 @@ export default function ExecutiveCommandCenter() {
                   <KPICard label="Stock at Risk" value={dash(wrStockAtRisk, fmtGHS)} small />
                   <KPICard label="At-Risk Categories" value={wrAtRiskCats ? String(wrAtRiskCats) : '—'} small />
                 </div>
-                {ceoAnswers.length ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {wrInsights.map((ins) => (
+                    <div key={ins.label} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
+                      <div className="text-xs text-[#c8a951] font-semibold mb-2">{ins.label}</div>
+                      {ins.items.length ? (
+                        <ul className="space-y-1">
+                          {ins.items.map((name) => (
+                            <li key={name} className="text-sm text-gray-200">{name}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="text-sm text-gray-600">—</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Store manager's judgement answers */}
+                {wrAnswers.length > 0 && (
                   <div className="space-y-3">
-                    {ceoAnswers.map((x, i) => (
+                    <div className="text-xs text-gray-400 uppercase tracking-wide">Manager's Plan</div>
+                    {wrAnswers.map((x, i) => (
                       <div key={i} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                         <div className="text-xs text-[#c8a951] mb-1">{x.q}</div>
                         <div className="text-sm text-gray-200 whitespace-pre-wrap">{x.a}</div>
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <EmptyState message="No CEO answers in this review" height={120} />
                 )}
               </div>
             </div>

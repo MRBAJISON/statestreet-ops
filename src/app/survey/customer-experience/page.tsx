@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { STORES } from '@/lib/config';
 
 const CATEGORIES = [
@@ -27,6 +27,13 @@ export default function CustomerExperienceSurvey() {
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  // After a successful submit, reload to a fresh blank form for the next customer.
+  useEffect(() => {
+    if (state !== 'done') return;
+    const t = setTimeout(() => window.location.reload(), 2500);
+    return () => clearTimeout(t);
+  }, [state]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -73,6 +80,7 @@ export default function CustomerExperienceSurvey() {
             <div className="text-3xl mb-2">🙏</div>
             <div className="text-lg font-semibold text-green-400">Thank you!</div>
             <p className="text-sm text-gray-400 mt-1">Your feedback has been received.</p>
+            <p className="text-xs text-gray-600 mt-3">Loading a fresh form…</p>
           </div>
         ) : (
           <form onSubmit={submit} className="bg-[var(--c-card)] border border-[var(--c-border)] rounded-xl p-6 space-y-4">

@@ -3,10 +3,13 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { getSession } from '@/lib/auth';
 import { hashPassword } from '@/lib/password';
+import { STORES } from '@/lib/config';
 import { asc } from 'drizzle-orm';
 
 const ROLES = ['owner', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand', 'store-manager'];
 const DEPARTMENTS = ['executive', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'];
+const STORE_VALUES = STORES.map((s) => s.value);
+const validStore = (s: unknown) => s === undefined || s === null || s === '' || STORE_VALUES.includes(String(s));
 
 async function requireOwner() {
   const session = await getSession();
@@ -18,7 +21,7 @@ export async function GET() {
   if (!(await requireOwner())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   const rows = await db.select().from(users).orderBy(asc(users.id));
   return NextResponse.json({
-    users: rows.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, department: u.department })),
+    users: rows.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, department: u.department, store: u.store ?? '' })),
   });
 }
 
@@ -26,12 +29,15 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   if (!(await requireOwner())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   try {
-    const { name, email, password, role, department } = (await req.json()) ?? {};
+    const { name, email, password, role, department, store } = (await req.json()) ?? {};
     if (!name || !email || !password) {
       return NextResponse.json({ error: 'Name, email and password are required' }, { status: 400 });
     }
     if (!ROLES.includes(role) || !DEPARTMENTS.includes(department)) {
       return NextResponse.json({ error: 'Invalid role or department' }, { status: 400 });
+    }
+    if (!validStore(store)) {
+      return NextResponse.json({ error: 'Invalid store' }, { status: 400 });
     }
     if (String(password).length < 6) {
       return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
@@ -39,9 +45,9 @@ export async function POST(req: NextRequest) {
     const passwordHash = await hashPassword(String(password));
     const [row] = await db
       .insert(users)
-      .values({ name, email: String(email).toLowerCase().trim(), passwordHash, role, department })
+      .values({ name, email: String(email).toLowerCase().trim(), passwordHash, role, department, store: store || null })
       .returning();
-    return NextResponse.json({ ok: true, user: { id: row.id, name: row.name, email: row.email, role: row.role, department: row.department } });
+    return NextResponse.json({ ok: true, user: { id: row.id, name: row.name, email: row.email, role: row.role, department: row.department, store: row.store ?? '' } });
   } catch (e) {
     const msg = (e as Error).message;
     if (/unique|duplicate/i.test(msg)) return NextResponse.json({ error: 'Email already exists' }, { status: 409 });

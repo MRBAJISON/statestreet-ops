@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { STORES } from '@/lib/config';
-import { postEntry } from '@/lib/api';
+import { postEntry, updateEntry } from '@/lib/api';
 
 // The 28 SKU categories from the Store Manager Monday Review Worksheet.
 const CATEGORIES = [
@@ -14,34 +14,74 @@ const CATEGORIES = [
   'Knitwear', 'Streetwear Sets', 'Jackets & Outerwear',
 ];
 
-// Only the judgement CEO questions remain — the data-derived ones (top earners,
-// concerns, stock risk) are captured directly by the category grid below.
+type Col = { key: string; label: string; type?: 'number' | 'text'; options?: string[]; auto?: boolean };
+
+const SECTIONS: { id: string; title: string; note?: string; cols: Col[] }[] = [
+  {
+    id: 's1', title: 'Section 1 · Category Performance Review', note: 'Enter opening stock, units sold and unit price — revenue, current stock and rating fill in automatically.',
+    cols: [
+      { key: 'openingStock', label: 'Opening Stock', type: 'number' },
+      { key: 'unitsSold', label: 'Units Sold Last Week', type: 'number' },
+      { key: 'unitPrice', label: 'Unit Price (GHC)', type: 'number' },
+      { key: 'revenue', label: 'Revenue Generated (auto)', auto: true },
+      { key: 'currentStock', label: 'Current Stock (auto)', auto: true },
+      { key: 'rating', label: 'Performance Rating (auto)', auto: true },
+      { key: 'comments', label: 'Comments', type: 'text' },
+    ],
+  },
+  {
+    id: 's2', title: 'Section 2 · Inventory Risk Assessment', note: 'Review every category.',
+    cols: [
+      { key: 'overstocked', label: 'Overstocked?', options: ['', 'Y', 'N'] },
+      { key: 'slowMoving', label: 'Slow Moving?', options: ['', 'Y', 'N'] },
+      { key: 'weeksNoMove', label: 'Weeks w/o Movement', type: 'number' },
+      { key: 'valueAtRisk', label: 'Stock Value at Risk (GHC)', type: 'number' },
+      { key: 'corrective', label: 'Corrective Action', type: 'text' },
+    ],
+  },
+  {
+    id: 's3', title: "Section 3 · This Week's Commercial Plan", note: 'Every category must have a plan.',
+    cols: [
+      { key: 'salesTargetUnits', label: 'Sales Target Units', type: 'number' },
+      { key: 'revenueTarget', label: 'Revenue Target (GHC)', type: 'number' },
+      { key: 'keyActivity', label: 'Key Selling Activity', type: 'text' },
+      { key: 'planAdvisor', label: 'Responsible Advisor', type: 'text' },
+    ],
+  },
+  {
+    id: 's4', title: 'Section 4 · Category Ownership',
+    cols: [
+      { key: 'assignedAdvisor', label: 'Assigned Advisor', type: 'text' },
+      { key: 'weeklyUnitTarget', label: 'Weekly Unit Target', type: 'number' },
+      { key: 'actualUnits', label: 'Actual Units Sold', type: 'number' },
+      { key: 'achievement', label: 'Achievement % (auto)', auto: true },
+      { key: 'mgrComments', label: 'Manager Comments', type: 'text' },
+    ],
+  },
+];
+
+// Manager judgement questions, shown under Section 1.
 const CEO_QUESTIONS = [
   { key: 'q3', text: 'Which category should Marketing amplify this week?' },
   { key: 'q5', text: 'What will you do differently this week to increase sales?' },
   { key: 'q6', text: 'If this store belonged to you, what would be your first three actions?' },
 ];
 
-const inputCls = 'w-full bg-[var(--c-card)] border border-[var(--c-border)] rounded px-1.5 py-1 text-xs text-[var(--c-fg)] focus:outline-none focus:border-[#c8a951]';
+const inputCls ='w-full bg-[var(--c-card)] border border-[var(--c-border)] rounded px-1.5 py-1 text-xs text-[var(--c-fg)] focus:outline-none focus:border-[#c8a951]';
 const headInputCls = 'bg-[var(--c-card)] border border-[var(--c-border)] rounded px-3 py-2 text-sm text-[var(--c-fg)] focus:outline-none focus:border-[#c8a951]';
 const num = (s: string) => Number(s) || 0;
 
-// Performance rating from sell-through of opening stock.
-function ratingFor(openingStock: number, unitsSold: number): string {
-  if (openingStock <= 0 || unitsSold < 0) return '';
-  const pct = (unitsSold / openingStock) * 100;
-  if (pct >= 80) return 'Good';
-  if (pct >= 50) return 'Fair';
-  return 'Poor';
-}
-
 export default function WeeklyReview() {
   const [header, setHeader] = useState({ store: '', manager: '', weekEnd: '', weeklySalesTarget: '', actualSales: '' });
-  // rows[category][colKey] holds only the manually entered fields.
+  // rows[category][colKey] = manually entered value
   const [rows, setRows] = useState<Record<string, Record<string, string>>>({});
   const [ceo, setCeo] = useState<Record<string, string>>({});
+  const [activeSection, setActiveSection] = useState('s1');
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // The in-progress review is saved into a single entry; the header/data stay on
+  // screen across section saves and only clear when the final section is submitted.
+  const [entryId, setEntryId] = useState<number | null>(null);
 
   const headerAchievement = num(header.weeklySalesTarget)
     ? Math.round((num(header.actualSales) / num(header.weeklySalesTarget)) * 1000) / 10
@@ -51,13 +91,24 @@ export default function WeeklyReview() {
     setRows((r) => ({ ...r, [cat]: { ...(r[cat] ?? {}), [key]: val } }));
   const cell = (cat: string, key: string) => rows[cat]?.[key] ?? '';
 
-  // Auto-calculated columns for a category row.
-  const calc = (cat: string) => {
+  // Section 1 auto-calculations.
+  const revenueOf = (cat: string) => num(cell(cat, 'unitsSold')) * num(cell(cat, 'unitPrice'));
+  const currentStockOf = (cat: string) => num(cell(cat, 'openingStock')) - num(cell(cat, 'unitsSold'));
+  const ratingOf = (cat: string) => {
     const opening = num(cell(cat, 'openingStock'));
-    const sold = num(cell(cat, 'unitsSold'));
-    const price = num(cell(cat, 'unitPrice'));
-    return { revenue: sold * price, currentStock: opening - sold, rating: ratingFor(opening, sold) };
+    if (opening <= 0) return '';
+    const pct = (num(cell(cat, 'unitsSold')) / opening) * 100; // sell-through of opening stock
+    if (pct >= 80) return 'Good';
+    if (pct >= 50) return 'Fair';
+    return 'Poor';
   };
+  // Section 4 auto-calculation.
+  const rowAchievement = (cat: string) => {
+    const t = num(cell(cat, 'weeklyUnitTarget'));
+    return t ? Math.round((num(cell(cat, 'actualUnits')) / t) * 1000) / 10 : 0;
+  };
+
+  const isFinalSection = activeSection === 's4';
 
   async function submit() {
     if (!header.store || !header.weekEnd) {
@@ -66,42 +117,72 @@ export default function WeeklyReview() {
     }
     setSubmitting(true);
     try {
-      // Build category payload incl. computed values; skip untouched rows.
+      // Merge manual fields with the computed ones so the dashboards get revenue/rating/etc.
       const categories: Record<string, Record<string, string | number>> = {};
       for (const cat of CATEGORIES) {
         const r = rows[cat];
         if (!r) continue;
-        const touched = ['openingStock', 'unitsSold', 'unitPrice', 'comments'].some((k) => (r[k] ?? '') !== '');
-        if (!touched) continue;
-        const c = calc(cat);
         categories[cat] = {
-          openingStock: cell(cat, 'openingStock'),
-          unitsSold: cell(cat, 'unitsSold'),
-          unitPrice: cell(cat, 'unitPrice'),
-          revenue: c.revenue,
-          currentStock: c.currentStock,
-          rating: c.rating,
-          comments: cell(cat, 'comments'),
+          ...r,
+          revenue: revenueOf(cat),
+          currentStock: currentStockOf(cat),
+          rating: ratingOf(cat),
+          achievement: rowAchievement(cat),
         };
       }
       const payload = { ...header, achievement: headerAchievement, categories, ceo };
-      await postEntry('commercial', 'weekly-review', payload);
-      setMsg({ ok: true, text: 'Weekly review saved to the live database.' });
-      setRows({}); setCeo({});
-      setHeader({ store: '', manager: '', weekEnd: '', weeklySalesTarget: '', actualSales: '' });
+
+      // First save creates the entry; later sections update the same record.
+      if (entryId == null) {
+        const res = await postEntry('commercial', 'weekly-review', payload);
+        setEntryId(res?.entry?.id ?? null);
+      } else {
+        await updateEntry(entryId, payload);
+      }
+
+      if (isFinalSection) {
+        // Final submission — clear the whole form for the next review.
+        setMsg({ ok: true, text: 'Weekly review submitted to the live database.' });
+        setRows({});
+        setCeo({});
+        setHeader({ store: '', manager: '', weekEnd: '', weeklySalesTarget: '', actualSales: '' });
+        setEntryId(null);
+        setActiveSection('s1');
+      } else {
+        // Keep the header and everything entered; just confirm the save.
+        setMsg({ ok: true, text: 'Saved. Your header and entries are kept — continue to the next section.' });
+      }
     } catch (e) {
       setMsg({ ok: false, text: 'Could not save: ' + (e as Error).message });
     }
     setSubmitting(false);
   }
 
+  const section = SECTIONS.find((s) => s.id === activeSection)!;
+
+  // Render an auto-calculated cell for the active section.
+  const autoCell = (cat: string, key: string) => {
+    if (key === 'revenue') {
+      const v = revenueOf(cat);
+      return <div className="px-1.5 py-1 text-[#c8a951] whitespace-nowrap">{v ? `GHS ${v.toLocaleString()}` : '—'}</div>;
+    }
+    if (key === 'currentStock') {
+      return <div className="px-1.5 py-1">{cell(cat, 'openingStock') !== '' ? currentStockOf(cat) : '—'}</div>;
+    }
+    if (key === 'rating') {
+      const r = ratingOf(cat);
+      const color = r === 'Good' ? 'text-green-400' : r === 'Fair' ? 'text-yellow-400' : r === 'Poor' ? 'text-red-400' : 'text-gray-600';
+      return <div className={`px-1.5 py-1 font-medium ${color}`}>{r || '—'}</div>;
+    }
+    if (key === 'achievement') {
+      const a = rowAchievement(cat);
+      return <div className="px-1.5 py-1 text-[#c8a951]">{a ? `${a}%` : '—'}</div>;
+    }
+    return null;
+  };
+
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="text-lg font-bold">Store Manager Weekly Review</h2>
-        <p className="text-sm text-gray-500">Merchandise-to-Money commercial review — one weekly submission per store.</p>
-      </div>
-
       {msg && (
         <div className={`text-sm p-3 rounded-lg border ${msg.ok ? 'border-green-500/30 bg-green-500/10 text-green-400' : 'border-red-500/30 bg-red-500/10 text-red-400'}`}>
           {msg.text}
@@ -135,63 +216,74 @@ export default function WeeklyReview() {
         </div>
       </div>
 
-      {/* Category performance grid (auto revenue / current stock / rating) */}
+      {/* Section switcher */}
+      <div className="flex gap-2 flex-wrap border-b border-[var(--c-border)] pb-2">
+        {SECTIONS.map((s) => (
+          <button key={s.id} type="button" onClick={() => setActiveSection(s.id)}
+            className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${activeSection === s.id ? 'bg-[#c8a951] text-black font-semibold' : 'bg-[var(--c-card)] border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
+            {s.title.split('·')[0].trim()}
+          </button>
+        ))}
+      </div>
+
+      {/* Active section grid */}
       <div>
-        <div className="text-sm font-semibold mb-1">Category Performance Review</div>
-        <div className="text-xs text-gray-500 mb-2">Enter opening stock, units sold and unit price. Revenue, current stock and the performance rating are calculated automatically.</div>
+        <div className="text-sm font-semibold mb-1">{section.title}</div>
+        {section.note && <div className="text-xs text-gray-500 mb-2">{section.note}</div>}
         <div className="overflow-x-auto border border-[var(--c-border)] rounded-lg">
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-[var(--c-card2)] text-gray-500">
                 <th className="text-left p-2 sticky left-0 bg-[var(--c-card2)] min-w-[9rem]">SKU Category</th>
-                <th className="text-left p-2 font-medium min-w-[5.5rem]">Opening Stock</th>
-                <th className="text-left p-2 font-medium min-w-[5.5rem]">Units Sold</th>
-                <th className="text-left p-2 font-medium min-w-[6rem]">Unit Price (GHC)</th>
-                <th className="text-left p-2 font-medium min-w-[7rem]">Revenue (auto)</th>
-                <th className="text-left p-2 font-medium min-w-[6rem]">Current Stock (auto)</th>
-                <th className="text-left p-2 font-medium min-w-[5.5rem]">Rating (auto)</th>
-                <th className="text-left p-2 font-medium min-w-[9rem]">Comments</th>
+                {section.cols.map((c) => <th key={c.key} className="text-left p-2 font-medium min-w-[7rem]">{c.label}</th>)}
               </tr>
             </thead>
             <tbody>
-              {CATEGORIES.map((cat) => {
-                const c = calc(cat);
-                const ratingColor = c.rating === 'Good' ? 'text-green-400' : c.rating === 'Fair' ? 'text-yellow-400' : c.rating === 'Poor' ? 'text-red-400' : 'text-gray-600';
-                return (
-                  <tr key={cat} className="border-t border-[var(--c-hover)]">
-                    <td className="p-1.5 sticky left-0 bg-[var(--c-bg)] text-gray-300 whitespace-nowrap">{cat}</td>
-                    <td className="p-1"><input type="number" value={cell(cat, 'openingStock')} onChange={(e) => setCell(cat, 'openingStock', e.target.value)} className={inputCls} /></td>
-                    <td className="p-1"><input type="number" value={cell(cat, 'unitsSold')} onChange={(e) => setCell(cat, 'unitsSold', e.target.value)} className={inputCls} /></td>
-                    <td className="p-1"><input type="number" value={cell(cat, 'unitPrice')} onChange={(e) => setCell(cat, 'unitPrice', e.target.value)} className={inputCls} /></td>
-                    <td className="p-1.5 text-[#c8a951] whitespace-nowrap">{c.revenue ? `GHS ${c.revenue.toLocaleString()}` : '—'}</td>
-                    <td className="p-1.5">{cell(cat, 'openingStock') !== '' ? c.currentStock : '—'}</td>
-                    <td className={`p-1.5 font-medium ${ratingColor}`}>{c.rating || '—'}</td>
-                    <td className="p-1"><input type="text" value={cell(cat, 'comments')} onChange={(e) => setCell(cat, 'comments', e.target.value)} className={inputCls} /></td>
-                  </tr>
-                );
-              })}
+              {CATEGORIES.map((cat) => (
+                <tr key={cat} className="border-t border-[var(--c-hover)]">
+                  <td className="p-1.5 sticky left-0 bg-[var(--c-bg)] text-gray-300 whitespace-nowrap">{cat}</td>
+                  {section.cols.map((c) => (
+                    <td key={c.key} className="p-1">
+                      {c.auto ? (
+                        autoCell(cat, c.key)
+                      ) : c.options ? (
+                        <select value={cell(cat, c.key)} onChange={(e) => setCell(cat, c.key, e.target.value)} className={inputCls}>
+                          {c.options.map((o) => <option key={o} value={o}>{o || '—'}</option>)}
+                        </select>
+                      ) : (
+                        <input type={c.type === 'number' ? 'number' : 'text'} value={cell(cat, c.key)} onChange={(e) => setCell(cat, c.key, e.target.value)} className={inputCls} />
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
+
+        {/* Section 1 also captures the manager's judgement questions. */}
+        {activeSection === 's1' && (
+          <div className="mt-4 space-y-3">
+            <div className="text-sm font-semibold">Manager Questions</div>
+            {CEO_QUESTIONS.map((q, i) => (
+              <div key={q.key}>
+                <label className="block text-xs text-gray-400 mb-1">{i + 1}. {q.text}</label>
+                <textarea value={ceo[q.key] ?? ''} onChange={(e) => setCeo({ ...ceo, [q.key]: e.target.value })} rows={2} className="w-full bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg px-3 py-2 text-sm text-[var(--c-fg)] resize-none focus:outline-none focus:border-[#c8a951]" />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* CEO questions (judgement only) */}
-      <div>
-        <div className="text-sm font-semibold mb-2">CEO Questions</div>
-        <div className="space-y-3">
-          {CEO_QUESTIONS.map((q, i) => (
-            <div key={q.key}>
-              <label className="block text-xs text-gray-400 mb-1">{i + 1}. {q.text}</label>
-              <textarea value={ceo[q.key] ?? ''} onChange={(e) => setCeo({ ...ceo, [q.key]: e.target.value })} rows={2} className="w-full bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg px-3 py-2 text-sm text-[var(--c-fg)] resize-none focus:outline-none focus:border-[#c8a951]" />
-            </div>
-          ))}
-        </div>
+      {/* Submit is available on every section. Each save keeps the header and all
+          entered data on screen; only the final section clears the form. */}
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={submit} disabled={submitting}
+          className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg text-sm disabled:opacity-50">
+          {submitting ? 'Saving…' : isFinalSection ? 'Submit Weekly Review' : 'Save Section'}
+        </button>
+        {!isFinalSection && <span className="text-xs text-gray-500">Your header and entries stay until you submit Section 4.</span>}
       </div>
-
-      <button type="button" onClick={submit} disabled={submitting}
-        className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg text-sm disabled:opacity-50">
-        {submitting ? 'Saving…' : 'Submit Weekly Review'}
-      </button>
     </div>
   );
 }

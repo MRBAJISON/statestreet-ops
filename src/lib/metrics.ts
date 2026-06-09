@@ -280,6 +280,25 @@ function commercialMetrics(rows: Entry[]) {
     };
   };
 
+  // Derived "CEO" insights — category names only (no figures), for statement-style display.
+  const reviewInsights = (p: P) => {
+    const cats = (p.categories ?? {}) as Record<string, Record<string, unknown>>;
+    const arr = Object.entries(cats).map(([name, f]) => ({
+      name,
+      rev: num(f.revenue),
+      risk: num(f.valueAtRisk),
+      rating: String(f.rating ?? ''),
+      flagged: String(f.overstocked) === 'Y' || String(f.slowMoving) === 'Y',
+    }));
+    const best = arr.filter((x) => x.rev > 0).sort((a, b) => b.rev - a.rev).slice(0, 3).map((x) => x.name);
+    const concernArr = arr.filter((x) => x.rating === 'Poor' || x.risk > 0 || x.flagged);
+    const concern = (concernArr.length ? concernArr : arr.filter((x) => x.rev > 0).sort((a, b) => a.rev - b.rev).slice(0, 3))
+      .map((x) => x.name)
+      .slice(0, 5);
+    const risk = arr.filter((x) => x.risk > 0 || x.flagged).sort((a, b) => b.risk - a.risk).map((x) => x.name).slice(0, 5);
+    return { best, concern, risk };
+  };
+
   // One record per submitted review, newest week first — drives the history picker.
   const reviews = wrRows
     .map((r) => {
@@ -294,6 +313,7 @@ function commercialMetrics(rows: Entry[]) {
         salesTarget: num(p.weeklySalesTarget),
         submittedAt: entryDate(r).toISOString().slice(0, 10),
         ceo: (p.ceo as Record<string, string>) ?? null,
+        insights: reviewInsights(p),
         ...reviewDetail(p),
       };
     })

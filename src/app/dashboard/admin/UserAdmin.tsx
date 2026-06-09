@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Modal, { ConfirmModal } from '@/components/ui/Modal';
+import { STORES, labelFor, STORE_LABELS } from '@/lib/config';
 
 interface User {
   id: number;
@@ -9,6 +10,7 @@ interface User {
   email: string;
   role: string;
   department: string;
+  store?: string;
 }
 
 const ROLES = ['owner', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand', 'store-manager'];
@@ -20,7 +22,7 @@ export default function UserAdmin() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'finance', department: 'finance' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'finance', department: 'finance', store: '' });
   // Row action menu (fixed-positioned so it escapes the table's overflow clip) + modal state.
   const [menu, setMenu] = useState<{ id: number; top: number; right: number } | null>(null);
   const [modal, setModal] = useState<{ type: 'password' | 'delete'; user: User } | null>(null);
@@ -49,7 +51,7 @@ export default function UserAdmin() {
     const json = await res.json();
     if (res.ok) {
       setMsg({ ok: true, text: `Added ${json.user.name}` });
-      setForm({ name: '', email: '', password: '', role: 'finance', department: 'finance' });
+      setForm({ name: '', email: '', password: '', role: 'finance', department: 'finance', store: '' });
       load();
     } else {
       setMsg({ ok: false, text: json.error || 'Failed to add user' });
@@ -125,6 +127,12 @@ export default function UserAdmin() {
           <select className={inputClass} value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}>
             {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
+          {form.role === 'store-manager' && (
+            <select className={inputClass} value={form.store} onChange={(e) => setForm({ ...form, store: e.target.value })}>
+              <option value="">Assign store…</option>
+              {STORES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          )}
           <button type="submit" className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold rounded-lg px-4 py-2 text-sm">Add User</button>
         </form>
       </div>
@@ -143,6 +151,7 @@ export default function UserAdmin() {
                   <th className="text-left py-2 pr-3 font-medium">Email</th>
                   <th className="text-left py-2 pr-3 font-medium">Role</th>
                   <th className="text-left py-2 pr-3 font-medium">Department</th>
+                  <th className="text-left py-2 pr-3 font-medium">Store</th>
                   <th className="text-right py-2 font-medium">Actions</th>
                 </tr>
               </thead>
@@ -160,6 +169,16 @@ export default function UserAdmin() {
                       <select className={selectClass} value={u.department} onChange={(e) => patchUser(u.id, { department: e.target.value })}>
                         {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
                       </select>
+                    </td>
+                    <td className="py-2 pr-3">
+                      {u.role === 'store-manager' ? (
+                        <select className={selectClass} value={u.store ?? ''} onChange={(e) => patchUser(u.id, { store: e.target.value })}>
+                          <option value="">— None —</option>
+                          {STORES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                        </select>
+                      ) : (
+                        <span className="text-gray-600">{u.store ? labelFor(STORE_LABELS, u.store) : '—'}</span>
+                      )}
                     </td>
                     <td className="py-2 text-right whitespace-nowrap">
                       <button
