@@ -37,6 +37,8 @@ export default function RecentEntries({ department }: { department: string }) {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [deleting, setDeleting] = useState<EntryRow | null>(null);
   const [busy, setBusy] = useState(false);
+  // Row action menu (fixed-positioned so it escapes the table's overflow clip).
+  const [menu, setMenu] = useState<{ id: number; top: number; right: number } | null>(null);
 
   function openEdit(e: EntryRow) {
     setDraft(Object.fromEntries(Object.entries(e.payload).map(([k, v]) => [k, String(v ?? '')])));
@@ -91,13 +93,36 @@ export default function RecentEntries({ department }: { department: string }) {
               <td className="py-2 pr-3 text-gray-300">{summarize(e.payload)}</td>
               <td className="py-2 px-3 text-right text-gray-500 whitespace-nowrap">{timeAgo(e.createdAt)}</td>
               <td className="py-2 text-right whitespace-nowrap">
-                <button onClick={() => openEdit(e)} className="text-gray-400 hover:text-[#c8a951] mr-3">Edit</button>
-                <button onClick={() => setDeleting(e)} className="text-gray-400 hover:text-red-400">Delete</button>
+                <button
+                  onClick={(ev) => {
+                    const r = ev.currentTarget.getBoundingClientRect();
+                    setMenu(menu?.id === e.id ? null : { id: e.id, top: r.bottom + 4, right: window.innerWidth - r.right });
+                  }}
+                  aria-label="Entry actions"
+                  className="px-2 py-1 rounded hover:bg-[var(--c-hover)] text-gray-400 hover:text-[var(--c-fg)] text-base leading-none"
+                >
+                  ⋯
+                </button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      {/* Row action menu (fixed; escapes table overflow clipping) */}
+      {menu && (() => {
+        const e = entries.find((x) => x.id === menu.id);
+        if (!e) return null;
+        return (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setMenu(null)} aria-hidden="true" />
+            <div className="fixed z-50 w-32 bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg shadow-xl py-1 text-left" style={{ top: menu.top, right: menu.right }}>
+              <button onClick={() => { openEdit(e); setMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-[var(--c-hover)] hover:text-[#c8a951]">Edit</button>
+              <button onClick={() => { setDeleting(e); setMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-[var(--c-hover)] hover:text-red-400">Delete</button>
+            </div>
+          </>
+        );
+      })()}
 
       {/* Edit entry modal */}
       <Modal

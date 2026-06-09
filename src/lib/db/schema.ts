@@ -26,6 +26,7 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash').notNull(),
   role: text('role').notNull(),
   department: text('department').notNull(),
+  store: text('store'), // assigned store for store-manager role (nullable)
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

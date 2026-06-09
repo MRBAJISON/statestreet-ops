@@ -3,10 +3,12 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { getSession } from '@/lib/auth';
 import { hashPassword } from '@/lib/password';
+import { STORES } from '@/lib/config';
 import { eq } from 'drizzle-orm';
 
 const ROLES = ['owner', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand', 'store-manager'];
 const DEPARTMENTS = ['executive', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'];
+const STORE_VALUES = STORES.map((s) => s.value);
 
 async function requireOwner() {
   const session = await getSession();
@@ -31,6 +33,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (!DEPARTMENTS.includes(body.department)) return NextResponse.json({ error: 'Invalid department' }, { status: 400 });
       patch.department = body.department;
     }
+    if ('store' in body) {
+      const s = body.store;
+      if (s !== '' && s !== null && !STORE_VALUES.includes(String(s))) {
+        return NextResponse.json({ error: 'Invalid store' }, { status: 400 });
+      }
+      patch.store = s || null;
+    }
     if (body.password) {
       if (String(body.password).length < 6) return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
       patch.passwordHash = await hashPassword(String(body.password));
@@ -38,7 +47,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (Object.keys(patch).length === 0) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
     const [row] = await db.update(users).set(patch).where(eq(users.id, numId)).returning();
     if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    return NextResponse.json({ ok: true, user: { id: row.id, name: row.name, email: row.email, role: row.role, department: row.department } });
+    return NextResponse.json({ ok: true, user: { id: row.id, name: row.name, email: row.email, role: row.role, department: row.department, store: row.store ?? '' } });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
