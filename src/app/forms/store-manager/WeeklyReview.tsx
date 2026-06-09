@@ -71,8 +71,8 @@ const inputCls ='w-full bg-[var(--c-card)] border border-[var(--c-border)] round
 const headInputCls = 'bg-[var(--c-card)] border border-[var(--c-border)] rounded px-3 py-2 text-sm text-[var(--c-fg)] focus:outline-none focus:border-[#c8a951]';
 const num = (s: string) => Number(s) || 0;
 
-export default function WeeklyReview({ assignedStore = '' }: { assignedStore?: string }) {
-  const [header, setHeader] = useState({ store: assignedStore, manager: '', weekEnd: '', weeklySalesTarget: '', actualSales: '' });
+export default function WeeklyReview({ assignedStore = '', managerName = '' }: { assignedStore?: string; managerName?: string }) {
+  const [header, setHeader] = useState({ store: assignedStore, manager: managerName, weekEnd: '', weeklySalesTarget: '', actualSales: '' });
   // rows[category][colKey] = manually entered value
   const [rows, setRows] = useState<Record<string, Record<string, string>>>({});
   const [ceo, setCeo] = useState<Record<string, string>>({});
@@ -145,7 +145,7 @@ export default function WeeklyReview({ assignedStore = '' }: { assignedStore?: s
         setMsg({ ok: true, text: 'Weekly review submitted to the live database.' });
         setRows({});
         setCeo({});
-        setHeader({ store: assignedStore, manager: '', weekEnd: '', weeklySalesTarget: '', actualSales: '' });
+        setHeader({ store: assignedStore, manager: managerName, weekEnd: '', weeklySalesTarget: '', actualSales: '' });
         setEntryId(null);
         setActiveSection('s1');
       } else {
@@ -204,7 +204,11 @@ export default function WeeklyReview({ assignedStore = '' }: { assignedStore?: s
           )}
         </label>
         <label className="text-xs text-gray-400">Manager
-          <input value={header.manager} onChange={(e) => setHeader({ ...header, manager: e.target.value })} className={`${headInputCls} w-full mt-1`} />
+          {managerName ? (
+            <div className={`${headInputCls} w-full mt-1 opacity-70 cursor-not-allowed`}>{managerName}</div>
+          ) : (
+            <input value={header.manager} onChange={(e) => setHeader({ ...header, manager: e.target.value })} className={`${headInputCls} w-full mt-1`} />
+          )}
         </label>
         <label className="text-xs text-gray-400">Week Ending
           <input type="date" value={header.weekEnd} onChange={(e) => setHeader({ ...header, weekEnd: e.target.value })} className={`${headInputCls} w-full mt-1`} />
