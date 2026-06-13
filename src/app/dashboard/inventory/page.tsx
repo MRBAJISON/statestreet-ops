@@ -8,8 +8,8 @@ import RecentEntries from '@/components/ui/RecentEntries';
 import { SimpleLineChart, SimpleDonutChart, SimpleBarChart } from '@/components/charts/Charts';
 import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
-import { useMetrics, type Period } from '@/lib/api';
-import { STORES } from '@/lib/config';
+import { useMetrics, useEntries, type Period } from '@/lib/api';
+import { STORES, STORE_LABELS, labelFor } from '@/lib/config';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -46,6 +46,9 @@ export default function InventoryPage() {
   const [anchor, setAnchor] = useState('');
   const [store, setStore] = useState('');
   const { data: m } = useMetrics<InventoryLive>('inventory', period, anchor, store);
+  const { entries: invEntries } = useEntries('inventory', 5000);
+  // Only the Inventory team's transfers — store-manager transfers (store-transfer) never show here.
+  const transfers = invEntries.filter((e) => e.formType === 'stock-transfer');
   const byBrand = m?.byBrand ?? [];
   const valueTrend = m?.valueTrend ?? [];
   const accuracyDistribution = (m?.accuracyDistribution ?? []).filter((a) => a.value > 0);
@@ -206,7 +209,36 @@ export default function InventoryPage() {
           </div>
         </Section>
 
-        <Section number={5} title="Recent Entries">
+        <Section number={5} title="Stock Transfers">
+          {transfers.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[var(--c-border)] text-gray-500">
+                    <th className="text-left py-2 pr-3 font-medium">Date</th>
+                    <th className="text-left py-2 pr-3 font-medium">From → To</th>
+                    <th className="text-left py-2 pr-3 font-medium">Item</th>
+                    <th className="text-right py-2 pl-3 font-medium">Units</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...transfers].sort((a, b) => (String(a.payload.date) < String(b.payload.date) ? 1 : -1)).slice(0, 25).map((e) => (
+                    <tr key={e.id} className="border-b border-[var(--c-hover)]">
+                      <td className="py-2 pr-3 whitespace-nowrap">{String(e.payload.date || '—')}</td>
+                      <td className="py-2 pr-3">{labelFor(STORE_LABELS, e.payload.fromStore)} → {labelFor(STORE_LABELS, e.payload.toStore)}</td>
+                      <td className="py-2 pr-3">{String(e.payload.sku || e.payload.description || '—')}</td>
+                      <td className="py-2 pl-3 text-right">{String(e.payload.qty || e.payload.units || '—')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState message="No stock transfers yet" hint="Submit Stock Transfer in the Inventory form." height={120} />
+          )}
+        </Section>
+
+        <Section number={6} title="Recent Entries">
           <RecentEntries department="inventory" />
         </Section>
       </div>

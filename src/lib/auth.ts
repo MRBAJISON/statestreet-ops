@@ -11,7 +11,7 @@ const ROLE_DEPARTMENTS: Record<UserRole, Department[]> = {
   finance: ['finance'],
   commercial: ['commercial'],
   marketing: ['marketing', 'brand'],
-  operations: ['operations'],
+  operations: ['finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'],
   inventory: ['inventory'],
   brand: ['brand'],
   'store-manager': ['commercial'],
