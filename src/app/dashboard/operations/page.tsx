@@ -13,6 +13,8 @@ import { STORES } from '@/lib/config';
 
 const pct = (n: number) => (n ? `${n}%` : '—');
 const score = (v: number): 'green' | 'yellow' | 'red' => (v >= 90 ? 'green' : v >= 70 ? 'yellow' : 'red');
+const fmtGHS = (n: number) =>
+  !n ? '—' : n >= 1_000_000 ? `GHS ${(n / 1_000_000).toFixed(2)}M` : n >= 1_000 ? `GHS ${(n / 1_000).toFixed(0)}K` : `GHS ${Math.round(n)}`;
 
 interface OperationsLive {
   opsScore: number;
@@ -34,6 +36,10 @@ interface OperationsLive {
   priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[];
   cxFeedback: { avgRating: number; avgNps: number; recommendRate: number; count: number };
   peopleHealth: { count: number; attendance: number; punctuality: number; training: number; absences: number; score: number; reasons: { name: string; value: number }[] };
+  maintenance: { totalCost: number; openCost: number; overdue: number };
+  sopByArea: { name: string; value: number }[];
+  sopDeviations: { store: string; area: string; deviations: string; corrective: string }[];
+  correctiveRegister: { source: string; store: string; text: string; status: string }[];
 }
 
 export default function OperationsPage() {
@@ -53,6 +59,10 @@ export default function OperationsPage() {
   const vmBreakdown = (m?.vmBreakdown ?? []).filter((v) => v.value > 0);
   const cx = m?.cxFeedback ?? { avgRating: 0, avgNps: 0, recommendRate: 0, count: 0 };
   const ph = m?.peopleHealth ?? { count: 0, attendance: 0, punctuality: 0, training: 0, absences: 0, score: 0, reasons: [] };
+  const maintenance = m?.maintenance ?? { totalCost: 0, openCost: 0, overdue: 0 };
+  const sopByArea = m?.sopByArea ?? [];
+  const sopDeviations = m?.sopDeviations ?? [];
+  const correctiveRegister = m?.correctiveRegister ?? [];
   const reasonLabel = (v: string) => ({ sick: 'Sick', leave: 'Approved Leave', 'no-show': 'No-show', other: 'Other' }[v] ?? v);
 
   return (
@@ -204,6 +214,11 @@ export default function OperationsPage() {
         </Section>
 
         <Section number={4} title="Priority Actions" subtitle="Maintenance">
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <KPICard label="Maintenance Spend" value={fmtGHS(maintenance.totalCost)} small />
+            <KPICard label="Open / Unspent" value={fmtGHS(maintenance.openCost)} small />
+            <KPICard label="Overdue" value={String(maintenance.overdue)} status={maintenance.overdue > 0 ? 'red' : 'green'} small />
+          </div>
           {priorityActions.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -296,7 +311,68 @@ export default function OperationsPage() {
           )}
         </Section>
 
-        <Section number={7} title="Recent Entries">
+        <Section number={7} title="SOP Compliance" subtitle="By area">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Compliance by Area</div>
+              {sopByArea.length ? (
+                <SimpleBarChart data={sopByArea} height={220} color="#c8a951" horizontal />
+              ) : (
+                <EmptyState message="No SOP checks yet" hint="Submit SOP Compliance in the Operations form." height={220} />
+              )}
+            </div>
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Deviations Found</div>
+              {sopDeviations.length ? (
+                <div className="space-y-2">
+                  {sopDeviations.map((d, i) => (
+                    <div key={i} className="text-xs p-2.5 rounded-lg border border-[var(--c-border)] bg-[var(--c-card2)]">
+                      <div className="flex justify-between gap-2 mb-1">
+                        <span className="text-[#c8a951]">{d.area}</span>
+                        <span className="text-gray-500">{d.store}</span>
+                      </div>
+                      <div className="text-gray-300">{d.deviations}</div>
+                      {d.corrective && <div className="text-gray-500 mt-1">→ {d.corrective}</div>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState message="No deviations logged" height={160} />
+              )}
+            </div>
+          </div>
+        </Section>
+
+        <Section number={8} title="Corrective Action Register">
+          {correctiveRegister.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[var(--c-border)] text-gray-500">
+                    <th className="text-left py-2 pr-3 font-medium">Source</th>
+                    <th className="text-left py-2 pr-3 font-medium">Action / Issue</th>
+                    <th className="text-left py-2 px-3 font-medium">Store</th>
+                    <th className="text-left py-2 pl-3 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {correctiveRegister.map((c, i) => (
+                    <tr key={i} className="border-b border-[var(--c-hover)]">
+                      <td className="py-2 pr-3 text-[#c8a951] whitespace-nowrap">{c.source}</td>
+                      <td className="py-2 pr-3 text-gray-300">{c.text}</td>
+                      <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{c.store}</td>
+                      <td className="py-2 pl-3 capitalize">{c.status || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState message="No corrective actions logged" hint="Issues from Store Standards, VM, SOP and Incidents appear here." height={120} />
+          )}
+        </Section>
+
+        <Section number={9} title="Recent Entries">
           <RecentEntries department="operations" />
         </Section>
       </div>

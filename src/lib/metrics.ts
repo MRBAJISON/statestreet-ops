@@ -533,6 +533,42 @@ function operationsMetrics(rows: Entry[]) {
     reasons: [...phReasons].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value),
   };
 
+  // Maintenance spend / overdue.
+  const maintenance = {
+    totalCost: maint.reduce((s, p) => s + num(p.cost), 0),
+    openCost: maint.filter((p) => !closed(p.status)).reduce((s, p) => s + num(p.cost), 0),
+    overdue: maint.filter((p) => /overdue/i.test(String(p.status))).length,
+  };
+
+  // SOP compliance by area (+ deviations list).
+  const SOP_AREA: Record<string, string> = {
+    opening: 'Opening', 'sales-floor': 'Sales Floor', cash: 'Cash Handling', service: 'Customer Service',
+    closing: 'Closing', 'loss-prev': 'Loss Prevention', 'inventory-handling': 'Inventory Handling',
+    'staff-execution': 'Staff Execution', 'discipline-leadership': 'Discipline & Leadership', 'staff-grooming': 'Staff Grooming',
+  };
+  const sopAreaMap = new Map<string, number[]>();
+  for (const p of sop) {
+    const a = String(p.area || '');
+    if (!a) continue;
+    if (!sopAreaMap.has(a)) sopAreaMap.set(a, []);
+    sopAreaMap.get(a)!.push(num(p.compliance));
+  }
+  const sopByArea = [...sopAreaMap]
+    .map(([a, v]) => ({ name: SOP_AREA[a] ?? a, value: round1(avg(v.filter((n) => n > 0))) }))
+    .filter((x) => x.value > 0);
+  const sopDeviations = sop
+    .filter((p) => String(p.deviations || '').trim())
+    .map((p) => ({ store: labelFor(STORE_LABELS, p.store), area: SOP_AREA[String(p.area)] ?? String(p.area || ''), deviations: String(p.deviations), corrective: String(p.corrective || '') }))
+    .slice(0, 8);
+
+  // Consolidated corrective-action / issues register across operations forms.
+  const correctiveRegister = [
+    ...audit.filter((p) => String(p.issues || '').trim()).map((p) => ({ source: 'Store Standards', store: labelFor(STORE_LABELS, p.store), text: String(p.issues), status: '' })),
+    ...vm.filter((p) => String(p.improvements || '').trim()).map((p) => ({ source: 'VM', store: labelFor(STORE_LABELS, p.store), text: String(p.improvements), status: '' })),
+    ...sop.filter((p) => String(p.corrective || '').trim()).map((p) => ({ source: 'SOP', store: labelFor(STORE_LABELS, p.store), text: String(p.corrective), status: '' })),
+    ...inc.filter((p) => String(p.actionTaken || '').trim()).map((p) => ({ source: 'Incident', store: labelFor(STORE_LABELS, p.store), text: String(p.actionTaken), status: String(p.status || '') })),
+  ].slice(0, 12);
+
   // Incidents grouped by store.
   const incStoreMap = new Map<string, number>();
   for (const p of inc) {
@@ -584,6 +620,10 @@ function operationsMetrics(rows: Entry[]) {
     storeScores,
     keyIssues,
     peopleHealth,
+    maintenance,
+    sopByArea,
+    sopDeviations,
+    correctiveRegister,
     risk: { high: sev('high'), medium: sev('med'), low: sev('low') },
     incidentTypes,
     incidentsByStore,
