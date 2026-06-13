@@ -1,5 +1,5 @@
 import type { Entry } from './db/schema';
-import { BRAND_LABELS, STORE_LABELS, CATEGORY_LABELS, labelFor } from './config';
+import { BRAND_LABELS, STORE_LABELS, CATEGORY_LABELS, EXPENSE_LABELS, CAPITAL_CATEGORIES, labelFor } from './config';
 
 const num = (v: unknown) => Number(String(v ?? '').replace(/[, ]/g, '')) || 0;
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
@@ -136,7 +136,9 @@ function financeMetrics(rows: Entry[]) {
   const taxTotal = exp.filter((p) => String(p.category) === 'tax').reduce((s, p) => s + num(p.amount), 0);
   const interestTotal = exp.filter((p) => String(p.category) === 'interest').reduce((s, p) => s + num(p.amount), 0);
   const belowLine = taxTotal + interestTotal;
-  const operatingExpenses = expensesTotal - belowLine;
+  // Capital expenditure is excluded from operating expenses (it never hits the P&L).
+  const capexTotal = exp.filter((p) => CAPITAL_CATEGORIES.includes(String(p.category))).reduce((s, p) => s + num(p.amount), 0);
+  const operatingExpenses = expensesTotal - belowLine - capexTotal;
   const expCatMap = new Map<string, { actual: number; budget: number }>();
   for (const p of exp) {
     const cat = String(p.category ?? 'other');
@@ -146,10 +148,29 @@ function financeMetrics(rows: Entry[]) {
     expCatMap.set(cat, e);
   }
   const expensesByCategory = [...expCatMap].map(([name, v]) => ({
-    name,
+    name: labelFor(EXPENSE_LABELS, name),
     actual: v.actual,
     budget: v.budget,
   }));
+
+  // Budget vs Actual — annual budgets (Budget Setup) drawn down by expenses.
+  const bud = payloads(rows, 'budget');
+  const budByItem = new Map<string, number>();
+  for (const b of bud) budByItem.set(String(b.item), (budByItem.get(String(b.item)) ?? 0) + num(b.amount));
+  const spentByItem = new Map<string, number>();
+  for (const p of exp) spentByItem.set(String(p.category), (spentByItem.get(String(p.category)) ?? 0) + num(p.amount));
+  const budgetVsActual = [...new Set([...budByItem.keys(), ...spentByItem.keys()])]
+    .map((item) => {
+      const budget = budByItem.get(item) ?? 0;
+      const spent = spentByItem.get(item) ?? 0;
+      return { item: labelFor(EXPENSE_LABELS, item), budget, spent, remaining: budget - spent, over: budget > 0 && spent > budget };
+    })
+    .filter((x) => x.budget > 0 || x.spent > 0)
+    .sort((a, b) => b.spent - a.spent);
+  const overspendLog = exp
+    .filter((p) => String(p.overspendReason || '').trim())
+    .map((p) => ({ item: labelFor(EXPENSE_LABELS, String(p.category)), amount: num(p.amount), reason: String(p.overspendReason), date: String(p.date || '') }))
+    .slice(0, 10);
 
   // Profit & loss — auto-calculated
   const grossProfit = revenueMtd - cogsTotal;
@@ -158,6 +179,13 @@ function financeMetrics(rows: Entry[]) {
   const operatingMargin = revenueMtd ? round1((operatingProfit / revenueMtd) * 100) : 0;
   const netProfit = operatingProfit - belowLine; // less tax & interest
   const netMargin = revenueMtd ? round1((netProfit / revenueMtd) * 100) : 0;
+
+  // Capital & Investment (annual) → ROCE / ROI.
+  const cap = payloads(rows, 'capital');
+  const capitalEmployed = cap.reduce((s, p) => s + num(p.capitalEmployed), 0);
+  const investment = cap.reduce((s, p) => s + num(p.investment), 0);
+  const roce = capitalEmployed > 0 ? round1((operatingProfit / capitalEmployed) * 100) : 0;
+  const roi = investment > 0 ? round1((netProfit / investment) * 100) : 0;
 
   // Weekly cash-flow trend (net per ISO week) + position/runway
   const weekMap = new Map<string, number>();
@@ -205,6 +233,9 @@ function financeMetrics(rows: Entry[]) {
     expensesTotal,
     expenseBudgetTotal,
     operatingExpenses,
+    capex: capexTotal,
+    budgetVsActual,
+    overspendLog,
     tax: taxTotal,
     interest: interestTotal,
     grossProfit,
@@ -213,6 +244,10 @@ function financeMetrics(rows: Entry[]) {
     operatingMargin,
     netProfit,
     netMargin,
+    capitalEmployed,
+    investment,
+    roce,
+    roi,
     debtors,
     creditors,
     cashInflow,
@@ -457,6 +492,7 @@ function operationsMetrics(rows: Entry[]) {
   const inc = payloads(rows, 'incident');
   const sop = payloads(rows, 'sop-check');
   const cx = payloads(rows, 'cx-feedback');
+  const hr = payloads(rows, 'hr');
 
   const closed = (s: unknown) => /resolv|close|complete|done/i.test(String(s));
   const maintDone = maint.filter((p) => closed(p.status)).length;
@@ -464,15 +500,17 @@ function operationsMetrics(rows: Entry[]) {
     inc.filter((p) => String(p.severity).toLowerCase().includes(lvl)).length;
 
   // Per-store audit scores
-  const storeMap = new Map<string, { ops: number[]; vm: number[]; readiness: number[]; cx: number[] }>();
+  const storeMap = new Map<string, { ops: number[]; vm: number[]; readiness: number[]; cx: number[]; clean: number[]; safety: number[] }>();
   for (const p of audit) {
     const k = labelFor(STORE_LABELS, p.store);
-    if (!storeMap.has(k)) storeMap.set(k, { ops: [], vm: [], readiness: [], cx: [] });
+    if (!storeMap.has(k)) storeMap.set(k, { ops: [], vm: [], readiness: [], cx: [], clean: [], safety: [] });
     const e = storeMap.get(k)!;
     e.ops.push(num(p.opsScore));
     e.vm.push(num(p.vmScore));
     e.readiness.push(num(p.readinessScore));
     e.cx.push(num(p.cxScore));
+    e.clean.push(num(p.cleanScore));
+    e.safety.push(num(p.safetyScore));
   }
   const storeScores = [...storeMap].map(([store, v]) => ({
     store,
@@ -480,7 +518,15 @@ function operationsMetrics(rows: Entry[]) {
     vm: round1(avg(v.vm)),
     readiness: round1(avg(v.readiness)),
     cx: round1(avg(v.cx)),
+    clean: round1(avg(v.clean)),
+    safety: round1(avg(v.safety)),
   }));
+
+  // Key issues raised during Store Standards reviews.
+  const keyIssues = audit
+    .filter((p) => String(p.issues || '').trim())
+    .map((p) => ({ store: labelFor(STORE_LABELS, p.store), date: String(p.date || ''), issues: String(p.issues) }))
+    .slice(0, 8);
 
   // VM compliance breakdown (vm-check sub-scores)
   const vmDim = (k: string) => round1(avg(vm.map((p) => num(p[k])).filter((n) => n > 0)));
@@ -488,13 +534,83 @@ function operationsMetrics(rows: Entry[]) {
     { name: 'Window Display', value: vmDim('windowDisplay') },
     { name: 'Mannequin', value: vmDim('mannequin') },
     { name: 'Presentation', value: vmDim('productPresentation') },
-    { name: 'Signage', value: vmDim('signage') },
-    { name: 'Cleanliness', value: vmDim('cleanliness') },
+    { name: 'Size Arrangement', value: vmDim('signage') },
   ];
 
   // Incidents by type
   const typeCount = (t: string) => inc.filter((p) => String(p.type).toLowerCase().includes(t)).length;
-  const incidentsByType = { security: typeCount('secur'), safety: typeCount('safet'), operational: typeCount('operat') };
+  const incidentTypes = [
+    { name: 'Security', value: typeCount('secur') },
+    { name: 'Safety', value: typeCount('safet') },
+    { name: 'Operational', value: typeCount('operat') },
+    { name: 'Fire', value: typeCount('fire') },
+    { name: 'Theft / Shrinkage', value: typeCount('theft') },
+    { name: 'Customer Injury', value: typeCount('customer') },
+    { name: 'Staff Injury', value: typeCount('staff') },
+  ].filter((x) => x.value > 0);
+
+  // People Health (HR) — attendance, punctuality, training, absences.
+  const hrAvg = (k: string) => round1(avg(hr.map((p) => num(p[k])).filter((n) => n > 0)));
+  const phParts = [hrAvg('attendance'), hrAvg('punctuality'), hrAvg('training')].filter((n) => n > 0);
+  const phReasons = new Map<string, number>();
+  for (const p of hr) {
+    const r = String(p.reason || '');
+    const a = num(p.absences);
+    if (r && a > 0) phReasons.set(r, (phReasons.get(r) ?? 0) + a);
+  }
+  const peopleHealth = {
+    count: hr.length,
+    attendance: hrAvg('attendance'),
+    punctuality: hrAvg('punctuality'),
+    training: hrAvg('training'),
+    absences: hr.reduce((s, p) => s + num(p.absences), 0),
+    score: phParts.length ? round1(phParts.reduce((a, b) => a + b, 0) / phParts.length) : 0,
+    reasons: [...phReasons].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value),
+  };
+
+  // Maintenance spend / overdue.
+  const maintenance = {
+    totalCost: maint.reduce((s, p) => s + num(p.cost), 0),
+    openCost: maint.filter((p) => !closed(p.status)).reduce((s, p) => s + num(p.cost), 0),
+    overdue: maint.filter((p) => /overdue/i.test(String(p.status))).length,
+  };
+
+  // SOP compliance by area (+ deviations list).
+  const SOP_AREA: Record<string, string> = {
+    opening: 'Opening', 'sales-floor': 'Sales Floor', cash: 'Cash Handling', service: 'Customer Service',
+    closing: 'Closing', 'loss-prev': 'Loss Prevention', 'inventory-handling': 'Inventory Handling',
+    'staff-execution': 'Staff Execution', 'discipline-leadership': 'Discipline & Leadership', 'staff-grooming': 'Staff Grooming',
+  };
+  const sopAreaMap = new Map<string, number[]>();
+  for (const p of sop) {
+    const a = String(p.area || '');
+    if (!a) continue;
+    if (!sopAreaMap.has(a)) sopAreaMap.set(a, []);
+    sopAreaMap.get(a)!.push(num(p.compliance));
+  }
+  const sopByArea = [...sopAreaMap]
+    .map(([a, v]) => ({ name: SOP_AREA[a] ?? a, value: round1(avg(v.filter((n) => n > 0))) }))
+    .filter((x) => x.value > 0);
+  const sopDeviations = sop
+    .filter((p) => String(p.deviations || '').trim())
+    .map((p) => ({ store: labelFor(STORE_LABELS, p.store), area: SOP_AREA[String(p.area)] ?? String(p.area || ''), deviations: String(p.deviations), corrective: String(p.corrective || '') }))
+    .slice(0, 8);
+
+  // Consolidated corrective-action / issues register across operations forms.
+  const correctiveRegister = [
+    ...audit.filter((p) => String(p.issues || '').trim()).map((p) => ({ source: 'Store Standards', store: labelFor(STORE_LABELS, p.store), text: String(p.issues), status: '' })),
+    ...vm.filter((p) => String(p.improvements || '').trim()).map((p) => ({ source: 'VM', store: labelFor(STORE_LABELS, p.store), text: String(p.improvements), status: '' })),
+    ...sop.filter((p) => String(p.corrective || '').trim()).map((p) => ({ source: 'SOP', store: labelFor(STORE_LABELS, p.store), text: String(p.corrective), status: '' })),
+    ...inc.filter((p) => String(p.actionTaken || '').trim()).map((p) => ({ source: 'Incident', store: labelFor(STORE_LABELS, p.store), text: String(p.actionTaken), status: String(p.status || '') })),
+  ].slice(0, 12);
+
+  // Incidents grouped by store.
+  const incStoreMap = new Map<string, number>();
+  for (const p of inc) {
+    const k = labelFor(STORE_LABELS, p.store);
+    incStoreMap.set(k, (incStoreMap.get(k) ?? 0) + 1);
+  }
+  const incidentsByStore = [...incStoreMap].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
 
   // Top risks — high-severity incidents
   const topRisks = inc
@@ -537,8 +653,15 @@ function operationsMetrics(rows: Entry[]) {
       (x) => ({ name: labelFor(STORE_LABELS, x.name), value: x.value })
     ),
     storeScores,
+    keyIssues,
+    peopleHealth,
+    maintenance,
+    sopByArea,
+    sopDeviations,
+    correctiveRegister,
     risk: { high: sev('high'), medium: sev('med'), low: sev('low') },
-    incidentsByType,
+    incidentTypes,
+    incidentsByStore,
     vmBreakdown,
     topRisks,
     priorityActions,
@@ -546,7 +669,7 @@ function operationsMetrics(rows: Entry[]) {
       avgRating: round1(avg(cx.map((p) => num(p.rating)).filter((n) => n > 0))),
       avgNps: Math.round(avg(cx.map((p) => num(p.nps)).filter((n) => n !== 0))),
       recommendRate: cx.length
-        ? round1((cx.filter((p) => /yes|recommend|likely/i.test(String(p.recommend))).length / cx.length) * 100)
+        ? round1((cx.filter((p) => /yes|recommend|likely|promoter/i.test(String(p.recommend))).length / cx.length) * 100)
         : 0,
       count: cx.length,
     },

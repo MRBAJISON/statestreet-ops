@@ -11,6 +11,7 @@ interface FormFieldProps {
   placeholder?: string;
   required?: boolean;
   options?: { label: string; value: string }[];
+  optgroups?: { label: string; options: { label: string; value: string }[] }[];
   prefix?: string;
   suffix?: string;
   min?: number;
@@ -19,18 +20,24 @@ interface FormFieldProps {
   readOnly?: boolean;
 }
 
-export default function FormField({ label, name, type = 'text', value, onChange, placeholder, required, options, prefix, suffix, min, max, step, readOnly }: FormFieldProps) {
+export default function FormField({ label, name, type = 'text', value, onChange, placeholder, required, options, optgroups, prefix, suffix, min, max, step, readOnly }: FormFieldProps) {
   const [hasContent, setHasContent] = useState(false);
   // Affix (GHS / %) is shown only while the field is empty.
   const filled = value !== undefined && value !== null ? String(value).length > 0 : hasContent;
 
-  if (type === 'select' && options) {
+  if (type === 'select' && (options || optgroups)) {
     return (
       <div>
         <label className="block text-xs text-gray-400 mb-1">{label}{required && <span className="text-red-400">*</span>}</label>
         <select name={name} value={value} onChange={onChange} required={required} className="w-full">
           <option value="">Select...</option>
-          {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          {optgroups
+            ? optgroups.map((g) => (
+                <optgroup key={g.label} label={g.label}>
+                  {g.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </optgroup>
+              ))
+            : options!.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
       </div>
     );
