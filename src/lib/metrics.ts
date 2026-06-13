@@ -383,6 +383,31 @@ function commercialMetrics(rows: Entry[]) {
     stockAtRisk: wrStockAtRisk,
     atRiskCategories: wrAtRiskCats,
   };
+  // Forex-style candlestick of weekly sales-target achievement.
+  // Each candle = one week: open = prior week's close, close = this week's avg achievement,
+  // high/low capture the spread across stores that week. Green = improvement, red = decline.
+  const achByWeek = new Map<string, number[]>();
+  for (const r of reviews) {
+    if (!r.weekEnd || !r.achievement) continue;
+    const arr = achByWeek.get(r.weekEnd) ?? [];
+    arr.push(r.achievement);
+    achByWeek.set(r.weekEnd, arr);
+  }
+  const achWeeks = [...achByWeek.entries()]
+    .map(([weekEnd, vals]) => ({ weekEnd, mean: avg(vals), hi: Math.max(...vals), lo: Math.min(...vals) }))
+    .sort((a, b) => (a.weekEnd < b.weekEnd ? -1 : 1)); // oldest -> newest
+  const achievementTrend = achWeeks.map((w, i) => {
+    const open = i === 0 ? w.mean : achWeeks[i - 1].mean;
+    const close = w.mean;
+    return {
+      name: w.weekEnd.slice(5),
+      open: round1(open),
+      close: round1(close),
+      high: round1(Math.max(open, close, w.hi)),
+      low: round1(Math.min(open, close, w.lo)),
+    };
+  });
+
   const wrLatest = reviews[0] ?? null;
   const weeklyReview = {
     count: reviews.length,

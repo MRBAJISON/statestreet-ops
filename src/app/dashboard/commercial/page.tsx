@@ -5,7 +5,7 @@ import KPICard from '@/components/ui/KPICard';
 import Section from '@/components/ui/Section';
 import EmptyState from '@/components/ui/EmptyState';
 import RecentEntries from '@/components/ui/RecentEntries';
-import { SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
+import { SimpleBarChart, SimpleDonutChart, CandlestickChart } from '@/components/charts/Charts';
 import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, type Period } from '@/lib/api';
@@ -41,6 +41,7 @@ interface CommercialLive {
   activeSku: number;
   categorySales: { name: string; value: number }[];
   sellThroughByCategory: { name: string; value: number }[];
+  achievementTrend: { name: string; open: number; high: number; low: number; close: number }[];
   salesByStore: { name: string; value: number }[];
   topSelling: SkuRow[];
   lowMoving: SkuRow[];
@@ -371,7 +372,22 @@ export default function CommercialPage() {
           )}
         </Section>
 
-        <Section number={7} title="Recent Entries">
+        <Section number={7} title="Sales Achievement Trend" subtitle="Weekly target achievement — forex view">
+          {(m?.achievementTrend?.length ?? 0) >= 2 ? (
+            <>
+              <div className="text-xs text-gray-500 mb-3">
+                Each candle is one week. Body = open→close achievement, wick = best/worst store that week.{' '}
+                <span className="text-green-500">Green</span> = improving on the prior week,{' '}
+                <span className="text-red-500">red</span> = declining. Gold line marks the 100% target.
+              </div>
+              <CandlestickChart data={m!.achievementTrend} height={300} suffix="%" target={100} />
+            </>
+          ) : (
+            <EmptyState message="Not enough weekly reviews yet" hint="Two or more weeks of reviews build the trend." height={200} />
+          )}
+        </Section>
+
+        <Section number={8} title="Recent Entries">
           <RecentEntries department="commercial" />
         </Section>
       </div>

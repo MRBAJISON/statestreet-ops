@@ -1,6 +1,6 @@
 'use client';
 
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, ComposedChart, ReferenceLine } from 'recharts';
 
 const COLORS = ['#c8a951', '#22c55e', '#3b82f6', '#ef4444', '#eab308', '#8b5cf6', '#f97316', '#06b6d4'];
 
@@ -113,6 +113,74 @@ export function SimpleDonutChart({ data, height = 200, innerRadius = 50, outerRa
           <text x="50%" y="58%" textAnchor="middle" fill="#6b7280" fontSize="0.6rem">{centerLabel}</text>
         )}
       </PieChart>
+    </ResponsiveContainer>
+  );
+}
+
+interface Candle {
+  name: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
+// Forex-style candlestick. Each candle: wick = low..high, body = open..close.
+// Green when close >= open (bullish/improving), red when declining.
+export function CandlestickChart({ data, height = 280, suffix = '%', target }: { data: Candle[]; height?: number; suffix?: string; target?: number }) {
+  const UP = '#22c55e';
+  const DOWN = '#ef4444';
+
+  // The visible Bar spans [low, high] (a recharts range bar); the custom shape uses
+  // that pixel rect to interpolate the open/close body, so all scaling stays native.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const renderCandle = (props: any) => {
+    const x = Number(props.x);
+    const width = Number(props.width);
+    const y = Number(props.y);
+    const barH = Number(props.height);
+    const p = props.payload as Candle;
+    if (!p || !isFinite(y) || !isFinite(barH) || barH <= 0) return <g />;
+    const { open, high, low, close } = p;
+    const span = high - low || 1;
+    const pxFor = (v: number) => y + ((high - v) / span) * barH;
+    const up = close >= open;
+    const color = up ? UP : DOWN;
+    const bodyTop = pxFor(Math.max(open, close));
+    const bodyBot = pxFor(Math.min(open, close));
+    const cx = x + width / 2;
+    const bodyW = Math.max(width * 0.6, 4);
+    return (
+      <g>
+        <line x1={cx} x2={cx} y1={y} y2={y + barH} stroke={color} strokeWidth={1.5} />
+        <rect x={cx - bodyW / 2} y={bodyTop} width={bodyW} height={Math.max(bodyBot - bodyTop, 2)} fill={color} rx={1} />
+      </g>
+    );
+  };
+
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <ComposedChart data={data} margin={{ top: 10, right: 8, bottom: 0, left: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
+        <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />
+        <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}${suffix}`} domain={['dataMin - 5', 'dataMax + 5']} />
+        <Tooltip
+          {...tooltipStyle}
+          content={({ active, payload }) => {
+            if (!active || !payload?.length) return null;
+            const c = payload[0].payload as Candle;
+            return (
+              <div style={{ ...tooltipStyle.contentStyle, padding: '8px 10px' }}>
+                <div style={{ color: '#9ca3af', marginBottom: 4 }}>Week {c.name}</div>
+                <div style={{ color: '#fff' }}>Open {c.open}{suffix} · Close {c.close}{suffix}</div>
+                <div style={{ color: '#6b7280' }}>High {c.high}{suffix} · Low {c.low}{suffix}</div>
+              </div>
+            );
+          }}
+        />
+        {target != null && <ReferenceLine y={target} stroke="#c8a951" strokeDasharray="4 4" />}
+        <Bar dataKey={(d: Candle) => [d.low, d.high]} shape={renderCandle} isAnimationActive={false} />
+      </ComposedChart>
     </ResponsiveContainer>
   );
 }
