@@ -24,9 +24,11 @@ interface OperationsLive {
   openIssues: number;
   incidentsTotal: number;
   vmByStore: { name: string; value: number }[];
-  storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[];
+  storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number; clean: number; safety: number }[];
+  keyIssues: { store: string; date: string; issues: string }[];
   risk: { high: number; medium: number; low: number };
-  incidentsByType: { security: number; safety: number; operational: number };
+  incidentTypes: { name: string; value: number }[];
+  incidentsByStore: { name: string; value: number }[];
   vmBreakdown: { name: string; value: number }[];
   topRisks: { description: string; severity: string; store: string; status: string }[];
   priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[];
@@ -42,7 +44,9 @@ export default function OperationsPage() {
   const storeScores = m?.storeScores ?? [];
   const risk = m?.risk ?? { high: 0, medium: 0, low: 0 };
   const incidentsTotal = m?.incidentsTotal ?? 0;
-  const byType = m?.incidentsByType ?? { security: 0, safety: 0, operational: 0 };
+  const incidentTypes = m?.incidentTypes ?? [];
+  const incidentsByStore = m?.incidentsByStore ?? [];
+  const keyIssues = m?.keyIssues ?? [];
   const topRisks = m?.topRisks ?? [];
   const priorityActions = m?.priorityActions ?? [];
   const vmBreakdown = (m?.vmBreakdown ?? []).filter((v) => v.value > 0);
@@ -115,6 +119,8 @@ export default function OperationsPage() {
                     <th className="text-right py-2 px-3 font-medium">VM</th>
                     <th className="text-right py-2 px-3 font-medium">Readiness</th>
                     <th className="text-right py-2 px-3 font-medium">CX</th>
+                    <th className="text-right py-2 px-3 font-medium">Clean &amp; Light</th>
+                    <th className="text-right py-2 px-3 font-medium">Safety</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -125,6 +131,8 @@ export default function OperationsPage() {
                       <td className="py-2 px-3 text-right">{s.vm || '—'}</td>
                       <td className="py-2 px-3 text-right">{s.readiness || '—'}</td>
                       <td className="py-2 px-3 text-right">{s.cx || '—'}</td>
+                      <td className="py-2 px-3 text-right">{s.clean || '—'}</td>
+                      <td className="py-2 px-3 text-right">{s.safety || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -133,23 +141,48 @@ export default function OperationsPage() {
           ) : (
             <EmptyState message="No store standards reviews yet" hint="Submit Store Standards in the Operations form." height={140} />
           )}
+          {keyIssues.length > 0 && (
+            <div className="mt-4">
+              <div className="text-xs text-gray-400 mb-2">Key Issues Raised</div>
+              <div className="space-y-2">
+                {keyIssues.map((k, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs p-2.5 rounded-lg border border-[var(--c-border)] bg-[var(--c-card2)]">
+                    <span className="text-gray-300 flex-1">{k.issues}</span>
+                    <span className="text-gray-500 whitespace-nowrap">{k.store}</span>
+                    <span className="text-gray-600 whitespace-nowrap">{k.date}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </Section>
 
         <Section number={3} title="Risk & Incident Monitor">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-            <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
-              <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Security</div>
-              <div className="text-lg font-bold text-red-400">{byType.security}</div>
+          {incidentTypes.length > 0 && (
+            <>
+              <div className="text-xs text-gray-400 mb-2">Incidents by Type</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                {incidentTypes.map((t) => (
+                  <div key={t.name} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
+                    <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">{t.name}</div>
+                    <div className="text-lg font-bold text-[#c8a951]">{t.value}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {incidentsByStore.length > 0 && (
+            <div className="mb-4">
+              <div className="text-xs text-gray-400 mb-2">Incidents by Store</div>
+              <div className="flex flex-wrap gap-2">
+                {incidentsByStore.map((s) => (
+                  <span key={s.name} className="text-xs bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg px-3 py-1.5">
+                    {s.name} <span className="text-[#c8a951] font-semibold ml-1">{s.value}</span>
+                  </span>
+                ))}
+              </div>
             </div>
-            <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
-              <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Safety</div>
-              <div className="text-lg font-bold text-orange-400">{byType.safety}</div>
-            </div>
-            <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
-              <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Operational</div>
-              <div className="text-lg font-bold text-yellow-400">{byType.operational}</div>
-            </div>
-          </div>
+          )}
           <div className="text-xs text-gray-400 mb-2">Top Risks (High / Critical incidents)</div>
           {topRisks.length ? (
             <div className="space-y-2">

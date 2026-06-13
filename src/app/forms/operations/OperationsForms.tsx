@@ -40,6 +40,7 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
   const forms = [
     { id: 'store-audit', label: 'Store Standards' },
     { id: 'vm-check', label: 'VM Compliance' },
+    { id: 'cx-feedback', label: 'Customer Experience' },
     { id: 'incident', label: 'Incident Report' },
     { id: 'sop-check', label: 'SOP Compliance' },
   ];
@@ -164,6 +165,28 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
               <FormField label="Size Arrangement %" name="signage" type="number" suffix="%" min={0} max={100} value={vm.signage} onChange={setV('signage')} />
               <FormField label="Overall VM Score % (auto)" name="overallVM" type="number" suffix="%" value={vmAvg ? String(vmAvg) : ''} readOnly />
               <FormField label="Needs Improvement" name="improvements" type="textarea" placeholder="Areas needing improvement" />
+            </div>
+          </FormSection>
+        )}
+
+        {activeForm === 'cx-feedback' && (
+          <FormSection title="Customer Experience (In-Store, Staff-Assessed)" description="Manager/auditor assessment of the in-store customer experience. (The customer's own voice is captured separately via the Marketing survey.)">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
+              <FormField label="Date" name="date" type="date" required />
+              <FormField label="Store" name="store" type="select" required options={STORES} />
+              {personField('Assessed By', 'assessedBy', true)}
+              <FormField label="Feedback Category" name="category" type="select" required options={[
+                { label: 'Store Cleanliness', value: 'cleanliness' }, { label: 'Staff Knowledge', value: 'staff-knowledge' },
+                { label: 'Product Availability', value: 'availability' }, { label: 'Fitting Room Experience', value: 'fitting-room' },
+                { label: 'Checkout Speed', value: 'checkout' }, { label: 'Overall Experience', value: 'overall' },
+              ]} />
+              <FormField label="Experience Rating (1-5)" name="rating" type="number" min={1} max={5} required />
+              <FormField label="NPS Score" name="nps" type="number" min={-100} max={100} />
+              <FormField label="Would Recommend" name="recommend" type="select" options={[
+                { label: 'Yes - Promoter', value: 'promoter' }, { label: 'Maybe - Passive', value: 'passive' },
+                { label: 'No - Detractor', value: 'detractor' },
+              ]} />
+              <FormField label="Comments" name="comments" type="textarea" placeholder="What stood out, good or bad?" />
             </div>
           </FormSection>
         )}

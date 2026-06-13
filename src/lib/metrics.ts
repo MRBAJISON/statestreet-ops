@@ -464,15 +464,17 @@ function operationsMetrics(rows: Entry[]) {
     inc.filter((p) => String(p.severity).toLowerCase().includes(lvl)).length;
 
   // Per-store audit scores
-  const storeMap = new Map<string, { ops: number[]; vm: number[]; readiness: number[]; cx: number[] }>();
+  const storeMap = new Map<string, { ops: number[]; vm: number[]; readiness: number[]; cx: number[]; clean: number[]; safety: number[] }>();
   for (const p of audit) {
     const k = labelFor(STORE_LABELS, p.store);
-    if (!storeMap.has(k)) storeMap.set(k, { ops: [], vm: [], readiness: [], cx: [] });
+    if (!storeMap.has(k)) storeMap.set(k, { ops: [], vm: [], readiness: [], cx: [], clean: [], safety: [] });
     const e = storeMap.get(k)!;
     e.ops.push(num(p.opsScore));
     e.vm.push(num(p.vmScore));
     e.readiness.push(num(p.readinessScore));
     e.cx.push(num(p.cxScore));
+    e.clean.push(num(p.cleanScore));
+    e.safety.push(num(p.safetyScore));
   }
   const storeScores = [...storeMap].map(([store, v]) => ({
     store,
@@ -480,7 +482,15 @@ function operationsMetrics(rows: Entry[]) {
     vm: round1(avg(v.vm)),
     readiness: round1(avg(v.readiness)),
     cx: round1(avg(v.cx)),
+    clean: round1(avg(v.clean)),
+    safety: round1(avg(v.safety)),
   }));
+
+  // Key issues raised during Store Standards reviews.
+  const keyIssues = audit
+    .filter((p) => String(p.issues || '').trim())
+    .map((p) => ({ store: labelFor(STORE_LABELS, p.store), date: String(p.date || ''), issues: String(p.issues) }))
+    .slice(0, 8);
 
   // VM compliance breakdown (vm-check sub-scores)
   const vmDim = (k: string) => round1(avg(vm.map((p) => num(p[k])).filter((n) => n > 0)));
@@ -493,7 +503,23 @@ function operationsMetrics(rows: Entry[]) {
 
   // Incidents by type
   const typeCount = (t: string) => inc.filter((p) => String(p.type).toLowerCase().includes(t)).length;
-  const incidentsByType = { security: typeCount('secur'), safety: typeCount('safet'), operational: typeCount('operat') };
+  const incidentTypes = [
+    { name: 'Security', value: typeCount('secur') },
+    { name: 'Safety', value: typeCount('safet') },
+    { name: 'Operational', value: typeCount('operat') },
+    { name: 'Fire', value: typeCount('fire') },
+    { name: 'Theft / Shrinkage', value: typeCount('theft') },
+    { name: 'Customer Injury', value: typeCount('customer') },
+    { name: 'Staff Injury', value: typeCount('staff') },
+  ].filter((x) => x.value > 0);
+
+  // Incidents grouped by store.
+  const incStoreMap = new Map<string, number>();
+  for (const p of inc) {
+    const k = labelFor(STORE_LABELS, p.store);
+    incStoreMap.set(k, (incStoreMap.get(k) ?? 0) + 1);
+  }
+  const incidentsByStore = [...incStoreMap].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
 
   // Top risks — high-severity incidents
   const topRisks = inc
@@ -536,8 +562,10 @@ function operationsMetrics(rows: Entry[]) {
       (x) => ({ name: labelFor(STORE_LABELS, x.name), value: x.value })
     ),
     storeScores,
+    keyIssues,
     risk: { high: sev('high'), medium: sev('med'), low: sev('low') },
-    incidentsByType,
+    incidentTypes,
+    incidentsByStore,
     vmBreakdown,
     topRisks,
     priorityActions,
@@ -545,7 +573,7 @@ function operationsMetrics(rows: Entry[]) {
       avgRating: round1(avg(cx.map((p) => num(p.rating)).filter((n) => n > 0))),
       avgNps: Math.round(avg(cx.map((p) => num(p.nps)).filter((n) => n !== 0))),
       recommendRate: cx.length
-        ? round1((cx.filter((p) => /yes|recommend|likely/i.test(String(p.recommend))).length / cx.length) * 100)
+        ? round1((cx.filter((p) => /yes|recommend|likely|promoter/i.test(String(p.recommend))).length / cx.length) * 100)
         : 0,
       count: cx.length,
     },
