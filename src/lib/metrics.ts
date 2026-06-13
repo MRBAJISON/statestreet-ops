@@ -487,6 +487,7 @@ function commercialMetrics(rows: Entry[]) {
       name: labelFor(CATEGORY_LABELS, x.name),
       value: x.value,
     })),
+    achievementTrend,
     salesByStore: groupSum(ss, 'store', 'totalSales').map((x) => ({
       name: labelFor(STORE_LABELS, x.name),
       value: x.value,
