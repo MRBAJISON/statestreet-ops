@@ -74,7 +74,16 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
 
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         <div className="text-[0.6rem] text-gray-600 uppercase tracking-wider px-3 py-2">Dashboards</div>
-        {departments.map(dept => {
+        {userRole === 'store-manager' && (
+          <Link href="/dashboard/store-manager"
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+              pathname === '/dashboard/store-manager' ? 'bg-[var(--c-hover)] text-[var(--c-fg)]' : 'text-gray-500 hover:text-gray-300 hover:bg-[var(--c-card)]'
+            }`}>
+            <span>🏬</span>
+            <span>My Store</span>
+          </Link>
+        )}
+        {userRole !== 'store-manager' && departments.map(dept => {
           const config = DEPT_CONFIG[dept];
           const href = `/dashboard/${dept === 'brand' ? 'brand-health' : dept}`;
           const isActive = pathname === href;
