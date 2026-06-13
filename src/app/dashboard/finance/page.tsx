@@ -7,6 +7,7 @@ import Section from '@/components/ui/Section';
 import ProgressBar from '@/components/ui/ProgressBar';
 import EmptyState from '@/components/ui/EmptyState';
 import RecentEntries from '@/components/ui/RecentEntries';
+import StoreLedger from '@/components/finance/StoreLedger';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { SimpleLineChart, SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
 import { useMetrics, type Period } from '@/lib/api';
@@ -439,7 +440,11 @@ export default function FinancePage() {
         )}
 
         {/* 6. Recent Entries */}
-        <Section number={hasForecast ? 7 : 6} title="Recent Entries">
+        <Section number={hasForecast ? 7 : 6} title="Daily Sales — Store Ledger" subtitle="Audit">
+          <StoreLedger />
+        </Section>
+
+        <Section number={hasForecast ? 8 : 7} title="Recent Entries">
           <RecentEntries department="finance" />
         </Section>
       </div>

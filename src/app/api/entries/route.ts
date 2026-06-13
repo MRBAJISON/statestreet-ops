@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { entries } from '@/lib/db/schema';
 import { and, desc, eq } from 'drizzle-orm';
+import { isAudited, recordAudit } from '@/lib/audit';
 
 const DEPARTMENTS = ['finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'];
 
@@ -34,6 +35,9 @@ export async function POST(req: NextRequest) {
       .insert(entries)
       .values({ department, formType, payload: cleaned })
       .returning();
+    if (isAudited(String(department), String(formType))) {
+      await recordAudit(row.id, 'create', { snapshot: cleaned });
+    }
     return NextResponse.json({ ok: true, entry: row });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

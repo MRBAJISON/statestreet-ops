@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { entries } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { isAudited, recordAudit, diffPayload } from '@/lib/audit';
 
 function parseId(v: string): number | null {
   const n = Number(v);
@@ -19,8 +20,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (typeof payload !== 'object' || payload === null) {
       return NextResponse.json({ error: 'payload object required' }, { status: 400 });
     }
+    const [before] = await db.select().from(entries).where(eq(entries.id, numId));
     const [row] = await db.update(entries).set({ payload }).where(eq(entries.id, numId)).returning();
     if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (before && isAudited(before.department, before.formType)) {
+      await recordAudit(numId, 'update', { fields: diffPayload(before.payload, payload) });
+    }
     return NextResponse.json({ ok: true, entry: row });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
@@ -35,6 +40,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     if (!numId) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
     const [row] = await db.delete(entries).where(eq(entries.id, numId)).returning();
     if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (isAudited(row.department, row.formType)) {
+      await recordAudit(numId, 'delete', { snapshot: row.payload });
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

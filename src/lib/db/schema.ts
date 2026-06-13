@@ -1,4 +1,4 @@
-import { pgTable, serial, text, jsonb, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, jsonb, timestamp, index, integer } from 'drizzle-orm/pg-core';
 
 // A single flexible table holds every form submission across all departments.
 // `payload` is the raw form data (jsonb); dashboards aggregate from these rows.
@@ -31,3 +31,20 @@ export const users = pgTable('users', {
 });
 
 export type DbUser = typeof users.$inferSelect;
+
+// Activity trail for entries (currently daily-sales/finance-revenue records).
+export const auditLog = pgTable(
+  'audit_log',
+  {
+    id: serial('id').primaryKey(),
+    entryId: integer('entry_id').notNull(),
+    action: text('action').notNull(), // 'create' | 'update' | 'delete'
+    userId: text('user_id'),
+    userName: text('user_name'),
+    changes: jsonb('changes').$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('audit_entry_idx').on(t.entryId)]
+);
+
+export type AuditRow = typeof auditLog.$inferSelect;
