@@ -24,14 +24,14 @@ export default function ExecutiveCommandCenter() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
   const [store, setStore] = useState('');
-  const fin = useMetrics<{ revenueMtd: number; netProfit: number; grossMargin: number; cashNet: number; netMargin: number; roce: number; roi: number; revenueByBrand: { name: string; value: number }[] }>('finance', period, anchor, store).data;
+  const fin = useMetrics<{ revenueMtd: number; netProfit: number; grossMargin: number; cashNet: number; netMargin: number; roce: number; roi: number; revenueByCategory: { name: string; value: number }[] }>('finance', period, anchor, store).data;
   const com = useMetrics<{ groupSales: number; convRate: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null; insights: { best: string[]; concern: string[]; risk: string[] } }[] } }>('commercial', period, anchor, store).data;
   const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[]; priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[]; peopleHealth: { score: number; attendance: number; punctuality: number; training: number; absences: number; count: number } }>('operations', period, anchor, store).data;
   const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory', period, anchor, store).data;
   const brd = useMetrics<{ healthIndex: number; sentiment: { positive: number }; ceoAttention: { priority: string; issue: string; impact: string; owner: string; status: string }[] }>('brand', period, anchor, store).data;
   const mkt = useMetrics<{ totalLeads: number; actions: { task: string; owner: string; priority: string; status: string; deadline: string }[] }>('marketing', period, anchor, store).data;
 
-  const revenueByBrand = fin?.revenueByBrand ?? [];
+  const revenueByCategory = fin?.revenueByCategory ?? [];
   const salesByStore = com?.salesByStore ?? [];
   const categorySales = com?.categorySales ?? [];
   const sellThroughByCategory = com?.sellThroughByCategory ?? [];
@@ -120,10 +120,10 @@ export default function ExecutiveCommandCenter() {
         <Section number={1} title="Group Performance" subtitle="Live">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div>
-              <div className="text-xs text-gray-400 mb-2">Revenue by Brand</div>
-              {revenueByBrand.length ? (
+              <div className="text-xs text-gray-400 mb-2">Revenue by Category</div>
+              {revenueByCategory.length ? (
                 <SimpleDonutChart
-                  data={revenueByBrand}
+                  data={revenueByCategory}
                   height={220}
                   innerRadius={55}
                   outerRadius={80}

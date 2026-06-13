@@ -90,6 +90,16 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
           );
         })}
 
+        {(userRole === 'commercial' || userRole === 'owner') && (
+          <Link href="/dashboard/weekly-targets"
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+              pathname === '/dashboard/weekly-targets' ? 'bg-[var(--c-hover)] text-[var(--c-fg)]' : 'text-gray-500 hover:text-gray-300 hover:bg-[var(--c-card)]'
+            }`}>
+            <span>🎯</span>
+            <span>Weekly Targets</span>
+          </Link>
+        )}
+
         {userRole === 'owner' && (
           <>
             <div className="text-[0.6rem] text-gray-600 uppercase tracking-wider px-3 py-2 mt-4">Administration</div>

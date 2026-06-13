@@ -5,7 +5,7 @@ import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry, postEntries, useEntries } from '@/lib/api';
-import { EXPENSE_GROUPS } from '@/lib/config';
+import { EXPENSE_GROUPS, PRODUCT_CATEGORIES } from '@/lib/config';
 
 // Cashflow categories: inflow types + the budget-item list (for outflows).
 const CASHFLOW_GROUPS = [
@@ -21,19 +21,7 @@ const CASHFLOW_GROUPS = [
   ...EXPENSE_GROUPS,
 ];
 
-// Normalize a free-text brand (from Excel or a select) to the canonical form value.
-function normalizeBrand(raw: string): string {
-  const b = (raw || '').toString().trim().toLowerCase();
-  if (!b) return '';
-  if (b.includes('boulevard') && b.includes('women')) return 'boulevard-women';
-  if (b.includes('boulevard')) return 'boulevard-men';
-  if (b.includes('angelo')) return 'dangelo';
-  if (b.includes('woodpecker')) return 'woodpeckers';
-  if (b.includes('carbon')) return 'carbon-shoes';
-  return b;
-}
-
-const num = (v: FormDataEntryValue | null | undefined | string | number) =>
+const num =(v: FormDataEntryValue | null | undefined | string | number) =>
   Number(String(v ?? '').replace(/[, ]/g, '')) || 0;
 
 export default function FinanceFormsPage() {
@@ -117,7 +105,7 @@ export default function FinanceFormsPage() {
         .map((r) => ({
           date: String(pick(r, 'date') || ''),
           store: String(pick(r, 'store') || ''),
-          brand: normalizeBrand(String(pick(r, 'brand') || '')),
+          category: String(pick(r, 'category') || ''),
           grossRevenue: num(pick(r, 'grossrevenue', 'gross', 'revenue') as string),
           cogs: num(pick(r, 'cogs', 'costofgoods', 'cost') as string),
           discounts: num(pick(r, 'discounts', 'discount') as string),
@@ -154,7 +142,7 @@ export default function FinanceFormsPage() {
       {
         Date: '2026-06-05',
         Store: 'Labone Men',
-        Brand: 'Boulevard Men',
+        Category: 'Watches',
         GrossRevenue: 18500,
         COGS: 9800,
         Discounts: 500,
@@ -236,7 +224,7 @@ export default function FinanceFormsPage() {
 
       <form onSubmit={handleSubmit} className="space-y-4 max-w-4xl">
         {activeForm === 'revenue' && (
-          <FormSection title="Daily Revenue Entry" description="Record daily revenue figures by store and brand">
+          <FormSection title="Daily Revenue Entry" description="Record daily revenue figures by store and category">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
               <FormField label="Store" name="store" type="select" required options={[
@@ -248,13 +236,7 @@ export default function FinanceFormsPage() {
                 { label: "D'Angelo Palace", value: 'dangelo' },
                 { label: 'Woodpeckers', value: 'woodpeckers' },
               ]} />
-              <FormField label="Brand" name="brand" type="select" required options={[
-                { label: 'Boulevard Men', value: 'boulevard-men' },
-                { label: 'Boulevard Women', value: 'boulevard-women' },
-                { label: "D'Angelo", value: 'dangelo' },
-                { label: 'Woodpeckers', value: 'woodpeckers' },
-                { label: 'Carbon Shoes', value: 'carbon-shoes' },
-              ]} />
+              <FormField label="Category" name="category" type="select" required options={PRODUCT_CATEGORIES} />
               <FormField label="Gross Revenue" name="grossRevenue" type="number" prefix="GHS" required step={0.01} />
               <FormField label="Cost of Goods (COGS)" name="cogs" type="number" prefix="GHS" step={0.01} />
               <FormField label="Discounts Given" name="discounts" type="number" prefix="GHS" step={0.01} />

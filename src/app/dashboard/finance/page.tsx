@@ -26,7 +26,7 @@ const dash = (n: number, f: (x: number) => string) => (n ? f(n) : '—');
 interface FinanceMetricsData {
   revenueMtd: number;
   cogs: number;
-  revenueByBrand: { name: string; value: number }[];
+  revenueByCategory: { name: string; value: number }[];
   daily: number[];
   labels: string[];
   transactions: number;
@@ -71,7 +71,7 @@ export default function FinancePage() {
   const { data: m } = useMetrics<FinanceMetricsData>('finance', period, anchor, store);
 
   const revenueMtd = m?.revenueMtd ?? 0;
-  const revenueByBrand = m?.revenueByBrand ?? [];
+  const revenueByCategory = m?.revenueByCategory ?? [];
   const daily = m?.daily ?? [];
   const labels = m?.labels ?? [];
   const dailyData = daily.map((v, i) => ({ name: labels[i] ?? String(i + 1), value: v }));
@@ -163,11 +163,11 @@ export default function FinancePage() {
               )}
             </div>
             <div>
-              <div className="text-xs text-gray-400 mb-2">Revenue by Brand</div>
-              {revenueByBrand.length ? (
+              <div className="text-xs text-gray-400 mb-2">Revenue by Category</div>
+              {revenueByCategory.length ? (
                 <>
                   <SimpleDonutChart
-                    data={revenueByBrand}
+                    data={revenueByCategory}
                     height={200}
                     innerRadius={45}
                     outerRadius={65}
@@ -175,7 +175,7 @@ export default function FinancePage() {
                     centerValue={fmtGHS(revenueMtd)}
                   />
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
-                    {revenueByBrand.map((b, i) => (
+                    {revenueByCategory.map((b, i) => (
                       <div key={b.name} className="flex items-center gap-1.5 text-[0.65rem]">
                         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: ['#c8a951', '#22c55e', '#3b82f6', '#ef4444', '#eab308', '#8b5cf6'][i % 6] }} />
                         <span className="text-gray-400 truncate">{b.name}</span>

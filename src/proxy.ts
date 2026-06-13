@@ -23,6 +23,7 @@ const SEGMENT_TO_DEPT: Record<string, string> = {
   inventory: 'inventory',
   'brand-health': 'brand',
   'store-manager': 'commercial',
+  'weekly-targets': 'commercial',
 };
 
 async function getRoleFromSession(req: NextRequest): Promise<string | null> {

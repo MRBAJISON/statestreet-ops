@@ -88,7 +88,7 @@ function groupAvg(items: P[], key: string, valKey: string) {
 function financeMetrics(rows: Entry[]) {
   const labels = Array.from({ length: 31 }, (_, i) => String(i + 1));
   const daily = new Array(31).fill(0);
-  const brandMap = new Map<string, number>();
+  const catMap = new Map<string, number>();
   let revenueMtd = 0;
   let cogsTotal = 0;
   let transactions = 0;
@@ -102,9 +102,9 @@ function financeMetrics(rows: Entry[]) {
     transactions += num(p.transactions);
     footfall += num(p.footfall);
     itemsSold += num(p.itemsSold);
-    const brandKey = String(p.brand ?? '');
-    const brand = BRAND_LABELS[brandKey] ?? (brandKey || 'Others');
-    brandMap.set(brand, (brandMap.get(brand) ?? 0) + gross);
+    const catKey = String(p.category ?? p.brand ?? '');
+    const cat = CATEGORY_LABELS[catKey] ?? (catKey || 'Others');
+    catMap.set(cat, (catMap.get(cat) ?? 0) + gross);
     const d = p.date ? new Date(String(p.date)) : null;
     const day = d && !isNaN(d.getTime()) ? d.getDate() : 0;
     if (day >= 1 && day <= 31) daily[day - 1] += gross;
@@ -211,7 +211,7 @@ function financeMetrics(rows: Entry[]) {
   return {
     revenueMtd,
     cogs: cogsTotal,
-    revenueByBrand: [...brandMap].map(([name, value]) => ({ name, value })),
+    revenueByCategory: [...catMap].map(([name, value]) => ({ name, value })),
     daily,
     labels,
     transactions,
