@@ -4,11 +4,17 @@ import { useMemo } from 'react';
 import { useEntries } from '@/lib/api';
 import RecentEntries from '@/components/ui/RecentEntries';
 import DailySales from './DailySales';
+import StockTransfer from './StockTransfer';
 import WeeklyReview, { type DailySale, type WeekTarget } from './WeeklyReview';
 
 export default function StoreManagerForms({ managerName, assignedStore }: { managerName: string; assignedStore: string }) {
   const { entries: finEntries, refresh } = useEntries('finance', 5000);
   const { entries: comEntries } = useEntries('commercial', 5000);
+  const { entries: invEntries, refresh: refreshInv } = useEntries('inventory', 5000);
+  const myTransfers = useMemo(
+    () => invEntries.filter((e) => e.formType === 'store-transfer' && String(e.payload.fromStore) === assignedStore),
+    [invEntries, assignedStore]
+  );
 
   // This store's daily sales (finance/revenue) and weekly targets (commercial/weekly-target).
   const myDaily = useMemo(
@@ -39,6 +45,8 @@ export default function StoreManagerForms({ managerName, assignedStore }: { mana
       </div>
 
       <DailySales assignedStore={assignedStore} recent={myDaily} onSaved={refresh} />
+
+      <StockTransfer assignedStore={assignedStore} managerName={managerName} recent={myTransfers} onSaved={refreshInv} />
 
       <WeeklyReview assignedStore={assignedStore} managerName={managerName} dailySales={dailySales} targets={targets} />
 
