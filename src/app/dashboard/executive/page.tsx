@@ -9,7 +9,7 @@ import { SimpleDonutChart, SimpleBarChart } from '@/components/charts/Charts';
 import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, type Period } from '@/lib/api';
-import { STORES } from '@/lib/config';
+import { STORES, rateRatio } from '@/lib/config';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -24,7 +24,7 @@ export default function ExecutiveCommandCenter() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
   const [store, setStore] = useState('');
-  const fin = useMetrics<{ revenueMtd: number; netProfit: number; grossMargin: number; cashNet: number; revenueByBrand: { name: string; value: number }[] }>('finance', period, anchor, store).data;
+  const fin = useMetrics<{ revenueMtd: number; netProfit: number; grossMargin: number; cashNet: number; netMargin: number; roce: number; roi: number; revenueByBrand: { name: string; value: number }[] }>('finance', period, anchor, store).data;
   const com = useMetrics<{ groupSales: number; convRate: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null; insights: { best: string[]; concern: string[]; risk: string[] } }[] } }>('commercial', period, anchor, store).data;
   const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[]; priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[]; peopleHealth: { score: number; attendance: number; punctuality: number; training: number; absences: number; count: number } }>('operations', period, anchor, store).data;
   const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory', period, anchor, store).data;
@@ -211,6 +211,28 @@ export default function ExecutiveCommandCenter() {
                 <div className="text-lg font-bold text-[#c8a951] mt-0.5">{d.value}</div>
               </Link>
             ))}
+          </div>
+
+          {/* Profitability ratios (rated) */}
+          <div className="mt-4">
+            <div className="text-xs text-gray-400 mb-2">Profitability Ratios <span className="text-gray-600">(best on Year/All)</span></div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {([
+                { name: 'Net Profit Margin', kind: 'netMargin' as const, value: fin?.netMargin ?? 0 },
+                { name: 'ROCE', kind: 'roce' as const, value: fin?.roce ?? 0 },
+                { name: 'ROI', kind: 'roi' as const, value: fin?.roi ?? 0 },
+              ]).map((r) => {
+                const rating = rateRatio(r.kind, r.value);
+                const tone = rating.tone === 'green' ? 'text-green-400' : rating.tone === 'yellow' ? 'text-yellow-400' : 'text-red-400';
+                return (
+                  <div key={r.kind} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-4">
+                    <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">{r.name}</div>
+                    <div className="text-2xl font-bold mt-1">{r.value ? `${r.value}%` : '—'}</div>
+                    <div className={`text-xs font-semibold mt-1 ${tone}`}>{r.value ? rating.label : 'No data'}</div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </Section>
 

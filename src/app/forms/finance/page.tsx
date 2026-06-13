@@ -63,6 +63,7 @@ export default function FinanceFormsPage() {
     { id: 'revenue', label: 'Daily Revenue Entry' },
     { id: 'expenses', label: 'Expense Recording' },
     { id: 'budget', label: 'Budget Setup' },
+    { id: 'capital', label: 'Capital & Investment' },
     { id: 'cashflow', label: 'Cash Flow Entry' },
     { id: 'debtors', label: 'Debtors / Creditors' },
     { id: 'forecast', label: 'Forecast Update' },
@@ -321,6 +322,17 @@ export default function FinanceFormsPage() {
               <FormField label="Budget Item" name="item" type="select" required optgroups={EXPENSE_GROUPS} />
               <FormField label="Annual Budgeted Amount" name="amount" type="number" prefix="GHS" required step={0.01} />
               <FormField label="Notes" name="notes" type="textarea" placeholder="Assumptions / basis for this budget" />
+            </div>
+          </FormSection>
+        )}
+
+        {activeForm === 'capital' && (
+          <FormSection title="Capital & Investment" description="Annual figures used for ROCE and ROI">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
+              <FormField label="Year" name="year" type="number" required min={2024} max={2100} placeholder={String(budgetYear)} />
+              <FormField label="Capital Employed" name="capitalEmployed" type="number" prefix="GHS" required step={0.01} />
+              <FormField label="Total Investment" name="investment" type="number" prefix="GHS" required step={0.01} />
+              <FormField label="Notes" name="notes" type="textarea" placeholder="Basis (e.g. total assets − current liabilities)" />
             </div>
           </FormSection>
         )}

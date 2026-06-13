@@ -180,6 +180,13 @@ function financeMetrics(rows: Entry[]) {
   const netProfit = operatingProfit - belowLine; // less tax & interest
   const netMargin = revenueMtd ? round1((netProfit / revenueMtd) * 100) : 0;
 
+  // Capital & Investment (annual) → ROCE / ROI.
+  const cap = payloads(rows, 'capital');
+  const capitalEmployed = cap.reduce((s, p) => s + num(p.capitalEmployed), 0);
+  const investment = cap.reduce((s, p) => s + num(p.investment), 0);
+  const roce = capitalEmployed > 0 ? round1((operatingProfit / capitalEmployed) * 100) : 0;
+  const roi = investment > 0 ? round1((netProfit / investment) * 100) : 0;
+
   // Weekly cash-flow trend (net per ISO week) + position/runway
   const weekMap = new Map<string, number>();
   for (const p of cf) {
@@ -237,6 +244,10 @@ function financeMetrics(rows: Entry[]) {
     operatingMargin,
     netProfit,
     netMargin,
+    capitalEmployed,
+    investment,
+    roce,
+    roi,
     debtors,
     creditors,
     cashInflow,

@@ -122,3 +122,32 @@ export const labelFor = (map: Record<string, string>, value: unknown): string =>
   const key = String(value ?? '');
   return map[key] ?? (key || '—');
 };
+
+// Financial-ratio performance bands → label + RAG tone.
+export type RatioTone = 'green' | 'yellow' | 'red';
+export function rateRatio(kind: 'netMargin' | 'roce' | 'roi', v: number): { label: string; tone: RatioTone } {
+  if (kind === 'netMargin') {
+    if (v < 0) return { label: 'Loss Making', tone: 'red' };
+    if (v < 1) return { label: 'Poor / Risk', tone: 'red' };
+    if (v < 4) return { label: 'Weak', tone: 'red' };
+    if (v < 7) return { label: 'Average', tone: 'yellow' };
+    if (v < 10) return { label: 'Good', tone: 'green' };
+    if (v <= 15) return { label: 'Very Good', tone: 'green' };
+    return { label: 'Excellent', tone: 'green' };
+  }
+  if (kind === 'roce') {
+    if (v < 5) return { label: 'Poor', tone: 'red' };
+    if (v < 10) return { label: 'Weak', tone: 'red' };
+    if (v < 15) return { label: 'Average', tone: 'yellow' };
+    if (v < 20) return { label: 'Good', tone: 'green' };
+    if (v <= 25) return { label: 'Very Good', tone: 'green' };
+    return { label: 'Excellent', tone: 'green' };
+  }
+  // roi
+  if (v < 5) return { label: 'Poor', tone: 'red' };
+  if (v < 10) return { label: 'Weak', tone: 'red' };
+  if (v < 15) return { label: 'Acceptable', tone: 'yellow' };
+  if (v < 20) return { label: 'Good', tone: 'green' };
+  if (v <= 30) return { label: 'Very Good', tone: 'green' };
+  return { label: 'Excellent', tone: 'green' };
+}

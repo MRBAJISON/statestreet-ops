@@ -11,6 +11,7 @@ import PeriodTabs from '@/components/ui/PeriodTabs';
 import { SimpleLineChart, SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
 import { useMetrics, type Period } from '@/lib/api';
 import { TARGETS, ragStatus } from '@/lib/targets';
+import { rateRatio } from '@/lib/config';
 import { STORES } from '@/lib/config';
 
 const fmtGHS = (n: number) =>
@@ -46,6 +47,10 @@ interface FinanceMetricsData {
   operatingMargin: number;
   netProfit: number;
   netMargin: number;
+  capitalEmployed: number;
+  investment: number;
+  roce: number;
+  roi: number;
   debtors: number;
   creditors: number;
   cashInflow: number;
@@ -208,6 +213,28 @@ export default function FinancePage() {
                   <ProgressBar value={Math.max(0, mg.value)} max={60} color="#c8a951" height={4} />
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Profitability ratios with rated performance bands */}
+          <div className="mt-6">
+            <div className="text-xs text-gray-400 mb-2">Profitability Ratios <span className="text-gray-600">(ROCE/ROI most meaningful on Year/All)</span></div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {([
+                { name: 'Net Profit Margin', kind: 'netMargin' as const, value: m?.netMargin ?? 0 },
+                { name: 'Return on Capital (ROCE)', kind: 'roce' as const, value: m?.roce ?? 0 },
+                { name: 'Return on Investment (ROI)', kind: 'roi' as const, value: m?.roi ?? 0 },
+              ]).map((r) => {
+                const rating = rateRatio(r.kind, r.value);
+                const tone = rating.tone === 'green' ? 'text-green-400' : rating.tone === 'yellow' ? 'text-yellow-400' : 'text-red-400';
+                return (
+                  <div key={r.kind} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-4">
+                    <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">{r.name}</div>
+                    <div className="text-2xl font-bold mt-1">{r.value ? `${r.value}%` : '—'}</div>
+                    <div className={`text-xs font-semibold mt-1 ${tone}`}>{r.value ? rating.label : 'No data'}</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </Section>
