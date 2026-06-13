@@ -1,8 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { STORES } from '@/lib/config';
+import { STORES, CATEGORY_LABELS } from '@/lib/config';
 import { postEntry, updateEntry } from '@/lib/api';
+
+export interface DailySale { date: string; category: string; grossRevenue: number; itemsSold: number }
+export interface WeekTarget { weekEnd: string; target: number }
 
 // The 28 SKU categories from the Store Manager Monday Review Worksheet.
 const CATEGORIES = [
@@ -21,9 +24,9 @@ const SECTIONS: { id: string; title: string; note?: string; cols: Col[] }[] = [
     id: 's1', title: 'Section 1 · Category Performance Review', note: 'Enter opening stock, units sold and unit price — revenue, current stock and rating fill in automatically.',
     cols: [
       { key: 'openingStock', label: 'Opening Stock', type: 'number' },
-      { key: 'unitsSold', label: 'Units Sold Last Week', type: 'number' },
+      { key: 'unitsSold', label: 'Units Sold (auto, from daily sales)', auto: true },
       { key: 'unitPrice', label: 'Unit Price (GHC)', type: 'number' },
-      { key: 'revenue', label: 'Revenue Generated (auto)', auto: true },
+      { key: 'revenue', label: 'Revenue (auto, from daily sales)', auto: true },
       { key: 'currentStock', label: 'Current Stock (auto)', auto: true },
       { key: 'rating', label: 'Performance Rating (auto)', auto: true },
       { key: 'comments', label: 'Comments', type: 'text' },
@@ -71,33 +74,51 @@ const inputCls ='w-full bg-[var(--c-card)] border border-[var(--c-border)] round
 const headInputCls = 'bg-[var(--c-card)] border border-[var(--c-border)] rounded px-3 py-2 text-sm text-[var(--c-fg)] focus:outline-none focus:border-[#c8a951]';
 const num = (s: string) => Number(s) || 0;
 
-export default function WeeklyReview({ assignedStore = '', managerName = '' }: { assignedStore?: string; managerName?: string }) {
-  const [header, setHeader] = useState({ store: assignedStore, manager: managerName, weekEnd: '', weeklySalesTarget: '', actualSales: '' });
+export default function WeeklyReview({ assignedStore = '', managerName = '', dailySales = [], targets = [] }: { assignedStore?: string; managerName?: string; dailySales?: DailySale[]; targets?: WeekTarget[] }) {
+  const [header, setHeader] = useState({ store: assignedStore, manager: managerName, weekEnd: '' });
   // rows[category][colKey] = manually entered value
   const [rows, setRows] = useState<Record<string, Record<string, string>>>({});
   const [ceo, setCeo] = useState<Record<string, string>>({});
   const [activeSection, setActiveSection] = useState('s1');
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  // The in-progress review is saved into a single entry; the header/data stay on
-  // screen across section saves and only clear when the final section is submitted.
   const [entryId, setEntryId] = useState<number | null>(null);
 
-  const headerAchievement = num(header.weeklySalesTarget)
-    ? Math.round((num(header.actualSales) / num(header.weeklySalesTarget)) * 1000) / 10
-    : 0;
+  // Daily sales that fall in the Mon–Sun week ending on the chosen weekEnd.
+  const inWeek = (dateStr: string) => {
+    if (!header.weekEnd) return false;
+    const end = new Date(header.weekEnd);
+    const d = new Date(dateStr);
+    if (isNaN(end.getTime()) || isNaN(d.getTime())) return false;
+    const diff = (end.getTime() - d.getTime()) / 86_400_000;
+    return diff >= 0 && diff < 7;
+  };
+  const weekDaily = dailySales.filter((d) => inWeek(d.date));
+  // Revenue + units per category (keyed by display label to match the grid rows).
+  const perCat = new Map<string, { revenue: number; units: number }>();
+  for (const d of weekDaily) {
+    const label = CATEGORY_LABELS[d.category] ?? d.category;
+    const e = perCat.get(label) ?? { revenue: 0, units: 0 };
+    e.revenue += Number(d.grossRevenue) || 0;
+    e.units += Number(d.itemsSold) || 0;
+    perCat.set(label, e);
+  }
+  const actualSales = weekDaily.reduce((s, d) => s + (Number(d.grossRevenue) || 0), 0);
+  const weeklyTarget = targets.find((t) => t.weekEnd === header.weekEnd)?.target ?? 0;
+  const headerAchievement = weeklyTarget > 0 ? Math.round((actualSales / weeklyTarget) * 1000) / 10 : 0;
 
   const setCell = (cat: string, key: string, val: string) =>
     setRows((r) => ({ ...r, [cat]: { ...(r[cat] ?? {}), [key]: val } }));
   const cell = (cat: string, key: string) => rows[cat]?.[key] ?? '';
 
-  // Section 1 auto-calculations.
-  const revenueOf = (cat: string) => num(cell(cat, 'unitsSold')) * num(cell(cat, 'unitPrice'));
-  const currentStockOf = (cat: string) => num(cell(cat, 'openingStock')) - num(cell(cat, 'unitsSold'));
+  // Section 1 — units & revenue come from the daily sales; current stock & rating derive from them.
+  const unitsSoldOf = (cat: string) => perCat.get(cat)?.units ?? 0;
+  const revenueOf = (cat: string) => perCat.get(cat)?.revenue ?? 0;
+  const currentStockOf = (cat: string) => num(cell(cat, 'openingStock')) - unitsSoldOf(cat);
   const ratingOf = (cat: string) => {
     const opening = num(cell(cat, 'openingStock'));
     if (opening <= 0) return '';
-    const pct = (num(cell(cat, 'unitsSold')) / opening) * 100; // sell-through of opening stock
+    const pct = (unitsSoldOf(cat) / opening) * 100; // sell-through of opening stock
     if (pct >= 80) return 'Good';
     if (pct >= 50) return 'Fair';
     return 'Poor';
@@ -121,16 +142,25 @@ export default function WeeklyReview({ assignedStore = '', managerName = '' }: {
       const categories: Record<string, Record<string, string | number>> = {};
       for (const cat of CATEGORIES) {
         const r = rows[cat];
-        if (!r) continue;
+        const hasDaily = perCat.has(cat);
+        if (!r && !hasDaily) continue;
         categories[cat] = {
-          ...r,
+          ...(r ?? {}),
+          unitsSold: unitsSoldOf(cat),
           revenue: revenueOf(cat),
           currentStock: currentStockOf(cat),
           rating: ratingOf(cat),
           achievement: rowAchievement(cat),
         };
       }
-      const payload = { ...header, achievement: headerAchievement, categories, ceo };
+      const payload = {
+        ...header,
+        weeklySalesTarget: weeklyTarget,
+        actualSales,
+        achievement: headerAchievement,
+        categories,
+        ceo,
+      };
 
       // First save creates the entry; later sections update the same record.
       if (entryId == null) {
@@ -145,7 +175,7 @@ export default function WeeklyReview({ assignedStore = '', managerName = '' }: {
         setMsg({ ok: true, text: 'Weekly review submitted to the live database.' });
         setRows({});
         setCeo({});
-        setHeader({ store: assignedStore, manager: managerName, weekEnd: '', weeklySalesTarget: '', actualSales: '' });
+        setHeader({ store: assignedStore, manager: managerName, weekEnd: '' });
         setEntryId(null);
         setActiveSection('s1');
       } else {
@@ -162,6 +192,10 @@ export default function WeeklyReview({ assignedStore = '', managerName = '' }: {
 
   // Render an auto-calculated cell for the active section.
   const autoCell = (cat: string, key: string) => {
+    if (key === 'unitsSold') {
+      const u = unitsSoldOf(cat);
+      return <div className="px-1.5 py-1">{u || '—'}</div>;
+    }
     if (key === 'revenue') {
       const v = revenueOf(cat);
       return <div className="px-1.5 py-1 text-[#c8a951] whitespace-nowrap">{v ? `GHS ${v.toLocaleString()}` : '—'}</div>;
@@ -213,12 +247,16 @@ export default function WeeklyReview({ assignedStore = '', managerName = '' }: {
         <label className="text-xs text-gray-400">Week Ending
           <input type="date" value={header.weekEnd} onChange={(e) => setHeader({ ...header, weekEnd: e.target.value })} className={`${headInputCls} w-full mt-1`} />
         </label>
-        <label className="text-xs text-gray-400">Weekly Sales Target (GHC)
-          <input type="number" value={header.weeklySalesTarget} onChange={(e) => setHeader({ ...header, weeklySalesTarget: e.target.value })} className={`${headInputCls} w-full mt-1`} />
-        </label>
-        <label className="text-xs text-gray-400">Actual Sales (GHC)
-          <input type="number" value={header.actualSales} onChange={(e) => setHeader({ ...header, actualSales: e.target.value })} className={`${headInputCls} w-full mt-1`} />
-        </label>
+        <div className="text-xs text-gray-400">Weekly Sales Target (GHC) — set by Commercial
+          <div className={`${headInputCls} w-full mt-1 opacity-70 cursor-not-allowed`}>
+            {weeklyTarget ? `GHS ${weeklyTarget.toLocaleString()}` : <span className="text-gray-600">Awaiting target</span>}
+          </div>
+        </div>
+        <div className="text-xs text-gray-400">Actual Sales (GHC) — auto from daily sales
+          <div className={`${headInputCls} w-full mt-1 opacity-80`}>
+            {actualSales ? `GHS ${actualSales.toLocaleString()}` : <span className="text-gray-600">No daily sales this week</span>}
+          </div>
+        </div>
         <div className="text-xs text-gray-400">Achievement %
           <div className="mt-1 bg-[var(--c-card2)] border border-[#c8a951]/30 rounded px-3 py-2 text-sm font-bold text-[#c8a951]">
             {headerAchievement ? `${headerAchievement}%` : '—'}
