@@ -1,5 +1,5 @@
 import type { Entry } from './db/schema';
-import { BRAND_LABELS, STORE_LABELS, CATEGORY_LABELS, EXPENSE_LABELS, labelFor } from './config';
+import { BRAND_LABELS, STORE_LABELS, CATEGORY_LABELS, EXPENSE_LABELS, CAPITAL_CATEGORIES, labelFor } from './config';
 
 const num = (v: unknown) => Number(String(v ?? '').replace(/[, ]/g, '')) || 0;
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
@@ -136,7 +136,9 @@ function financeMetrics(rows: Entry[]) {
   const taxTotal = exp.filter((p) => String(p.category) === 'tax').reduce((s, p) => s + num(p.amount), 0);
   const interestTotal = exp.filter((p) => String(p.category) === 'interest').reduce((s, p) => s + num(p.amount), 0);
   const belowLine = taxTotal + interestTotal;
-  const operatingExpenses = expensesTotal - belowLine;
+  // Capital expenditure is excluded from operating expenses (it never hits the P&L).
+  const capexTotal = exp.filter((p) => CAPITAL_CATEGORIES.includes(String(p.category))).reduce((s, p) => s + num(p.amount), 0);
+  const operatingExpenses = expensesTotal - belowLine - capexTotal;
   const expCatMap = new Map<string, { actual: number; budget: number }>();
   for (const p of exp) {
     const cat = String(p.category ?? 'other');
@@ -150,6 +152,25 @@ function financeMetrics(rows: Entry[]) {
     actual: v.actual,
     budget: v.budget,
   }));
+
+  // Budget vs Actual — annual budgets (Budget Setup) drawn down by expenses.
+  const bud = payloads(rows, 'budget');
+  const budByItem = new Map<string, number>();
+  for (const b of bud) budByItem.set(String(b.item), (budByItem.get(String(b.item)) ?? 0) + num(b.amount));
+  const spentByItem = new Map<string, number>();
+  for (const p of exp) spentByItem.set(String(p.category), (spentByItem.get(String(p.category)) ?? 0) + num(p.amount));
+  const budgetVsActual = [...new Set([...budByItem.keys(), ...spentByItem.keys()])]
+    .map((item) => {
+      const budget = budByItem.get(item) ?? 0;
+      const spent = spentByItem.get(item) ?? 0;
+      return { item: labelFor(EXPENSE_LABELS, item), budget, spent, remaining: budget - spent, over: budget > 0 && spent > budget };
+    })
+    .filter((x) => x.budget > 0 || x.spent > 0)
+    .sort((a, b) => b.spent - a.spent);
+  const overspendLog = exp
+    .filter((p) => String(p.overspendReason || '').trim())
+    .map((p) => ({ item: labelFor(EXPENSE_LABELS, String(p.category)), amount: num(p.amount), reason: String(p.overspendReason), date: String(p.date || '') }))
+    .slice(0, 10);
 
   // Profit & loss — auto-calculated
   const grossProfit = revenueMtd - cogsTotal;
@@ -205,6 +226,9 @@ function financeMetrics(rows: Entry[]) {
     expensesTotal,
     expenseBudgetTotal,
     operatingExpenses,
+    capex: capexTotal,
+    budgetVsActual,
+    overspendLog,
     tax: taxTotal,
     interest: interestTotal,
     grossProfit,

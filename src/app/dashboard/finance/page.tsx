@@ -32,6 +32,9 @@ interface FinanceMetricsData {
   footfall: number;
   itemsSold: number;
   expensesByCategory: { name: string; actual: number; budget: number }[];
+  budgetVsActual: { item: string; budget: number; spent: number; remaining: number; over: boolean }[];
+  overspendLog: { item: string; amount: number; reason: string; date: string }[];
+  capex: number;
   revenueByStore: { name: string; value: number }[];
   expensesByStore: { name: string; value: number }[];
   debtorAging: { name: string; value: number }[];
@@ -70,6 +73,8 @@ export default function FinancePage() {
   const hasDaily = daily.some((v) => v > 0);
 
   const expenses = m?.expensesByCategory ?? [];
+  const budgetVsActual = m?.budgetVsActual ?? [];
+  const overspendLog = m?.overspendLog ?? [];
   const expenseData = expenses.map((c) => ({ name: c.name, value: c.actual, value2: c.budget }));
   const expensesTotal = m?.expensesTotal ?? 0;
   const budgetTotal = m?.expenseBudgetTotal ?? 0;
@@ -270,13 +275,61 @@ export default function FinancePage() {
               })}
             </div>
             <div className="lg:col-span-2">
-              <div className="text-xs text-gray-400 mb-2">Actual vs Budget by Category</div>
+              <div className="text-xs text-gray-400 mb-2">Spend by Category</div>
               {expenseData.length ? (
                 <SimpleBarChart data={expenseData} height={260} color="#c8a951" color2="#4a4a4a" prefix="GHS " />
               ) : (
                 <EmptyState message="No expenses recorded yet" hint="Submit Expense Recording in the Finance form." height={260} />
               )}
             </div>
+          </div>
+
+          {/* Budget vs Actual (annual budgets from Budget Setup) */}
+          <div className="mt-6">
+            <div className="text-xs text-gray-400 mb-2">Budget vs Actual <span className="text-gray-600">(annual — view on Year/All for full figures)</span></div>
+            {budgetVsActual.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-[var(--c-border)] text-gray-500">
+                      <th className="text-left py-2 pr-3 font-medium">Item</th>
+                      <th className="text-right py-2 px-3 font-medium">Budget</th>
+                      <th className="text-right py-2 px-3 font-medium">Spent</th>
+                      <th className="text-right py-2 px-3 font-medium">Remaining</th>
+                      <th className="text-right py-2 pl-3 font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {budgetVsActual.map((b) => (
+                      <tr key={b.item} className="border-b border-[var(--c-hover)]">
+                        <td className="py-2 pr-3">{b.item}</td>
+                        <td className="py-2 px-3 text-right">{fmtGHS(b.budget)}</td>
+                        <td className="py-2 px-3 text-right">{fmtGHS(b.spent)}</td>
+                        <td className={`py-2 px-3 text-right ${b.remaining < 0 ? 'text-red-400' : 'text-green-400'}`}>{fmtGHS(b.remaining)}</td>
+                        <td className="py-2 pl-3 text-right">{b.over ? <span className="text-red-400">Over</span> : b.budget ? <span className="text-green-400">On track</span> : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState message="No budgets set yet" hint="Set annual budgets via Budget Setup in the Finance form." height={120} />
+            )}
+            {overspendLog.length > 0 && (
+              <div className="mt-4">
+                <div className="text-xs text-gray-400 mb-2">Overspend Log</div>
+                <div className="space-y-2">
+                  {overspendLog.map((o, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs p-2.5 rounded-lg border border-red-500/20 bg-red-500/5">
+                      <span className="text-[#c8a951] whitespace-nowrap">{o.item}</span>
+                      <span className="text-red-400 whitespace-nowrap">{fmtGHS(o.amount)}</span>
+                      <span className="text-gray-300 flex-1">{o.reason}</span>
+                      <span className="text-gray-600 whitespace-nowrap">{o.date}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </Section>
 

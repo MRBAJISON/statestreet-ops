@@ -4,7 +4,7 @@ import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
-import { submitEntry, postEntries } from '@/lib/api';
+import { submitEntry, postEntries, useEntries } from '@/lib/api';
 import { EXPENSE_GROUPS } from '@/lib/config';
 
 // Cashflow categories: inflow types + the budget-item list (for outflows).
@@ -42,9 +42,27 @@ export default function FinanceFormsPage() {
   const [message, setMessage] = useState('');
   const [uploadStatus, setUploadStatus] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // Expense ↔ budget linkage state.
+  const { entries: finEntries, refresh: refreshFin } = useEntries('finance', 5000);
+  const [expCat, setExpCat] = useState('');
+  const [expAmount, setExpAmount] = useState('');
+  const [overspendReason, setOverspendReason] = useState('');
+  const budgetYear = new Date().getFullYear();
+
+  const annualBudget = finEntries
+    .filter((e) => e.formType === 'budget' && String(e.payload.item) === expCat && num(e.payload.year as string) === budgetYear)
+    .reduce((s, e) => s + num(e.payload.amount as string), 0);
+  const spentYTD = finEntries
+    .filter((e) => e.formType === 'expenses' && String(e.payload.category) === expCat && new Date(String(e.payload.date)).getFullYear() === budgetYear)
+    .reduce((s, e) => s + num(e.payload.amount as string), 0);
+  const remaining = annualBudget - spentYTD;
+  const isOverspend = expCat !== '' && annualBudget > 0 && num(expAmount) > remaining;
+  const fmtGHS = (n: number) => `GHS ${Math.round(n).toLocaleString()}`;
+
   const forms = [
     { id: 'revenue', label: 'Daily Revenue Entry' },
     { id: 'expenses', label: 'Expense Recording' },
+    { id: 'budget', label: 'Budget Setup' },
     { id: 'cashflow', label: 'Cash Flow Entry' },
     { id: 'debtors', label: 'Debtors / Creditors' },
     { id: 'forecast', label: 'Forecast Update' },
@@ -53,10 +71,18 @@ export default function FinanceFormsPage() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
+    if (activeForm === 'expenses' && isOverspend && !overspendReason.trim()) {
+      setMessage('This exceeds the remaining budget — please add a reason for the overspend.');
+      setSubmitted(true);
+      setTimeout(() => setSubmitted(false), 4000);
+      return;
+    }
     try {
       await submitEntry('finance', activeForm, form);
       setMessage('Saved to the live database. The Finance & Executive dashboards reflect it now.');
       form.reset();
+      setExpCat(''); setExpAmount(''); setOverspendReason('');
+      refreshFin();
     } catch (err) {
       setMessage('Could not save: ' + (err as Error).message);
     }
@@ -243,7 +269,7 @@ export default function FinanceFormsPage() {
           <FormSection title="Expense Recording" description="Record operational expenses">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
-              <FormField label="Category" name="category" type="select" required optgroups={EXPENSE_GROUPS} />
+              <FormField label="Category" name="category" type="select" required optgroups={EXPENSE_GROUPS} value={expCat} onChange={(e) => setExpCat(e.target.value)} />
               <FormField label="Store / Department" name="store" type="select" options={[
                 { label: 'Head Office', value: 'hq' },
                 { label: 'Dzorwulu Men', value: 'dzorwulu-men' },
@@ -254,8 +280,7 @@ export default function FinanceFormsPage() {
                 { label: "D'Angelo Palace", value: 'dangelo' },
                 { label: 'Woodpeckers', value: 'woodpeckers' },
               ]} />
-              <FormField label="Amount" name="amount" type="number" prefix="GHS" required step={0.01} />
-              <FormField label="Budget" name="budget" type="number" prefix="GHS" step={0.01} />
+              <FormField label="Amount" name="amount" type="number" prefix="GHS" required step={0.01} value={expAmount} onChange={(e) => setExpAmount(e.target.value)} />
               <FormField label="Vendor / Payee" name="vendor" placeholder="Vendor name" />
               <FormField label="Invoice Number" name="invoice" placeholder="INV-XXXX" />
               <FormField label="Payment Method" name="paymentMethod" type="select" options={[
@@ -265,6 +290,37 @@ export default function FinanceFormsPage() {
                 { label: 'Cheque', value: 'cheque' },
               ]} />
               <FormField label="Description" name="description" type="textarea" placeholder="Brief description of expense" />
+            </div>
+
+            {expCat !== '' && annualBudget > 0 && (
+              <div className={`mt-3 rounded-lg border p-3 text-xs ${isOverspend ? 'border-red-500/40 bg-red-500/10' : 'border-[var(--c-border)] bg-[var(--c-card2)]'}`}>
+                <div className="flex flex-wrap gap-x-6 gap-y-1">
+                  <span>Annual Budget <b className="text-[var(--c-fg)]">{fmtGHS(annualBudget)}</b></span>
+                  <span>Spent YTD <b className="text-[var(--c-fg)]">{fmtGHS(spentYTD)}</b></span>
+                  <span>Remaining <b className={remaining < 0 ? 'text-red-400' : 'text-green-400'}>{fmtGHS(remaining)}</b></span>
+                </div>
+                {isOverspend && (
+                  <div className="mt-2 text-red-400">⚠ This exceeds the remaining budget by {fmtGHS(num(expAmount) - remaining)}. A reason is required.</div>
+                )}
+              </div>
+            )}
+            {isOverspend && (
+              <div className="mt-3">
+                <label className="block text-xs text-gray-400 mb-1">Reason for Overspend<span className="text-red-400">*</span></label>
+                <textarea name="overspendReason" value={overspendReason} onChange={(e) => setOverspendReason(e.target.value)} rows={2}
+                  className="w-full bg-[var(--c-card)] border border-red-500/40 rounded-lg px-3 py-2 text-sm text-[var(--c-fg)] resize-none focus:outline-none focus:border-[#c8a951]" placeholder="Why is this over budget?" />
+              </div>
+            )}
+          </FormSection>
+        )}
+
+        {activeForm === 'budget' && (
+          <FormSection title="Budget Setup" description="Set the annual budget per item. Expenses draw down against this during the year.">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
+              <FormField label="Year" name="year" type="number" required min={2024} max={2100} placeholder={String(budgetYear)} />
+              <FormField label="Budget Item" name="item" type="select" required optgroups={EXPENSE_GROUPS} />
+              <FormField label="Annual Budgeted Amount" name="amount" type="number" prefix="GHS" required step={0.01} />
+              <FormField label="Notes" name="notes" type="textarea" placeholder="Assumptions / basis for this budget" />
             </div>
           </FormSection>
         )}
