@@ -488,8 +488,7 @@ function operationsMetrics(rows: Entry[]) {
     { name: 'Window Display', value: vmDim('windowDisplay') },
     { name: 'Mannequin', value: vmDim('mannequin') },
     { name: 'Presentation', value: vmDim('productPresentation') },
-    { name: 'Signage', value: vmDim('signage') },
-    { name: 'Cleanliness', value: vmDim('cleanliness') },
+    { name: 'Size Arrangement', value: vmDim('signage') },
   ];
 
   // Incidents by type

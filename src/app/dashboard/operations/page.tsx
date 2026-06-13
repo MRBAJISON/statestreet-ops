@@ -104,7 +104,7 @@ export default function OperationsPage() {
           </div>
         </Section>
 
-        <Section number={2} title="Store Audit Scores">
+        <Section number={2} title="Store Standards Scores">
           {storeScores.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -131,7 +131,7 @@ export default function OperationsPage() {
               </table>
             </div>
           ) : (
-            <EmptyState message="No store audits yet" hint="Submit Store Audit in the Operations form." height={140} />
+            <EmptyState message="No store standards reviews yet" hint="Submit Store Standards in the Operations form." height={140} />
           )}
         </Section>
 
@@ -194,7 +194,7 @@ export default function OperationsPage() {
               </table>
             </div>
           ) : (
-            <EmptyState message="No maintenance actions yet" hint="Submit Maintenance Request in the Operations form." height={120} />
+            <EmptyState message="No maintenance actions yet" hint="Log maintenance under Store Standards in the Operations form." height={120} />
           )}
         </Section>
 
