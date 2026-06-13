@@ -1,5 +1,5 @@
 import type { Entry } from './db/schema';
-import { BRAND_LABELS, STORE_LABELS, CATEGORY_LABELS, labelFor } from './config';
+import { BRAND_LABELS, STORE_LABELS, CATEGORY_LABELS, EXPENSE_LABELS, labelFor } from './config';
 
 const num = (v: unknown) => Number(String(v ?? '').replace(/[, ]/g, '')) || 0;
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
@@ -146,7 +146,7 @@ function financeMetrics(rows: Entry[]) {
     expCatMap.set(cat, e);
   }
   const expensesByCategory = [...expCatMap].map(([name, v]) => ({
-    name,
+    name: labelFor(EXPENSE_LABELS, name),
     actual: v.actual,
     budget: v.budget,
   }));

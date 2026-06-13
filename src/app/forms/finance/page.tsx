@@ -5,6 +5,21 @@ import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry, postEntries } from '@/lib/api';
+import { EXPENSE_GROUPS } from '@/lib/config';
+
+// Cashflow categories: inflow types + the budget-item list (for outflows).
+const CASHFLOW_GROUPS = [
+  {
+    label: 'Inflows',
+    options: [
+      { label: 'Sales Revenue', value: 'sales' },
+      { label: 'Customer Payment', value: 'customer-payment' },
+      { label: 'Capital Injection', value: 'capital-injection' },
+      { label: 'Loan / Other Inflow', value: 'inflow-other' },
+    ],
+  },
+  ...EXPENSE_GROUPS,
+];
 
 // Normalize a free-text brand (from Excel or a select) to the canonical form value.
 function normalizeBrand(raw: string): string {
@@ -228,18 +243,7 @@ export default function FinanceFormsPage() {
           <FormSection title="Expense Recording" description="Record operational expenses">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
-              <FormField label="Category" name="category" type="select" required options={[
-                { label: 'Rent', value: 'rent' },
-                { label: 'Salaries', value: 'salaries' },
-                { label: 'Marketing', value: 'marketing' },
-                { label: 'Utilities', value: 'utilities' },
-                { label: 'Logistics', value: 'logistics' },
-                { label: 'Admin', value: 'admin' },
-                { label: 'Maintenance', value: 'maintenance' },
-                { label: 'Other', value: 'other' },
-                { label: 'Interest / Finance Cost', value: 'interest' },
-                { label: 'Tax', value: 'tax' },
-              ]} />
+              <FormField label="Category" name="category" type="select" required optgroups={EXPENSE_GROUPS} />
               <FormField label="Store / Department" name="store" type="select" options={[
                 { label: 'Head Office', value: 'hq' },
                 { label: 'Dzorwulu Men', value: 'dzorwulu-men' },
@@ -273,16 +277,7 @@ export default function FinanceFormsPage() {
                 { label: 'Inflow', value: 'inflow' },
                 { label: 'Outflow', value: 'outflow' },
               ]} />
-              <FormField label="Category" name="category" type="select" required options={[
-                { label: 'Sales Revenue', value: 'sales' },
-                { label: 'Supplier Payment', value: 'supplier' },
-                { label: 'Salary Payment', value: 'salary' },
-                { label: 'Rent Payment', value: 'rent' },
-                { label: 'Loan Repayment', value: 'loan' },
-                { label: 'Tax Payment', value: 'tax' },
-                { label: 'Customer Payment', value: 'customer-payment' },
-                { label: 'Other', value: 'other' },
-              ]} />
+              <FormField label="Category" name="category" type="select" required optgroups={CASHFLOW_GROUPS} />
               <FormField label="Amount" name="amount" type="number" prefix="GHS" required step={0.01} />
               <FormField label="Bank Account" name="account" type="select" options={[
                 { label: 'Main Operating Account', value: 'main' },

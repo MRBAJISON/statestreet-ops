@@ -57,22 +57,58 @@ export const PRODUCT_CATEGORIES: Option[] = [
   { label: 'Jackets & Outerwear', value: 'jackets-outerwear' },
 ];
 
-export const EXPENSE_CATEGORIES: Option[] = [
-  { label: 'Rent', value: 'rent' },
-  { label: 'Salaries', value: 'salaries' },
-  { label: 'Marketing', value: 'marketing' },
-  { label: 'Utilities', value: 'utilities' },
-  { label: 'Logistics', value: 'logistics' },
-  { label: 'Admin', value: 'admin' },
-  { label: 'Maintenance', value: 'maintenance' },
-  { label: 'Other', value: 'other' },
-  // Below-the-line items — excluded from operating expenses, used for net profit.
-  { label: 'Interest / Finance Cost', value: 'interest' },
-  { label: 'Tax', value: 'tax' },
+// The single source of truth for budget / expense / cashflow categories.
+// group: operating (P&L opex) | capital (capex, excluded from operating profit)
+//        | below-line (interest & tax, below the operating line for net profit).
+type ExpenseGroup = 'operating' | 'capital' | 'below-line';
+export interface ExpenseItem extends Option {
+  group: ExpenseGroup;
+}
+
+export const EXPENSE_ITEMS: ExpenseItem[] = [
+  { label: 'Stock Purchases', value: 'stock-purchases', group: 'operating' },
+  { label: 'Freight & Clearance', value: 'freight-clearance', group: 'operating' },
+  { label: 'Forex', value: 'forex', group: 'operating' },
+  { label: 'Payroll Cost', value: 'payroll', group: 'operating' },
+  { label: 'Rent', value: 'rent', group: 'operating' },
+  { label: 'Utilities', value: 'utilities', group: 'operating' },
+  { label: 'Repairs & Maintenance', value: 'repairs-maintenance', group: 'operating' },
+  { label: 'Marketing Spend', value: 'marketing-spend', group: 'operating' },
+  { label: 'Delivery & Other Transport Costs', value: 'delivery-transport', group: 'operating' },
+  { label: 'Professional Fees', value: 'professional-fees', group: 'operating' },
+  { label: 'Statutory Payments', value: 'statutory-payments', group: 'operating' },
+  { label: 'Insurance', value: 'insurance', group: 'operating' },
+  { label: 'Bank Charges', value: 'bank-charges', group: 'operating' },
+  { label: 'Printing & Stationery', value: 'printing-stationery', group: 'operating' },
+  { label: 'Voice & Data Charges', value: 'voice-data', group: 'operating' },
+  { label: 'Food & Entertainment', value: 'food-entertainment', group: 'operating' },
+  { label: 'Foreign Travels', value: 'foreign-travels', group: 'operating' },
+  { label: 'IT & Digital Services', value: 'it-digital', group: 'operating' },
+  { label: 'Office Expenses', value: 'office-expenses', group: 'operating' },
+  { label: 'Fuel & Vehicle Maintenance', value: 'fuel-vehicle', group: 'operating' },
+  { label: 'Shop & Store Expenses', value: 'shop-store', group: 'operating' },
+  { label: 'MD-Related Expenditure', value: 'md-expenditure', group: 'operating' },
+  { label: 'Medical Expenses', value: 'medical', group: 'operating' },
+  { label: 'Asset – Motor Vehicle', value: 'asset-motor-vehicle', group: 'capital' },
+  { label: 'Asset – Furniture & Fittings', value: 'asset-furniture-fittings', group: 'capital' },
+  { label: 'Asset – Shop Equipments', value: 'asset-shop-equipments', group: 'capital' },
+  { label: 'Interest / Finance Cost', value: 'interest', group: 'below-line' },
+  { label: 'Tax', value: 'tax', group: 'below-line' },
 ];
 
-// Categories treated as below operating line (for Operating vs Net Profit).
-export const BELOW_LINE_CATEGORIES = ['interest', 'tax'];
+const itemsIn = (g: ExpenseGroup): Option[] => EXPENSE_ITEMS.filter((i) => i.group === g).map(({ label, value }) => ({ label, value }));
+
+// Flat list + value sets used by metrics.
+export const EXPENSE_CATEGORIES: Option[] = EXPENSE_ITEMS.map(({ label, value }) => ({ label, value }));
+export const BELOW_LINE_CATEGORIES = EXPENSE_ITEMS.filter((i) => i.group === 'below-line').map((i) => i.value);
+export const CAPITAL_CATEGORIES = EXPENSE_ITEMS.filter((i) => i.group === 'capital').map((i) => i.value);
+
+// Grouped options for <optgroup> dropdowns (Budget / Expense / Cashflow).
+export const EXPENSE_GROUPS: { label: string; options: Option[] }[] = [
+  { label: 'Operating Expenses', options: itemsIn('operating') },
+  { label: 'Capital Expenditure', options: itemsIn('capital') },
+  { label: 'Below the Line', options: itemsIn('below-line') },
+];
 
 // value -> label maps (for turning stored form values back into display names)
 const toMap = (opts: Option[]) => Object.fromEntries(opts.map((o) => [o.value, o.label]));
@@ -80,6 +116,7 @@ const toMap = (opts: Option[]) => Object.fromEntries(opts.map((o) => [o.value, o
 export const STORE_LABELS: Record<string, string> = toMap(STORES);
 export const BRAND_LABELS: Record<string, string> = toMap(BRANDS);
 export const CATEGORY_LABELS: Record<string, string> = toMap(PRODUCT_CATEGORIES);
+export const EXPENSE_LABELS: Record<string, string> = toMap(EXPENSE_CATEGORIES);
 
 export const labelFor = (map: Record<string, string>, value: unknown): string => {
   const key = String(value ?? '');
