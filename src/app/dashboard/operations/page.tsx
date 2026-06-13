@@ -33,6 +33,7 @@ interface OperationsLive {
   topRisks: { description: string; severity: string; store: string; status: string }[];
   priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[];
   cxFeedback: { avgRating: number; avgNps: number; recommendRate: number; count: number };
+  peopleHealth: { count: number; attendance: number; punctuality: number; training: number; absences: number; score: number; reasons: { name: string; value: number }[] };
 }
 
 export default function OperationsPage() {
@@ -51,6 +52,8 @@ export default function OperationsPage() {
   const priorityActions = m?.priorityActions ?? [];
   const vmBreakdown = (m?.vmBreakdown ?? []).filter((v) => v.value > 0);
   const cx = m?.cxFeedback ?? { avgRating: 0, avgNps: 0, recommendRate: 0, count: 0 };
+  const ph = m?.peopleHealth ?? { count: 0, attendance: 0, punctuality: 0, training: 0, absences: 0, score: 0, reasons: [] };
+  const reasonLabel = (v: string) => ({ sick: 'Sick', leave: 'Approved Leave', 'no-show': 'No-show', other: 'Other' }[v] ?? v);
 
   return (
     <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)]">
@@ -265,7 +268,35 @@ export default function OperationsPage() {
           </div>
         </Section>
 
-        <Section number={6} title="Recent Entries">
+        <Section number={6} title="People Health" subtitle="HR">
+          {ph.count > 0 ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <KPICard label="People Health" value={pct(ph.score)} status={score(ph.score)} small />
+                <KPICard label="Attendance" value={pct(ph.attendance)} status={score(ph.attendance)} small />
+                <KPICard label="Punctuality" value={pct(ph.punctuality)} status={score(ph.punctuality)} small />
+                <KPICard label="Training Completion" value={pct(ph.training)} status={score(ph.training)} small />
+                <KPICard label="Absences" value={String(ph.absences)} status={ph.absences > 0 ? 'yellow' : 'green'} small />
+              </div>
+              {ph.reasons.length > 0 && (
+                <div>
+                  <div className="text-xs text-gray-400 mb-2">Absences by Reason</div>
+                  <div className="flex flex-wrap gap-2">
+                    {ph.reasons.map((r) => (
+                      <span key={r.name} className="text-xs bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg px-3 py-1.5">
+                        {reasonLabel(r.name)} <span className="text-[#c8a951] font-semibold ml-1">{r.value}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <EmptyState message="No HR entries yet" hint="Submit Human Resources in the Operations form." height={120} />
+          )}
+        </Section>
+
+        <Section number={7} title="Recent Entries">
           <RecentEntries department="operations" />
         </Section>
       </div>

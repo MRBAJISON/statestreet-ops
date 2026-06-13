@@ -457,6 +457,7 @@ function operationsMetrics(rows: Entry[]) {
   const inc = payloads(rows, 'incident');
   const sop = payloads(rows, 'sop-check');
   const cx = payloads(rows, 'cx-feedback');
+  const hr = payloads(rows, 'hr');
 
   const closed = (s: unknown) => /resolv|close|complete|done/i.test(String(s));
   const maintDone = maint.filter((p) => closed(p.status)).length;
@@ -513,6 +514,25 @@ function operationsMetrics(rows: Entry[]) {
     { name: 'Staff Injury', value: typeCount('staff') },
   ].filter((x) => x.value > 0);
 
+  // People Health (HR) — attendance, punctuality, training, absences.
+  const hrAvg = (k: string) => round1(avg(hr.map((p) => num(p[k])).filter((n) => n > 0)));
+  const phParts = [hrAvg('attendance'), hrAvg('punctuality'), hrAvg('training')].filter((n) => n > 0);
+  const phReasons = new Map<string, number>();
+  for (const p of hr) {
+    const r = String(p.reason || '');
+    const a = num(p.absences);
+    if (r && a > 0) phReasons.set(r, (phReasons.get(r) ?? 0) + a);
+  }
+  const peopleHealth = {
+    count: hr.length,
+    attendance: hrAvg('attendance'),
+    punctuality: hrAvg('punctuality'),
+    training: hrAvg('training'),
+    absences: hr.reduce((s, p) => s + num(p.absences), 0),
+    score: phParts.length ? round1(phParts.reduce((a, b) => a + b, 0) / phParts.length) : 0,
+    reasons: [...phReasons].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value),
+  };
+
   // Incidents grouped by store.
   const incStoreMap = new Map<string, number>();
   for (const p of inc) {
@@ -563,6 +583,7 @@ function operationsMetrics(rows: Entry[]) {
     ),
     storeScores,
     keyIssues,
+    peopleHealth,
     risk: { high: sev('high'), medium: sev('med'), low: sev('low') },
     incidentTypes,
     incidentsByStore,

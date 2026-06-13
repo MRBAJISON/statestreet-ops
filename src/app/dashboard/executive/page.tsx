@@ -26,7 +26,7 @@ export default function ExecutiveCommandCenter() {
   const [store, setStore] = useState('');
   const fin = useMetrics<{ revenueMtd: number; netProfit: number; grossMargin: number; cashNet: number; revenueByBrand: { name: string; value: number }[] }>('finance', period, anchor, store).data;
   const com = useMetrics<{ groupSales: number; convRate: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null; insights: { best: string[]; concern: string[]; risk: string[] } }[] } }>('commercial', period, anchor, store).data;
-  const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[]; priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[] }>('operations', period, anchor, store).data;
+  const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[]; priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[]; peopleHealth: { score: number; attendance: number; punctuality: number; training: number; absences: number; count: number } }>('operations', period, anchor, store).data;
   const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory', period, anchor, store).data;
   const brd = useMetrics<{ healthIndex: number; sentiment: { positive: number }; ceoAttention: { priority: string; issue: string; impact: string; owner: string; status: string }[] }>('brand', period, anchor, store).data;
   const mkt = useMetrics<{ totalLeads: number; actions: { task: string; owner: string; priority: string; status: string; deadline: string }[] }>('marketing', period, anchor, store).data;
@@ -103,7 +103,7 @@ export default function ExecutiveCommandCenter() {
         <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={STORES} onStoreChange={setStore} />
       </div>
       <div className="px-6 py-3">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
           <KPICard label="Group Revenue" value={dash(fin?.revenueMtd ?? 0, fmtGHS)} status="green" small />
           <KPICard label="Net Profit" value={dash(fin?.netProfit ?? 0, fmtGHS)} status={(fin?.netProfit ?? 0) >= 0 ? 'green' : 'red'} small />
           <KPICard label="Gross Margin" value={pct(fin?.grossMargin ?? 0)} small />
@@ -111,6 +111,7 @@ export default function ExecutiveCommandCenter() {
           <KPICard label="Store Sales" value={dash(com?.groupSales ?? 0, fmtGHS)} small />
           <KPICard label="Inventory Value" value={dash(inv?.inventoryValue ?? 0, fmtGHS)} small />
           <KPICard label="Ops Score" value={pct(ops?.opsScore ?? 0)} small />
+          <KPICard label="People Health" value={pct(ops?.peopleHealth?.score ?? 0)} status={(ops?.peopleHealth?.score ?? 0) >= 90 ? 'green' : (ops?.peopleHealth?.score ?? 0) >= 70 ? 'yellow' : 'red'} small />
         </div>
       </div>
 

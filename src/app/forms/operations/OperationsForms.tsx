@@ -43,6 +43,7 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
     { id: 'cx-feedback', label: 'Customer Experience' },
     { id: 'incident', label: 'Incident Report' },
     { id: 'sop-check', label: 'SOP Compliance' },
+    { id: 'hr', label: 'Human Resources' },
   ];
 
   // A person field that pre-fills (read-only) with the logged-in manager's name.
@@ -235,6 +236,25 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
               {personField('Checked By', 'checker', true)}
               <FormField label="Deviations Found" name="deviations" type="textarea" placeholder="List any SOP deviations" />
               <FormField label="Corrective Action" name="corrective" type="textarea" placeholder="Required corrective actions" />
+            </div>
+          </FormSection>
+        )}
+
+        {activeForm === 'hr' && (
+          <FormSection title="Human Resources" description="People health — staff attendance, punctuality, training and absences per store">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
+              <FormField label="Date" name="date" type="date" required />
+              <FormField label="Store" name="store" type="select" required options={STORES} />
+              {personField('Recorded By', 'recordedBy', true)}
+              <FormField label="Staff Punctuality %" name="punctuality" type="number" suffix="%" min={0} max={100} required />
+              <FormField label="Attendance %" name="attendance" type="number" suffix="%" min={0} max={100} required />
+              <FormField label="Training Completion %" name="training" type="number" suffix="%" min={0} max={100} />
+              <FormField label="Absences (count)" name="absences" type="number" min={0} />
+              <FormField label="Absence Reason" name="reason" type="select" options={[
+                { label: 'Sick', value: 'sick' }, { label: 'Approved Leave', value: 'leave' },
+                { label: 'No-show', value: 'no-show' }, { label: 'Other', value: 'other' },
+              ]} />
+              <FormField label="Notes" name="notes" type="textarea" placeholder="Context on attendance / training" />
             </div>
           </FormSection>
         )}
