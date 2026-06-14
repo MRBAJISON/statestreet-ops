@@ -34,6 +34,7 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
       form.reset();
       setGross('');
       setDiscounts('');
+      setCogs('');
       onSaved();
     } catch (err) {
       setMsg({ ok: false, text: 'Could not save: ' + (err as Error).message });
@@ -58,7 +59,7 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
           <FormField label="Date" name="date" type="date" required />
           <FormField label="Category" name="category" type="select" required options={PRODUCT_CATEGORIES} />
           <FormField label="Gross Revenue" name="grossRevenue" type="number" prefix="GHS" required step={0.01} value={gross} onChange={(e) => setGross(e.target.value)} />
-          <FormField label="Cost of Goods (COGS)" name="cogs" type="number" prefix="GHS" step={0.01} />
+          <FormField label="Cost of Goods (COGS)" name="cogs" type="number" prefix="GHS" step={0.01} value={cogs} onChange={(e) => setCogs(e.target.value)} />
           <FormField label="Discounts Given" name="discounts" type="number" prefix="GHS" step={0.01} value={discounts} onChange={(e) => setDiscounts(e.target.value)} />
           <FormField label="Net Revenue (auto)" name="netRevenue" type="number" prefix="GHS" value={netRevenue ? String(netRevenue) : ''} readOnly />
           <FormField label="Transactions" name="transactions" type="number" />
