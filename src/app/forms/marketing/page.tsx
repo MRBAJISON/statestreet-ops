@@ -51,7 +51,7 @@ export default function MarketingFormsPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 max-w-4xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl font-bold">Marketing Data Entry</h1>
         <p className="text-sm text-gray-500 mt-1">Enter marketing data to update the Marketing Command Center dashboard</p>

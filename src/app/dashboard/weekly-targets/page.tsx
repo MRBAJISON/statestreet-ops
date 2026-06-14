@@ -115,12 +115,13 @@ export default function TargetsPage() {
 
   return (
     <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)] p-6">
-      <div className="mb-6">
+      <div className="max-w-3xl mx-auto">
+      <div className="mb-6 text-center">
         <h1 className="text-xl font-bold">Targets</h1>
         <p className="text-sm text-gray-500 mt-1">Set store weekly sales targets and the executive KPI targets that drive the Executive Command Center.</p>
       </div>
 
-      <div className="flex gap-2 mb-6 flex-wrap">
+      <div className="flex gap-2 mb-6 flex-wrap justify-center">
         {TABS.map((t) => (
           <button key={t.id} onClick={() => { setTab(t.id); setMsg(null); }}
             className={`px-4 py-2 rounded-lg text-sm transition-colors ${tab === t.id ? 'bg-[#c8a951] text-black font-semibold' : 'bg-[var(--c-card)] border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
@@ -136,7 +137,7 @@ export default function TargetsPage() {
       )}
 
       {tab === 'weekly' && (
-        <div className="bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg p-4 max-w-3xl">
+        <div className="bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg p-4 max-w-3xl mx-auto">
           <p className="text-xs text-gray-500 mb-3">Set each store&apos;s weekly sales target. These appear read-only on the Store Manager Weekly Review.</p>
           <label className="text-xs text-gray-400">Week Ending
             <input type="date" value={weekEnd} onChange={(e) => { setWeekEnd(e.target.value); setDrafts({}); }} className={`block mt-1 ${inputCls}`} />
@@ -183,7 +184,7 @@ export default function TargetsPage() {
       )}
 
       {tab === 'executive' && (
-        <div className="bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg p-4 max-w-2xl">
+        <div className="bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg p-4 max-w-2xl mx-auto">
           <p className="text-xs text-gray-500 mb-3">Monthly KPI targets feed the Executive Command Center cards (and their progress bars). History is kept per month.</p>
           <label className="text-xs text-gray-400">Target Month
             <input type="month" value={execMonth} onChange={(e) => { setExecMonth(e.target.value); setEDrafts({}); }} className={`block mt-1 ${inputCls}`} />
@@ -220,6 +221,7 @@ export default function TargetsPage() {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

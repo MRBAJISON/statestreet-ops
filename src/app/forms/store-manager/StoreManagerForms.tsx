@@ -46,7 +46,7 @@ export default function StoreManagerForms({ managerName, assignedStore }: { mana
   const [activeForm, setActiveForm] = useState('daily-sales');
 
   return (
-    <div className="p-6">
+    <div className="p-6 max-w-4xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl font-bold">Stores Data Entry</h1>
         <p className="text-sm text-gray-500 mt-1">Log daily sales and transfers, then complete the weekly review. Results feed the Commercial and Executive dashboards.</p>

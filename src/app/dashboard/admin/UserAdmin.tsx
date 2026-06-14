@@ -103,7 +103,8 @@ export default function UserAdmin() {
 
   return (
     <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)] p-6">
-      <div className="mb-6">
+      <div className="max-w-4xl mx-auto">
+      <div className="mb-6 text-center">
         <h1 className="text-xl font-bold">User Administration</h1>
         <p className="text-sm text-gray-500 mt-1">Add, edit, reset passwords, and remove user accounts.</p>
       </div>
@@ -252,6 +253,7 @@ export default function UserAdmin() {
         confirmLabel="Delete user"
         message={<>Delete <span className="font-semibold">{modal?.user.name}</span> ({modal?.user.email})? This cannot be undone.</>}
       />
+      </div>
     </div>
   );
 }
