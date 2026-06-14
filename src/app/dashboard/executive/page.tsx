@@ -10,6 +10,9 @@ import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, type Period } from '@/lib/api';
 import { STORES, rateRatio } from '@/lib/config';
+import { TARGETS } from '@/lib/targets';
+
+const RETAIL_STORE_COUNT = STORES.filter((s) => s.value !== 'head-office').length;
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -19,14 +22,62 @@ const fmtGHS = (n: number) =>
     : `GHS ${Math.round(n).toLocaleString()}`;
 const dash = (n: number, f: (x: number) => string) => (n ? f(n) : '—');
 const pct = (n: number) => (n ? `${n}%` : '—');
+const money = (n: number) => `GHS ${Math.round(n).toLocaleString()}`;
+
+const cardCls = 'bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3 flex flex-col';
+const headCls = 'flex items-center gap-2 mb-1.5';
+const iconCls = 'text-base leading-none';
+const labelCls = 'text-[0.6rem] text-gray-500 uppercase tracking-wider leading-tight';
+const valueCls = 'text-lg font-bold text-[var(--c-fg)]';
+
+// Money KPI vs target, with a gold progress bar + % of target (matches the reference cards).
+function KpiProgress({ icon, label, value, target }: { icon: string; label: string; value: number; target: number }) {
+  const ratio = target > 0 ? (value / target) * 100 : 0;
+  return (
+    <div className={cardCls}>
+      <div className={headCls}><span className={iconCls}>{icon}</span><span className={labelCls}>{label}</span></div>
+      <div className={valueCls}>{value ? money(value) : '—'}</div>
+      <div className="text-[0.6rem] text-gray-500 mt-1">Target: {target ? money(target) : '—'}</div>
+      <div className="mt-1 h-1.5 rounded-full bg-[var(--c-hover)] overflow-hidden">
+        <div className="h-full bg-[#c8a951] rounded-full" style={{ width: `${Math.min(100, Math.max(0, ratio))}%` }} />
+      </div>
+      <div className="text-[0.6rem] text-[#c8a951] font-semibold mt-0.5 text-right">{target ? `${ratio.toFixed(1)}%` : ''}</div>
+    </div>
+  );
+}
+
+// Percentage KPI vs target, with the gap shown in percentage points.
+function KpiDelta({ icon, label, value, target }: { icon: string; label: string; value: number; target: number }) {
+  const delta = Math.round((value - target) * 10) / 10;
+  return (
+    <div className={cardCls}>
+      <div className={headCls}><span className={iconCls}>{icon}</span><span className={labelCls}>{label}</span></div>
+      <div className={valueCls}>{value ? `${value}%` : '—'}</div>
+      <div className="text-[0.6rem] text-gray-500 mt-1">Target: {target ? `${target}%` : '—'}</div>
+      <div className={`text-[0.6rem] font-semibold mt-0.5 ${delta >= 0 ? 'text-green-400' : 'text-red-400'}`}>{value ? `${delta >= 0 ? '+' : ''}${delta}pp` : ''}</div>
+    </div>
+  );
+}
+
+// Count KPI with two supporting stats.
+function KpiStat({ icon, label, value, sub1, sub2 }: { icon: string; label: string; value: string; sub1: string; sub2: string }) {
+  return (
+    <div className={cardCls}>
+      <div className={headCls}><span className={iconCls}>{icon}</span><span className={labelCls}>{label}</span></div>
+      <div className={valueCls}>{value}</div>
+      <div className="text-[0.6rem] text-gray-500 mt-1">{sub1}</div>
+      <div className="text-[0.6rem] text-gray-400 mt-0.5">{sub2}</div>
+    </div>
+  );
+}
 
 export default function ExecutiveCommandCenter() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
   const [store, setStore] = useState('');
-  const fin = useMetrics<{ revenueMtd: number; netProfit: number; grossMargin: number; cashNet: number; netMargin: number; roce: number; roi: number; revenueByCategory: { name: string; value: number }[] }>('finance', period, anchor, store).data;
-  const com = useMetrics<{ groupSales: number; convRate: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null; insights: { best: string[]; concern: string[]; risk: string[] } }[] } }>('commercial', period, anchor, store).data;
-  const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[]; priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[]; peopleHealth: { score: number; attendance: number; punctuality: number; training: number; absences: number; count: number } }>('operations', period, anchor, store).data;
+  const fin = useMetrics<{ revenueMtd: number; netProfit: number; grossProfit: number; operatingProfit: number; grossMargin: number; cashNet: number; netMargin: number; roce: number; roi: number; revenueByCategory: { name: string; value: number }[] }>('finance', period, anchor, store).data;
+  const com = useMetrics<{ groupSales: number; convRate: number; sellThrough: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null; insights: { best: string[]; concern: string[]; risk: string[] } }[] } }>('commercial', period, anchor, store).data;
+  const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[]; priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[]; peopleHealth: { score: number; attendance: number; punctuality: number; training: number; absences: number; count: number }; staffing: { total: number; onDuty: number; absent: number } }>('operations', period, anchor, store).data;
   const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory', period, anchor, store).data;
   const brd = useMetrics<{ healthIndex: number; sentiment: { positive: number }; ceoAttention: { priority: string; issue: string; impact: string; owner: string; status: string }[] }>('brand', period, anchor, store).data;
   const mkt = useMetrics<{ totalLeads: number; actions: { task: string; owner: string; priority: string; status: string; deadline: string }[] }>('marketing', period, anchor, store).data;
@@ -103,15 +154,16 @@ export default function ExecutiveCommandCenter() {
         <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={STORES} onStoreChange={setStore} />
       </div>
       <div className="px-6 py-3">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-          <KPICard label="Group Revenue" value={dash(fin?.revenueMtd ?? 0, fmtGHS)} status="green" small />
-          <KPICard label="Net Profit" value={dash(fin?.netProfit ?? 0, fmtGHS)} status={(fin?.netProfit ?? 0) >= 0 ? 'green' : 'red'} small />
-          <KPICard label="Gross Margin" value={pct(fin?.grossMargin ?? 0)} small />
-          <KPICard label="Net Cash Flow" value={dash(fin?.cashNet ?? 0, fmtGHS)} status={(fin?.cashNet ?? 0) >= 0 ? 'green' : 'red'} small />
-          <KPICard label="Store Sales" value={dash(com?.groupSales ?? 0, fmtGHS)} small />
-          <KPICard label="Inventory Value" value={dash(inv?.inventoryValue ?? 0, fmtGHS)} small />
-          <KPICard label="Ops Score" value={pct(ops?.opsScore ?? 0)} small />
-          <KPICard label="People Health" value={pct(ops?.peopleHealth?.score ?? 0)} status={(ops?.peopleHealth?.score ?? 0) >= 90 ? 'green' : (ops?.peopleHealth?.score ?? 0) >= 70 ? 'yellow' : 'red'} small />
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+          <KpiProgress icon="💰" label="Group Revenue (MTD)" value={fin?.revenueMtd ?? 0} target={TARGETS.executive.revenueMtd} />
+          <KpiProgress icon="🪙" label="Gross Profit (MTD)" value={fin?.grossProfit ?? 0} target={TARGETS.executive.grossProfit} />
+          <KpiProgress icon="📈" label="Operating Profit (MTD)" value={fin?.operatingProfit ?? 0} target={TARGETS.executive.operatingProfit} />
+          <KpiDelta icon="🧮" label="Group GM% (MTD)" value={fin?.grossMargin ?? 0} target={TARGETS.executive.grossMargin} />
+          <KpiDelta icon="🛒" label="Group Sell Through (YTD)" value={com?.sellThrough ?? 0} target={TARGETS.executive.sellThrough} />
+          <KpiStat icon="🏬" label="Active Stores" value={String(RETAIL_STORE_COUNT)} sub1="Total Stores" sub2={`Open: ${RETAIL_STORE_COUNT}   Closed: 0`} />
+          <KpiStat icon="👥" label="Total Employees" value={(ops?.staffing?.total ?? 0) ? String(ops?.staffing?.total) : '—'}
+            sub1={(ops?.staffing?.total ?? 0) ? `On Duty: ${ops?.staffing?.onDuty ?? 0}` : 'No HR data'}
+            sub2={(ops?.staffing?.total ?? 0) ? `Absent: ${ops?.staffing?.absent ?? 0}` : ''} />
         </div>
       </div>
 

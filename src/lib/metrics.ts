@@ -594,6 +594,21 @@ function operationsMetrics(rows: Entry[]) {
     reasons: [...phReasons].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value),
   };
 
+  // Current staffing snapshot — latest HR record per location (so multiple days don't double-count).
+  const latestHrByStore = new Map<string, P>();
+  for (const p of hr) {
+    const k = String(p.store || '');
+    const prev = latestHrByStore.get(k);
+    if (!prev || String(p.date || '') >= String(prev.date || '')) latestHrByStore.set(k, p);
+  }
+  let staffTotal = 0;
+  let staffPresent = 0;
+  for (const p of latestHrByStore.values()) {
+    staffTotal += num(p.staffTotal);
+    staffPresent += num(p.staffPresent);
+  }
+  const staffing = { total: staffTotal, onDuty: staffPresent, absent: Math.max(0, staffTotal - staffPresent) };
+
   // Maintenance spend / overdue.
   const maintenance = {
     totalCost: maint.reduce((s, p) => s + num(p.cost), 0),
@@ -681,6 +696,7 @@ function operationsMetrics(rows: Entry[]) {
     storeScores,
     keyIssues,
     peopleHealth,
+    staffing,
     maintenance,
     sopByArea,
     sopDeviations,

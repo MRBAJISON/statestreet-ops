@@ -2,6 +2,14 @@
 // (no target line or RAG status is shown until you set one). These are config the
 // business owns — not operational data — so they live here, editable in one place.
 export const TARGETS = {
+  // Executive KPI-bar targets (edit to your real numbers).
+  executive: {
+    revenueMtd: 1_000_000,
+    grossProfit: 480_000,
+    operatingProfit: 150_000,
+    grossMargin: 48, // %
+    sellThrough: 75, // %
+  },
   finance: { revenueMtd: 0, grossMargin: 0, netMargin: 0 },
   commercial: { groupSales: 0, grossMargin: 0, convRate: 0, sellThrough: 0 },
   operations: { opsScore: 0, vmScore: 0, readiness: 0, sopCompliance: 0, cxScore: 0 },
