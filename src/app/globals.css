@@ -67,24 +67,30 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 1px var(--color-gold);
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.8rem;
-}
+/* Element defaults for tables live in @layer base so per-cell Tailwind utilities
+   (text-right / text-center / padding) override them. Unlayered rules beat layered
+   utilities regardless of specificity — which previously made `th text-right` a no-op
+   and left every numeric header left-aligned over right-aligned values. */
+@layer base {
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+  }
 
-th {
-  text-align: left;
-  padding: 0.5rem;
-  font-weight: 600;
-  color: var(--color-subtle);
-  border-bottom: 1px solid var(--c-border2);
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
+  th {
+    text-align: left;
+    padding: 0.5rem;
+    font-weight: 600;
+    color: var(--color-subtle);
+    border-bottom: 1px solid var(--c-border2);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
 
-td {
-  padding: 0.4rem 0.5rem;
-  border-bottom: 1px solid var(--c-hover);
+  td {
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid var(--c-hover);
+  }
 }
