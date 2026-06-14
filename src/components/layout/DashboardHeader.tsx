@@ -11,12 +11,12 @@ export default function DashboardHeader({ title, subtitle, mission, missionDetai
 
   return (
     <div className="bg-[var(--c-card2)] border-b border-[var(--c-hover)] px-6 py-4">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="relative flex items-center justify-center">
+        <div className="text-center">
           <h1 className="text-xl font-bold tracking-wide">{title}</h1>
           <p className="text-xs text-[#c8a951] tracking-wider mt-0.5">{subtitle}</p>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="hidden lg:flex items-center gap-6 absolute right-0">
           <div className="text-right">
             <div className="text-xs text-gray-400">{now}</div>
             <div className="text-[0.6rem] text-gray-600">Updated: 09:00 AM</div>
