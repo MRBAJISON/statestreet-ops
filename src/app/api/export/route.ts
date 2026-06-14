@@ -8,10 +8,10 @@ import { buildWorkbook, type ExportScope } from '@/lib/export';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Which roles may pull which scope. Owner can do everything.
+// Which roles may pull which scope. (Owner intentionally excluded — not needed there.)
 const ALLOWED: Record<ExportScope, string[]> = {
-  all: ['operations', 'owner'],
-  finance: ['finance', 'owner'],
+  all: ['operations'],
+  finance: ['finance'],
 };
 
 export async function GET(req: NextRequest) {
