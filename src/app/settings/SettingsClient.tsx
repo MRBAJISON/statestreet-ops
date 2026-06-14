@@ -9,7 +9,7 @@ const inputCls =
   'w-full bg-[var(--c-card2)] border border-[var(--c-border)] rounded px-3 py-2 text-sm text-[var(--c-fg)] focus:outline-none focus:border-[#c8a951]';
 const labelCls = 'block text-xs text-gray-400 mb-1';
 const btnCls = 'bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-5 py-2 rounded-lg text-sm disabled:opacity-50';
-const cardCls = 'bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg p-5 max-w-xl';
+const cardCls = 'bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg p-5';
 
 function Msg({ m }: { m: { ok: boolean; text: string } | null }) {
   if (!m) return null;
@@ -77,8 +77,9 @@ export default function SettingsClient({ user }: { user: UserInfo }) {
   }
 
   return (
-    <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)] p-6 space-y-6">
-      <div>
+    <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)] p-6">
+      <div className="max-w-xl mx-auto space-y-6">
+      <div className="text-center">
         <h1 className="text-xl font-bold">Settings</h1>
         <p className="text-sm text-gray-500 mt-1">Manage your profile, password and appearance.</p>
       </div>
@@ -146,6 +147,7 @@ export default function SettingsClient({ user }: { user: UserInfo }) {
           ))}
         </div>
       </section>
+      </div>
     </div>
   );
 }
