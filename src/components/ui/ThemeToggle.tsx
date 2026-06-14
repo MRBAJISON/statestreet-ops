@@ -26,7 +26,7 @@ export default function ThemeToggle({ compact = false }: { compact?: boolean }) 
   if (compact) {
     return (
       <button onClick={toggle} aria-label={label} title={label}
-        className="w-9 h-9 flex items-center justify-center rounded-lg border border-[var(--c-border)] bg-[var(--c-card)] hover:border-[#c8a951] transition-colors text-sm">
+        className="w-7 h-7 flex items-center justify-center rounded-md border border-[var(--c-border)] bg-[var(--c-card)] hover:border-[#c8a951] transition-colors text-xs">
         {icon}
       </button>
     );

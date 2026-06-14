@@ -1,4 +1,5 @@
 @import "tailwindcss";
+/* light-mode muted-text contrast overrides below */
 
 @theme inline {
   --color-background: #0a0a0a;
@@ -39,6 +40,16 @@
   --c-border2: #d6d6d3;
   --c-fg: #18181b;
 }
+
+/* The UI was built dark-first with light Tailwind grays for muted text, which are
+   too faint on a light background. Darken them in light mode for readable contrast.
+   (Unlayered rules override the layered Tailwind utilities.) */
+[data-theme="light"] .text-gray-300 { color: #6b7280; }
+[data-theme="light"] .text-gray-400 { color: #4b5563; }
+[data-theme="light"] .text-gray-500 { color: #374151; }
+[data-theme="light"] .text-gray-600 { color: #4b5563; }
+[data-theme="light"] .hover\:text-gray-300:hover,
+[data-theme="light"] .hover\:text-gray-300:hover span { color: #374151; }
 
 * {
   scrollbar-width: thin;
