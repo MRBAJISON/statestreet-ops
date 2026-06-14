@@ -1,11 +1,17 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useEntries } from '@/lib/api';
 import RecentEntries from '@/components/ui/RecentEntries';
 import DailySales from './DailySales';
 import StockTransfer from './StockTransfer';
 import WeeklyReview, { type DailySale, type WeekTarget } from './WeeklyReview';
+
+const FORMS = [
+  { id: 'daily-sales', label: 'Daily Sales' },
+  { id: 'stock-transfer', label: 'Stock Transfer' },
+  { id: 'weekly-review', label: 'Weekly Review' },
+];
 
 export default function StoreManagerForms({ managerName, assignedStore }: { managerName: string; assignedStore: string }) {
   const { entries: finEntries, refresh } = useEntries('finance', 5000);
@@ -37,22 +43,41 @@ export default function StoreManagerForms({ managerName, assignedStore }: { mana
     [comEntries, assignedStore]
   );
 
+  const [activeForm, setActiveForm] = useState('daily-sales');
+
   return (
-    <div className="p-6 space-y-8">
-      <div>
-        <h1 className="text-xl font-bold">Store Manager Weekly Review</h1>
-        <p className="text-sm text-gray-500 mt-1">Log daily sales, then complete the weekly review. Results feed the Commercial and Executive dashboards.</p>
+    <div className="p-6">
+      <div className="mb-6">
+        <h1 className="text-xl font-bold">Stores Data Entry</h1>
+        <p className="text-sm text-gray-500 mt-1">Log daily sales and transfers, then complete the weekly review. Results feed the Commercial and Executive dashboards.</p>
       </div>
 
-      <DailySales assignedStore={assignedStore} recent={myDaily} onSaved={refresh} />
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {FORMS.map((f) => (
+          <button key={f.id} onClick={() => setActiveForm(f.id)}
+            className={`px-4 py-2 rounded-lg text-sm transition-colors ${activeForm === f.id ? 'bg-[#c8a951] text-black font-semibold' : 'bg-[var(--c-card)] border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
+            {f.label}
+          </button>
+        ))}
+      </div>
 
-      <StockTransfer assignedStore={assignedStore} managerName={managerName} recent={myTransfers} onSaved={refreshInv} />
+      <div className="max-w-4xl space-y-8">
+        {activeForm === 'daily-sales' && (
+          <DailySales assignedStore={assignedStore} recent={myDaily} onSaved={refresh} />
+        )}
 
-      <WeeklyReview assignedStore={assignedStore} managerName={managerName} dailySales={dailySales} targets={targets} />
+        {activeForm === 'stock-transfer' && (
+          <StockTransfer assignedStore={assignedStore} managerName={managerName} recent={myTransfers} onSaved={refreshInv} />
+        )}
 
-      <div className="max-w-4xl">
-        <h2 className="text-sm font-bold uppercase tracking-wide mb-3">Your Submissions</h2>
-        <RecentEntries department="commercial" />
+        {activeForm === 'weekly-review' && (
+          <WeeklyReview assignedStore={assignedStore} managerName={managerName} dailySales={dailySales} targets={targets} />
+        )}
+
+        <div>
+          <h2 className="text-sm font-bold uppercase tracking-wide mb-3">Your Submissions</h2>
+          <RecentEntries department="commercial" />
+        </div>
       </div>
     </div>
   );

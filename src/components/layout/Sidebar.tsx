@@ -130,7 +130,7 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
                 pathname === '/forms/store-manager' ? 'bg-[var(--c-hover)] text-[var(--c-fg)]' : 'text-gray-500 hover:text-gray-300 hover:bg-[var(--c-card)]'
               }`}>
               <span className="text-xs">📝</span>
-              <span>Weekly Review</span>
+              <span>Stores</span>
             </Link>
           </>
         )}
