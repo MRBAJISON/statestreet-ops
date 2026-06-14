@@ -57,8 +57,10 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
             <path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
           </svg>
         </div>
-        <span className="text-sm font-bold tracking-wider">STATESTREET</span>
-        <span className="text-[0.6rem] text-[#c8a951] tracking-widest hidden sm:inline">RETAIL GROUP</span>
+        <div className="flex flex-col leading-tight">
+          <span className="text-sm font-bold tracking-wider">STATESTREET</span>
+          <span className="text-[0.6rem] text-[#c8a951] tracking-widest">RETAIL GROUP</span>
+        </div>
       </div>
     </div>
 
