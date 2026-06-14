@@ -109,6 +109,26 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
           </Link>
         )}
 
+        {(userRole === 'finance' || userRole === 'operations' || userRole === 'owner') && (
+          <>
+            <div className="text-[0.6rem] text-gray-600 uppercase tracking-wider px-3 py-2 mt-4">Reports</div>
+            {(userRole === 'operations' || userRole === 'owner') && (
+              <a href="/api/export?scope=all"
+                className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors text-gray-500 hover:text-gray-300 hover:bg-[var(--c-card)]">
+                <span>📊</span>
+                <span>Export All Data</span>
+              </a>
+            )}
+            {(userRole === 'finance' || userRole === 'owner') && (
+              <a href="/api/export?scope=finance"
+                className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors text-gray-500 hover:text-gray-300 hover:bg-[var(--c-card)]">
+                <span>📊</span>
+                <span>Export Finance &amp; Stores</span>
+              </a>
+            )}
+          </>
+        )}
+
         {userRole === 'owner' && (
           <>
             <div className="text-[0.6rem] text-gray-600 uppercase tracking-wider px-3 py-2 mt-4">Administration</div>
