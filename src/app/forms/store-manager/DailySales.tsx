@@ -13,12 +13,12 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
-  // Net Revenue auto-calculates as Gross Revenue − Discounts Given − COGS.
+  // Net Revenue auto-calculates as Gross Revenue − Discounts Given.
+  // (COGS is captured for gross-profit metrics, not deducted from net revenue.)
   const [gross, setGross] = useState('');
   const [discounts, setDiscounts] = useState('');
-  const [cogs, setCogs] = useState('');
   const num = (s: string) => Number(s) || 0;
-  const netRevenue = num(gross) ? Math.round((num(gross) - num(discounts) - num(cogs)) * 100) / 100 : 0;
+  const netRevenue = num(gross) ? Math.round((num(gross) - num(discounts)) * 100) / 100 : 0;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -34,7 +34,6 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
       form.reset();
       setGross('');
       setDiscounts('');
-      setCogs('');
       onSaved();
     } catch (err) {
       setMsg({ ok: false, text: 'Could not save: ' + (err as Error).message });
@@ -59,7 +58,7 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
           <FormField label="Date" name="date" type="date" required />
           <FormField label="Category" name="category" type="select" required options={PRODUCT_CATEGORIES} />
           <FormField label="Gross Revenue" name="grossRevenue" type="number" prefix="GHS" required step={0.01} value={gross} onChange={(e) => setGross(e.target.value)} />
-          <FormField label="Cost of Goods (COGS)" name="cogs" type="number" prefix="GHS" step={0.01} value={cogs} onChange={(e) => setCogs(e.target.value)} />
+          <FormField label="Cost of Goods (COGS)" name="cogs" type="number" prefix="GHS" step={0.01} />
           <FormField label="Discounts Given" name="discounts" type="number" prefix="GHS" step={0.01} value={discounts} onChange={(e) => setDiscounts(e.target.value)} />
           <FormField label="Net Revenue (auto)" name="netRevenue" type="number" prefix="GHS" value={netRevenue ? String(netRevenue) : ''} readOnly />
           <FormField label="Transactions" name="transactions" type="number" />

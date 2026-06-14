@@ -37,9 +37,12 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
     setHr({ staffTotal: '', staffPresent: '' });
   }
 
+  // Within Store Standards, a sub-tab toggles between the standards checklist
+  // and a maintenance request (submitted as a separate 'maintenance' record).
+  const [auditTab, setAuditTab] = useState<'standards' | 'maintenance'>('standards');
+
   const forms = [
     { id: 'store-audit', label: 'Store Standards' },
-    { id: 'maintenance', label: 'Maintenance Request' },
     { id: 'vm-check', label: 'VM Compliance' },
     { id: 'cx-feedback', label: 'Customer Experience' },
     { id: 'incident', label: 'Incident Report' },
@@ -56,8 +59,10 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
+    // Maintenance is a sub-tab of Store Standards but persists as its own record type.
+    const effectiveType = activeForm === 'store-audit' && auditTab === 'maintenance' ? 'maintenance' : activeForm;
     try {
-      await submitEntry('operations', activeForm, form);
+      await submitEntry('operations', effectiveType, form);
       setMessage('Saved to the live database. The dashboard reflects it now.');
       form.reset();
       resetAuto();
@@ -92,48 +97,65 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
 
       <form onSubmit={handleSubmit} className="space-y-4 max-w-4xl">
         {activeForm === 'store-audit' && (
-          <FormSection title="Store Standards" description="Complete the store standards checklist">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
-              <FormField label="Date" name="date" type="date" required />
-              <FormField label="Store" name="store" type="select" required options={STORES} />
-              {personField('Auditor', 'auditor', true)}
-              <FormField label="Operations Score %" name="opsScore" type="number" suffix="%" required min={0} max={100} value={audit.opsScore} onChange={setA('opsScore')} />
-              <FormField label="VM Score %" name="vmScore" type="number" suffix="%" required min={0} max={100} value={audit.vmScore} onChange={setA('vmScore')} />
-              <FormField label="Readiness Score %" name="readinessScore" type="number" suffix="%" required min={0} max={100} value={audit.readinessScore} onChange={setA('readinessScore')} />
-              <FormField label="CX Score %" name="cxScore" type="number" suffix="%" required min={0} max={100} value={audit.cxScore} onChange={setA('cxScore')} />
-              <FormField label="Cleanliness & Lighting Score %" name="cleanScore" type="number" suffix="%" min={0} max={100} value={audit.cleanScore} onChange={setA('cleanScore')} />
-              <FormField label="Safety Score %" name="safetyScore" type="number" suffix="%" min={0} max={100} value={audit.safetyScore} onChange={setA('safetyScore')} />
-              <FormField label="Key Issues Found" name="issues" type="textarea" placeholder="List any issues found during the review" />
-              <FormField label="Overall Status (auto)" name="status" value={auditStatus} readOnly placeholder="Fill scores above" />
+          <>
+            {/* Sub-tabs within Store Standards: the standards checklist + a maintenance request. */}
+            <div className="flex gap-2">
+              {([
+                { id: 'standards', label: 'Store Standards' },
+                { id: 'maintenance', label: 'Maintenance Request' },
+              ] as const).map((t) => (
+                <button key={t.id} type="button" onClick={() => setAuditTab(t.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${auditTab === t.id ? 'bg-[#c8a951] text-black font-semibold' : 'bg-[var(--c-card)] border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
+                  {t.label}
+                </button>
+              ))}
             </div>
-          </FormSection>
-        )}
 
-        {activeForm === 'maintenance' && (
-          <FormSection title="Maintenance Request" description="Log a maintenance need for a store or location.">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
-              <FormField label="Date" name="date" type="date" required />
-              <FormField label="Store" name="store" type="select" required options={STORES} />
-              <FormField label="Category" name="category" type="select" options={[
-                { label: 'Electrical', value: 'electrical' }, { label: 'HVAC / Air Conditioning', value: 'hvac' },
-                { label: 'Plumbing', value: 'plumbing' }, { label: 'Carpentry', value: 'carpentry' },
-                { label: 'Painting', value: 'painting' }, { label: 'Security Systems', value: 'security' },
-                { label: 'IT / Network', value: 'it' }, { label: 'Other', value: 'other' },
-              ]} />
-              <FormField label="Priority" name="priority" type="select" options={[
-                { label: 'Critical - Immediate', value: 'critical' }, { label: 'High - Within 24hrs', value: 'high' },
-                { label: 'Medium - Within 1 week', value: 'medium' }, { label: 'Low - Scheduled', value: 'low' },
-              ]} />
-              <FormField label="Description" name="description" type="textarea" required placeholder="Describe the issue" />
-              {personField('Reported By', 'reportedBy')}
-              <FormField label="Assigned To" name="assignedTo" />
-              <FormField label="Estimated Cost" name="cost" type="number" prefix="GHS" step={0.01} />
-              <FormField label="Status" name="status" type="select" options={[
-                { label: 'Open', value: 'open' }, { label: 'In Progress', value: 'in-progress' },
-                { label: 'Completed', value: 'completed' }, { label: 'Overdue', value: 'overdue' },
-              ]} />
-            </div>
-          </FormSection>
+            {auditTab === 'standards' && (
+              <FormSection title="Store Standards" description="Complete the store standards checklist">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
+                  <FormField label="Date" name="date" type="date" required />
+                  <FormField label="Store" name="store" type="select" required options={STORES} />
+                  {personField('Auditor', 'auditor', true)}
+                  <FormField label="Operations Score %" name="opsScore" type="number" suffix="%" required min={0} max={100} value={audit.opsScore} onChange={setA('opsScore')} />
+                  <FormField label="VM Score %" name="vmScore" type="number" suffix="%" required min={0} max={100} value={audit.vmScore} onChange={setA('vmScore')} />
+                  <FormField label="Readiness Score %" name="readinessScore" type="number" suffix="%" required min={0} max={100} value={audit.readinessScore} onChange={setA('readinessScore')} />
+                  <FormField label="CX Score %" name="cxScore" type="number" suffix="%" required min={0} max={100} value={audit.cxScore} onChange={setA('cxScore')} />
+                  <FormField label="Cleanliness & Lighting Score %" name="cleanScore" type="number" suffix="%" min={0} max={100} value={audit.cleanScore} onChange={setA('cleanScore')} />
+                  <FormField label="Safety Score %" name="safetyScore" type="number" suffix="%" min={0} max={100} value={audit.safetyScore} onChange={setA('safetyScore')} />
+                  <FormField label="Key Issues Found" name="issues" type="textarea" placeholder="List any issues found during the review" />
+                  <FormField label="Overall Status (auto)" name="status" value={auditStatus} readOnly placeholder="Fill scores above" />
+                </div>
+              </FormSection>
+            )}
+
+            {auditTab === 'maintenance' && (
+              <FormSection title="Maintenance Request" description="Log a maintenance need for a store or location.">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
+                  <FormField label="Date" name="date" type="date" required />
+                  <FormField label="Store" name="store" type="select" required options={STORES} />
+                  <FormField label="Category" name="category" type="select" options={[
+                    { label: 'Electrical', value: 'electrical' }, { label: 'HVAC / Air Conditioning', value: 'hvac' },
+                    { label: 'Plumbing', value: 'plumbing' }, { label: 'Carpentry', value: 'carpentry' },
+                    { label: 'Painting', value: 'painting' }, { label: 'Security Systems', value: 'security' },
+                    { label: 'IT / Network', value: 'it' }, { label: 'Other', value: 'other' },
+                  ]} />
+                  <FormField label="Priority" name="priority" type="select" options={[
+                    { label: 'Critical - Immediate', value: 'critical' }, { label: 'High - Within 24hrs', value: 'high' },
+                    { label: 'Medium - Within 1 week', value: 'medium' }, { label: 'Low - Scheduled', value: 'low' },
+                  ]} />
+                  <FormField label="Description" name="description" type="textarea" required placeholder="Describe the issue" />
+                  {personField('Reported By', 'reportedBy')}
+                  <FormField label="Assigned To" name="assignedTo" />
+                  <FormField label="Estimated Cost" name="cost" type="number" prefix="GHS" step={0.01} />
+                  <FormField label="Status" name="status" type="select" options={[
+                    { label: 'Open', value: 'open' }, { label: 'In Progress', value: 'in-progress' },
+                    { label: 'Completed', value: 'completed' }, { label: 'Overdue', value: 'overdue' },
+                  ]} />
+                </div>
+              </FormSection>
+            )}
+          </>
         )}
 
         {activeForm === 'vm-check' && (
