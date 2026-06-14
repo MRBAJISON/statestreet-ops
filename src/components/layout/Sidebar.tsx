@@ -105,7 +105,7 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
               pathname === '/dashboard/weekly-targets' ? 'bg-[var(--c-hover)] text-[var(--c-fg)]' : 'text-gray-500 hover:text-gray-300 hover:bg-[var(--c-card)]'
             }`}>
             <span>🎯</span>
-            <span>Weekly Targets</span>
+            <span>Targets</span>
           </Link>
         )}
 
