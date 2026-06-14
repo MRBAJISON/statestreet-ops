@@ -8,7 +8,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import { SimpleDonutChart, SimpleBarChart } from '@/components/charts/Charts';
 import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
-import { useMetrics, type Period } from '@/lib/api';
+import { useMetrics, useEntries, type Period } from '@/lib/api';
 import { STORES, rateRatio } from '@/lib/config';
 import { TARGETS } from '@/lib/targets';
 
@@ -81,6 +81,23 @@ export default function ExecutiveCommandCenter() {
   const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory', period, anchor, store).data;
   const brd = useMetrics<{ healthIndex: number; sentiment: { positive: number }; ceoAttention: { priority: string; issue: string; impact: string; owner: string; status: string }[] }>('brand', period, anchor, store).data;
   const mkt = useMetrics<{ totalLeads: number; actions: { task: string; owner: string; priority: string; status: string; deadline: string }[] }>('marketing', period, anchor, store).data;
+
+  // Live executive targets: monthly KPIs for the anchor month + annual sell-through
+  // for the anchor year, set on the Targets page. Falls back to config defaults.
+  const { entries: comEntries } = useEntries('commercial', 5000);
+  const anchorDate = anchor ? new Date(anchor) : new Date();
+  const anchorMonth = `${anchorDate.getFullYear()}-${String(anchorDate.getMonth() + 1).padStart(2, '0')}`;
+  const anchorYear = String(anchorDate.getFullYear());
+  const tNum = (v: unknown) => Number(String(v ?? '').replace(/[, ]/g, '')) || 0;
+  const monthlyTargetRec = comEntries.find((e) => e.formType === 'exec-target' && String(e.payload.month) === anchorMonth);
+  const annualTargetRec = comEntries.find((e) => e.formType === 'exec-target-annual' && String(e.payload.year) === anchorYear);
+  const T = {
+    revenueMtd: tNum(monthlyTargetRec?.payload.revenueMtd) || TARGETS.executive.revenueMtd,
+    grossProfit: tNum(monthlyTargetRec?.payload.grossProfit) || TARGETS.executive.grossProfit,
+    operatingProfit: tNum(monthlyTargetRec?.payload.operatingProfit) || TARGETS.executive.operatingProfit,
+    grossMargin: tNum(monthlyTargetRec?.payload.grossMargin) || TARGETS.executive.grossMargin,
+    sellThrough: tNum(annualTargetRec?.payload.sellThrough) || TARGETS.executive.sellThrough,
+  };
 
   const revenueByCategory = fin?.revenueByCategory ?? [];
   const salesByStore = com?.salesByStore ?? [];
@@ -155,11 +172,11 @@ export default function ExecutiveCommandCenter() {
       </div>
       <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-          <KpiProgress icon="💰" label="Group Revenue (MTD)" value={fin?.revenueMtd ?? 0} target={TARGETS.executive.revenueMtd} />
-          <KpiProgress icon="🪙" label="Gross Profit (MTD)" value={fin?.grossProfit ?? 0} target={TARGETS.executive.grossProfit} />
-          <KpiProgress icon="📈" label="Operating Profit (MTD)" value={fin?.operatingProfit ?? 0} target={TARGETS.executive.operatingProfit} />
-          <KpiDelta icon="🧮" label="Group GM% (MTD)" value={fin?.grossMargin ?? 0} target={TARGETS.executive.grossMargin} />
-          <KpiDelta icon="🛒" label="Group Sell Through (YTD)" value={com?.sellThrough ?? 0} target={TARGETS.executive.sellThrough} />
+          <KpiProgress icon="💰" label="Group Revenue (MTD)" value={fin?.revenueMtd ?? 0} target={T.revenueMtd} />
+          <KpiProgress icon="🪙" label="Gross Profit (MTD)" value={fin?.grossProfit ?? 0} target={T.grossProfit} />
+          <KpiProgress icon="📈" label="Operating Profit (MTD)" value={fin?.operatingProfit ?? 0} target={T.operatingProfit} />
+          <KpiDelta icon="🧮" label="Group GM% (MTD)" value={fin?.grossMargin ?? 0} target={T.grossMargin} />
+          <KpiDelta icon="🛒" label="Group Sell Through (YTD)" value={com?.sellThrough ?? 0} target={T.sellThrough} />
           <KpiStat icon="🏬" label="Active Stores" value={String(RETAIL_STORE_COUNT)} sub1="Total Stores" sub2={`Open: ${RETAIL_STORE_COUNT}   Closed: 0`} />
           <KpiStat icon="👥" label="Total Employees" value={(ops?.staffing?.total ?? 0) ? String(ops?.staffing?.total) : '—'}
             sub1={(ops?.staffing?.total ?? 0) ? `On Duty: ${ops?.staffing?.onDuty ?? 0}` : 'No HR data'}
