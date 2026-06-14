@@ -5,8 +5,8 @@
 import { db } from './db';
 import { users, type DbUser } from './db/schema';
 import { eq } from 'drizzle-orm';
+import { authSecret } from './secret';
 
-const SECRET = process.env.AUTH_SECRET || 'dev-insecure-secret-change-me';
 const TTL_MS = 60 * 60 * 1000; // 1 hour
 const enc = new TextEncoder();
 
@@ -30,7 +30,7 @@ async function hmac(data: string, key: string): Promise<string> {
 
 export async function signResetToken(u: { id: number | string; passwordHash: string }): Promise<string> {
   const payload = toB64url(enc.encode(JSON.stringify({ uid: String(u.id), exp: Date.now() + TTL_MS })));
-  const sig = await hmac(payload, SECRET + u.passwordHash);
+  const sig = await hmac(payload, authSecret() + u.passwordHash);
   return `${payload}.${sig}`;
 }
 
@@ -47,6 +47,6 @@ export async function verifyResetToken(token: string | undefined | null): Promis
   if (!data?.uid || !data.exp || Date.now() > data.exp) return null;
   const [u] = await db.select().from(users).where(eq(users.id, Number(data.uid)));
   if (!u) return null;
-  if ((await hmac(payload, SECRET + u.passwordHash)) !== sig) return null;
+  if ((await hmac(payload, authSecret() + u.passwordHash)) !== sig) return null;
   return u;
 }

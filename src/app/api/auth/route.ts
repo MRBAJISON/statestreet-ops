@@ -2,7 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticate, createSessionToken } from '@/lib/auth';
 import { cookies } from 'next/headers';
 
+// Best-effort per-IP brute-force throttle (resets per serverless instance).
+const ATTEMPTS = new Map<string, { count: number; ts: number }>();
+const WINDOW_MS = 5 * 60_000; // 5 minutes
+const MAX_ATTEMPTS = 10;
+
+function loginThrottled(ip: string): boolean {
+  const now = Date.now();
+  const rec = ATTEMPTS.get(ip);
+  if (!rec || now - rec.ts > WINDOW_MS) {
+    ATTEMPTS.set(ip, { count: 1, ts: now });
+    return false;
+  }
+  rec.count += 1;
+  return rec.count > MAX_ATTEMPTS;
+}
+
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  if (loginThrottled(ip)) {
+    return NextResponse.json({ error: 'Too many attempts. Please wait a few minutes and try again.' }, { status: 429 });
+  }
+
   const { email, password } = await req.json();
   const user = await authenticate(email, password);
 

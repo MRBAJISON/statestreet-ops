@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { entries } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { isAudited, recordAudit, diffPayload } from '@/lib/audit';
+import { getSession } from '@/lib/auth';
 
 function parseId(v: string): number | null {
   const n = Number(v);
@@ -12,6 +13,7 @@ function parseId(v: string): number | null {
 // Update an entry's payload.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    if (!(await getSession())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { id } = await params;
     const numId = parseId(id);
     if (!numId) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
@@ -35,6 +37,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 // Delete an entry.
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    if (!(await getSession())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { id } = await params;
     const numId = parseId(id);
     if (!numId) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });

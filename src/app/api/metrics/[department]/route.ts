@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { entries } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { computeMetrics, filterByPeriod, filterByStore, type Period } from '@/lib/metrics';
+import { getSession } from '@/lib/auth';
 
 // Live aggregated metrics for a department, computed from its entries for a period.
 export async function GET(
@@ -10,6 +11,9 @@ export async function GET(
   { params }: { params: Promise<{ department: string }> }
 ) {
   try {
+    if (!(await getSession())) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const { department } = await params;
     const sp = req.nextUrl.searchParams;
     const p = sp.get('period');

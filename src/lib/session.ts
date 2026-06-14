@@ -2,8 +2,10 @@
 // Token format: base64url(payload) + "." + base64url(hmac(payload))
 // A forged/edited cookie fails signature verification.
 
-const SECRET = process.env.AUTH_SECRET || 'dev-insecure-secret-change-me';
+import { authSecret } from './secret';
+
 const enc = new TextEncoder();
+const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // sessions self-expire after 7 days
 
 function toB64url(bytes: Uint8Array): string {
   let s = '';
@@ -20,7 +22,7 @@ function fromB64url(str: string): Uint8Array {
 }
 
 async function hmac(data: string): Promise<string> {
-  const key = await crypto.subtle.importKey('raw', enc.encode(SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const key = await crypto.subtle.importKey('raw', enc.encode(authSecret()), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', key, enc.encode(data));
   return toB64url(new Uint8Array(sig));
 }
@@ -55,7 +57,10 @@ export async function verifySession(token: string | undefined | null): Promise<S
   const [payload, sig] = token.split('.');
   if ((await hmac(payload)) !== sig) return null; // signature mismatch -> reject
   try {
-    return JSON.parse(new TextDecoder().decode(fromB64url(payload))) as SessionData;
+    const data = JSON.parse(new TextDecoder().decode(fromB64url(payload))) as SessionData;
+    // Reject stale tokens even if the cookie somehow outlives its maxAge.
+    if (!data.ts || Date.now() - data.ts > MAX_AGE_MS) return null;
+    return data;
   } catch {
     return null;
   }

@@ -3,12 +3,16 @@ import { db } from '@/lib/db';
 import { entries } from '@/lib/db/schema';
 import { and, desc, eq } from 'drizzle-orm';
 import { isAudited, recordAudit } from '@/lib/audit';
+import { getSession } from '@/lib/auth';
 
 const DEPARTMENTS = ['finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'];
 
 // Persist a form submission. Body: { department, formType, payload }
 export async function POST(req: NextRequest) {
   try {
+    if (!(await getSession())) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const body = await req.json();
     const { department, formType, payload } = body ?? {};
 
@@ -47,6 +51,9 @@ export async function POST(req: NextRequest) {
 // List raw entries, optionally filtered by ?department= &formType=
 export async function GET(req: NextRequest) {
   try {
+    if (!(await getSession())) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const sp = req.nextUrl.searchParams;
     const department = sp.get('department');
     const formType = sp.get('formType');
