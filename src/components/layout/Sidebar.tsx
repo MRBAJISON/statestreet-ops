@@ -167,6 +167,12 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
             })}
           </>
         )}
+
+        <div className="text-[0.6rem] text-gray-600 uppercase tracking-wider px-3 py-2 mt-4">Account</div>
+        <Link href="/settings" className={linkCls(pathname === '/settings')}>
+          <span>⚙️</span>
+          <span>Settings</span>
+        </Link>
       </nav>
 
       <div className="p-3 border-t border-[var(--c-hover)]">
