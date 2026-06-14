@@ -7,6 +7,7 @@ interface FormFieldProps {
   name: string;
   type?: string;
   value?: string | number;
+  defaultValue?: string | number;
   onChange?: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
   placeholder?: string;
   required?: boolean;
@@ -20,8 +21,8 @@ interface FormFieldProps {
   readOnly?: boolean;
 }
 
-export default function FormField({ label, name, type = 'text', value, onChange, placeholder, required, options, optgroups, prefix, suffix, min, max, step, readOnly }: FormFieldProps) {
-  const [hasContent, setHasContent] = useState(false);
+export default function FormField({ label, name, type = 'text', value, defaultValue, onChange, placeholder, required, options, optgroups, prefix, suffix, min, max, step, readOnly }: FormFieldProps) {
+  const [hasContent, setHasContent] = useState(defaultValue != null && String(defaultValue).length > 0);
   // Affix (GHS / %) is shown only while the field is empty.
   const filled = value !== undefined && value !== null ? String(value).length > 0 : hasContent;
 
@@ -61,6 +62,7 @@ export default function FormField({ label, name, type = 'text', value, onChange,
           type={type}
           name={name}
           value={value}
+          defaultValue={defaultValue}
           onChange={(e) => {
             setHasContent(e.target.value.length > 0);
             onChange?.(e);

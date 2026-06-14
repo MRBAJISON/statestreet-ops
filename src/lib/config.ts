@@ -15,6 +15,7 @@ export const STORES: Option[] = [
   { label: 'Boulevard Women Dzorwulu', value: 'bw-dzorwulu' },
   { label: "D'Angelo Palace", value: 'dangelo' },
   { label: 'Woodpeckers', value: 'woodpeckers' },
+  { label: 'Head Office', value: 'head-office' },
 ];
 
 export const BRANDS: Option[] = [

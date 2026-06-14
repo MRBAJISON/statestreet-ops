@@ -4,14 +4,8 @@ import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
-import { submitEntry, postEntry } from '@/lib/api';
-
-const STORES = [
-  { label: 'Dzorwulu Men', value: 'dzorwulu-men' }, { label: 'East Legon Men', value: 'east-legon-men' },
-  { label: 'Labone Men', value: 'labone-men' }, { label: 'Boulevard Women Labone', value: 'bw-labone' },
-  { label: 'Boulevard Women Dzorwulu', value: 'bw-dzorwulu' }, { label: "D'Angelo Palace", value: 'dangelo' },
-  { label: 'Woodpeckers', value: 'woodpeckers' },
-];
+import { submitEntry } from '@/lib/api';
+import { STORES } from '@/lib/config';
 
 export default function OperationsForms({ managerName = '' }: { managerName?: string }) {
   const [activeForm, setActiveForm] = useState('store-audit');
@@ -32,13 +26,20 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
   const setV = (k: keyof typeof vm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setVm((s) => ({ ...s, [k]: e.target.value }));
   const vmAvg = avgOf(Object.values(vm).map(num).filter((n) => n > 0));
 
+  // Human Resources — Attendance % auto-derived from staff counts (present / total).
+  const [hr, setHr] = useState({ staffTotal: '', staffPresent: '' });
+  const setH = (k: keyof typeof hr) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setHr((s) => ({ ...s, [k]: e.target.value }));
+  const attendancePct = num(hr.staffTotal) > 0 ? Math.round((num(hr.staffPresent) / num(hr.staffTotal)) * 1000) / 10 : 0;
+
   function resetAuto() {
     setAudit({ opsScore: '', vmScore: '', readinessScore: '', cxScore: '', cleanScore: '', safetyScore: '' });
     setVm({ windowDisplay: '', mannequin: '', productPresentation: '', signage: '' });
+    setHr({ staffTotal: '', staffPresent: '' });
   }
 
   const forms = [
     { id: 'store-audit', label: 'Store Standards' },
+    { id: 'maintenance', label: 'Maintenance Request' },
     { id: 'vm-check', label: 'VM Compliance' },
     { id: 'cx-feedback', label: 'Customer Experience' },
     { id: 'incident', label: 'Incident Report' },
@@ -56,29 +57,7 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
     e.preventDefault();
     const form = e.currentTarget;
     try {
-      if (activeForm === 'store-audit') {
-        // Store Standards submits two records: the audit, plus an optional nested
-        // Maintenance request (m_* fields) so existing maintenance metrics keep working.
-        const fd = new FormData(form);
-        const auditPayload: Record<string, unknown> = {};
-        const mnt: Record<string, string> = {};
-        fd.forEach((v, k) => {
-          const val = typeof v === 'string' ? v : '';
-          if (k.startsWith('m_')) mnt[k.slice(2)] = val;
-          else auditPayload[k] = val;
-        });
-        await postEntry('operations', 'store-audit', auditPayload);
-        // Only create a maintenance record if the manager actually logged one.
-        if (mnt.description?.trim() || mnt.category) {
-          await postEntry('operations', 'maintenance', {
-            date: auditPayload.date ?? '',
-            store: auditPayload.store ?? '',
-            ...mnt,
-          });
-        }
-      } else {
-        await submitEntry('operations', activeForm, form);
-      }
+      await submitEntry('operations', activeForm, form);
       setMessage('Saved to the live database. The dashboard reflects it now.');
       form.reset();
       resetAuto();
@@ -113,7 +92,6 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
 
       <form onSubmit={handleSubmit} className="space-y-4 max-w-4xl">
         {activeForm === 'store-audit' && (
-          <>
           <FormSection title="Store Standards" description="Complete the store standards checklist">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
@@ -129,30 +107,33 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
               <FormField label="Overall Status (auto)" name="status" value={auditStatus} readOnly placeholder="Fill scores above" />
             </div>
           </FormSection>
+        )}
 
-          <FormSection title="Maintenance Request (optional)" description="Log any maintenance need found during this review — saved as a maintenance record. Leave blank if none.">
+        {activeForm === 'maintenance' && (
+          <FormSection title="Maintenance Request" description="Log a maintenance need for a store or location.">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
-              <FormField label="Category" name="m_category" type="select" options={[
+              <FormField label="Date" name="date" type="date" required />
+              <FormField label="Store" name="store" type="select" required options={STORES} />
+              <FormField label="Category" name="category" type="select" options={[
                 { label: 'Electrical', value: 'electrical' }, { label: 'HVAC / Air Conditioning', value: 'hvac' },
                 { label: 'Plumbing', value: 'plumbing' }, { label: 'Carpentry', value: 'carpentry' },
                 { label: 'Painting', value: 'painting' }, { label: 'Security Systems', value: 'security' },
                 { label: 'IT / Network', value: 'it' }, { label: 'Other', value: 'other' },
               ]} />
-              <FormField label="Priority" name="m_priority" type="select" options={[
+              <FormField label="Priority" name="priority" type="select" options={[
                 { label: 'Critical - Immediate', value: 'critical' }, { label: 'High - Within 24hrs', value: 'high' },
                 { label: 'Medium - Within 1 week', value: 'medium' }, { label: 'Low - Scheduled', value: 'low' },
               ]} />
-              <FormField label="Description" name="m_description" type="textarea" placeholder="Describe the issue (leave blank if no maintenance needed)" />
-              {personField('Reported By', 'm_reportedBy')}
-              <FormField label="Assigned To" name="m_assignedTo" />
-              <FormField label="Estimated Cost" name="m_cost" type="number" prefix="GHS" step={0.01} />
-              <FormField label="Status" name="m_status" type="select" options={[
+              <FormField label="Description" name="description" type="textarea" required placeholder="Describe the issue" />
+              {personField('Reported By', 'reportedBy')}
+              <FormField label="Assigned To" name="assignedTo" />
+              <FormField label="Estimated Cost" name="cost" type="number" prefix="GHS" step={0.01} />
+              <FormField label="Status" name="status" type="select" options={[
                 { label: 'Open', value: 'open' }, { label: 'In Progress', value: 'in-progress' },
                 { label: 'Completed', value: 'completed' }, { label: 'Overdue', value: 'overdue' },
               ]} />
             </div>
           </FormSection>
-          </>
         )}
 
         {activeForm === 'vm-check' && (
@@ -241,15 +222,17 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
         )}
 
         {activeForm === 'hr' && (
-          <FormSection title="Human Resources" description="People health — staff attendance, punctuality, training and absences per store">
+          <FormSection title="Human Resources" description="People health — staff attendance, punctuality, training and absences per location">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
-              <FormField label="Store" name="store" type="select" required options={STORES} />
-              {personField('Recorded By', 'recordedBy', true)}
-              <FormField label="Staff Punctuality %" name="punctuality" type="number" suffix="%" min={0} max={100} required />
-              <FormField label="Attendance %" name="attendance" type="number" suffix="%" min={0} max={100} required />
-              <FormField label="Training Completion %" name="training" type="number" suffix="%" min={0} max={100} />
+              <FormField label="Store / Location" name="store" type="select" required options={STORES} />
+              <FormField label="Recorded By (name)" name="recordedBy" defaultValue={managerName} required placeholder="Person completing this record" />
+              <FormField label="Number of Staff (at location)" name="staffTotal" type="number" min={0} required value={hr.staffTotal} onChange={setH('staffTotal')} />
+              <FormField label="Number of Staff Present" name="staffPresent" type="number" min={0} required value={hr.staffPresent} onChange={setH('staffPresent')} />
               <FormField label="Absences (count)" name="absences" type="number" min={0} />
+              <FormField label="Attendance % (auto)" name="attendance" type="number" suffix="%" value={attendancePct ? String(attendancePct) : ''} readOnly />
+              <FormField label="Staff Punctuality %" name="punctuality" type="number" suffix="%" min={0} max={100} required />
+              <FormField label="Training Completion %" name="training" type="number" suffix="%" min={0} max={100} />
               <FormField label="Absence Reason" name="reason" type="select" options={[
                 { label: 'Sick', value: 'sick' }, { label: 'Approved Leave', value: 'leave' },
                 { label: 'No-show', value: 'no-show' }, { label: 'Other', value: 'other' },

@@ -13,11 +13,12 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
-  // Net Revenue auto-calculates as Gross Revenue − Discounts Given.
+  // Net Revenue auto-calculates as Gross Revenue − Discounts Given − COGS.
   const [gross, setGross] = useState('');
   const [discounts, setDiscounts] = useState('');
+  const [cogs, setCogs] = useState('');
   const num = (s: string) => Number(s) || 0;
-  const netRevenue = num(gross) ? Math.round((num(gross) - num(discounts)) * 100) / 100 : 0;
+  const netRevenue = num(gross) ? Math.round((num(gross) - num(discounts) - num(cogs)) * 100) / 100 : 0;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

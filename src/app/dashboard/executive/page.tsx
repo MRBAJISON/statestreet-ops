@@ -175,8 +175,23 @@ export default function ExecutiveCommandCenter() {
           )}
         </Section>
 
+        {/* People Health (Operations HR) */}
+        <Section number={3} title="People Health" subtitle="Operations HR">
+          {(ops?.peopleHealth?.count ?? 0) > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              <KPICard label="Overall Score" value={pct(ops?.peopleHealth?.score ?? 0)} status={(ops?.peopleHealth?.score ?? 0) >= 90 ? 'green' : (ops?.peopleHealth?.score ?? 0) >= 70 ? 'yellow' : 'red'} small />
+              <KPICard label="Attendance" value={pct(ops?.peopleHealth?.attendance ?? 0)} small />
+              <KPICard label="Punctuality" value={pct(ops?.peopleHealth?.punctuality ?? 0)} small />
+              <KPICard label="Training" value={pct(ops?.peopleHealth?.training ?? 0)} small />
+              <KPICard label="Absences" value={(ops?.peopleHealth?.absences ?? 0) ? String(ops?.peopleHealth?.absences) : '—'} small />
+            </div>
+          ) : (
+            <EmptyState message="No people-health data yet" hint="Captured via Operations → Human Resources." height={120} />
+          )}
+        </Section>
+
         {/* Category performance */}
-        <Section number={3} title="Category Performance">
+        <Section number={4} title="Category Performance">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
               <div className="text-xs text-gray-400 mb-2">Sales by Category</div>
@@ -198,7 +213,7 @@ export default function ExecutiveCommandCenter() {
         </Section>
 
         {/* Department snapshot */}
-        <Section number={4} title="Departments">
+        <Section number={5} title="Departments">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {departments.map((d) => (
               <Link
@@ -237,7 +252,7 @@ export default function ExecutiveCommandCenter() {
         </Section>
 
         {/* CEO Attention */}
-        <Section number={5} title="CEO Attention Index">
+        <Section number={6} title="CEO Attention Index">
           {ceoAttention.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -269,7 +284,7 @@ export default function ExecutiveCommandCenter() {
         </Section>
 
         {/* Action Tracker (cross-department) */}
-        <Section number={6} title="Action Tracker">
+        <Section number={7} title="Action Tracker">
           {actionTracker.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -301,7 +316,7 @@ export default function ExecutiveCommandCenter() {
         </Section>
 
         {/* Store Manager CEO Answers (from selected Weekly Review) */}
-        <Section number={7} title="Store Manager — Key Insights" subtitle={wrHeading}>
+        <Section number={8} title="Store Manager — Key Insights" subtitle={wrHeading}>
           {wr && wr.count > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
               {/* Week history list */}
