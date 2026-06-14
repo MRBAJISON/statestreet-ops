@@ -76,7 +76,9 @@ export function SimpleBarChart({ data, height = 200, color = '#c8a951', color2, 
           </>
         ) : (
           <>
-            <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 9 }} axisLine={false} tickLine={false} />
+            {/* interval={0} forces every category label to render (recharts otherwise drops
+                labels it thinks will overlap); angling keeps long names legible. */}
+            <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 9 }} axisLine={false} tickLine={false} interval={0} angle={-30} textAnchor="end" height={64} tickMargin={6} />
             <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => { const n = Number(v); return prefix + (n >= 1000 ? (n / 1000).toFixed(0) + 'K' : n); }} />
           </>
         )}
