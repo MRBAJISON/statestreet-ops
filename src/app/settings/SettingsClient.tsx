@@ -193,18 +193,6 @@ export default function SettingsClient({ user, isOwner }: { user: UserInfo; isOw
       </section>
       )}
 
-      {/* Appearance */}
-      <section className={cardCls}>
-        <h2 className={h2Cls}>Appearance</h2>
-        <div className="max-w-sm mx-auto">
-          <label className={labelCls}>Theme</label>
-          <select className={inputCls} value={theme} onChange={(e) => applyTheme(e.target.value === 'light' ? 'light' : 'dark')}>
-            <option value="light">☀️ Light</option>
-            <option value="dark">🌙 Dark</option>
-          </select>
-        </div>
-      </section>
-
       {/* Organization (owner only) */}
       {isOwner && (
         <section className={cardCls}>
@@ -262,6 +250,18 @@ export default function SettingsClient({ user, isOwner }: { user: UserInfo; isOw
           </form>
         </section>
       )}
+
+      {/* Appearance */}
+      <section className={cardCls}>
+        <h2 className={h2Cls}>Appearance</h2>
+        <div className="max-w-sm mx-auto">
+          <label className={labelCls}>Theme</label>
+          <select className={inputCls} value={theme} onChange={(e) => applyTheme(e.target.value === 'light' ? 'light' : 'dark')}>
+            <option value="light">☀️ Light</option>
+            <option value="dark">🌙 Dark</option>
+          </select>
+        </div>
+      </section>
       </div>
     </div>
   );
