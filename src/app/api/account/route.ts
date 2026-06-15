@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { getSession, createSessionToken } from '@/lib/auth';
+import { getOrgSettings } from '@/lib/org-server';
 
 // Update the signed-in user's own profile (display name).
 export async function PATCH(req: NextRequest) {
@@ -22,8 +23,9 @@ export async function PATCH(req: NextRequest) {
   const token = await createSessionToken({
     id: String(row.id), name: row.name, email: row.email, role: row.role as never, department: row.department as never, store: row.store ?? '',
   });
+  const sessionDays = (await getOrgSettings()).security.sessionDays;
   (await cookies()).set('session', token, {
-    httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 60 * 60 * 24 * 7, path: '/',
+    httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 60 * 60 * 24 * sessionDays, path: '/',
   });
 
   return NextResponse.json({ ok: true, name: row.name });

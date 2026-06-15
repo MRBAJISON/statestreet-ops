@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { Department } from '@/lib/types';
+import { useOrg } from '@/components/providers/OrgProvider';
 
 interface SidebarProps {
   userName: string;
@@ -24,6 +25,7 @@ const DEPT_CONFIG: Record<Department, { label: string; icon: string; color: stri
 export default function Sidebar({ userName, userRole, departments }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { org } = useOrg();
   const [open, setOpen] = useState(false); // off-canvas drawer (all screen sizes)
 
   // Close the drawer on navigation — so it collapses as soon as a dashboard is opened.
@@ -52,14 +54,18 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
     <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 bg-[var(--c-card2)] border-b border-[var(--c-border)]">
       <button onClick={() => setOpen(true)} aria-label="Open menu" className="text-2xl leading-none">☰</button>
       <div className="flex items-center gap-2">
-        <div className="w-7 h-7 bg-[#c8a951] rounded flex items-center justify-center">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round">
-            <path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
-          </svg>
-        </div>
+        {org.logo ? (
+          <img src={org.logo} alt="" className="w-7 h-7 rounded object-contain" />
+        ) : (
+          <div className="w-7 h-7 bg-[#c8a951] rounded flex items-center justify-center">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
+            </svg>
+          </div>
+        )}
         <div className="flex flex-col leading-tight">
-          <span className="text-sm font-bold tracking-wider">STATESTREET</span>
-          <span className="text-[0.6rem] text-[#c8a951] tracking-widest">RETAIL GROUP</span>
+          <span className="text-sm font-bold tracking-wider">{org.companyName.toUpperCase()}</span>
+          <span className="text-[0.6rem] text-[#c8a951] tracking-widest">{org.tagline.toUpperCase()}</span>
         </div>
       </div>
     </div>
@@ -70,16 +76,20 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
     <aside className={`w-64 bg-[var(--c-card2)] border-r border-[var(--c-border)] flex flex-col h-screen fixed inset-y-0 left-0 z-50 transform transition-transform ${open ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="p-4 border-b border-[var(--c-hover)] flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-[#c8a951] rounded flex items-center justify-center shrink-0">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round">
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-            </svg>
-          </div>
+          {org.logo ? (
+            <img src={org.logo} alt="" className="w-8 h-8 rounded object-contain shrink-0" />
+          ) : (
+            <div className="w-8 h-8 bg-[#c8a951] rounded flex items-center justify-center shrink-0">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+                <path d="M2 12l10 5 10-5" />
+              </svg>
+            </div>
+          )}
           <div>
-            <div className="text-sm font-bold tracking-wider">STATESTREET</div>
-            <div className="text-[0.6rem] text-[#c8a951] tracking-widest">RETAIL GROUP</div>
+            <div className="text-sm font-bold tracking-wider">{org.companyName.toUpperCase()}</div>
+            <div className="text-[0.6rem] text-[#c8a951] tracking-widest">{org.tagline.toUpperCase()}</div>
           </div>
         </div>
         <button onClick={() => setOpen(false)} aria-label="Close menu" className="text-xl text-gray-500 hover:text-[var(--c-fg)] leading-none">✕</button>

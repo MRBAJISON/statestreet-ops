@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useOrg } from '@/components/providers/OrgProvider';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { org } = useOrg();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -42,16 +44,20 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-[#c8a951] rounded-lg flex items-center justify-center">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round">
-                <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                <path d="M2 17l10 5 10-5" />
-                <path d="M2 12l10 5 10-5" />
-              </svg>
-            </div>
+            {org.logo ? (
+              <img src={org.logo} alt="" className="w-12 h-12 rounded-lg object-contain" />
+            ) : (
+              <div className="w-12 h-12 bg-[#c8a951] rounded-lg flex items-center justify-center">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                  <path d="M2 17l10 5 10-5" />
+                  <path d="M2 12l10 5 10-5" />
+                </svg>
+              </div>
+            )}
             <div className="text-left">
-              <h1 className="text-xl font-bold tracking-wider">STATESTREET</h1>
-              <p className="text-xs text-[#c8a951] tracking-widest">RETAIL GROUP</p>
+              <h1 className="text-xl font-bold tracking-wider">{org.companyName.toUpperCase()}</h1>
+              <p className="text-xs text-[#c8a951] tracking-widest">{org.tagline.toUpperCase()}</p>
             </div>
           </div>
           <h2 className="text-lg font-semibold text-gray-300">Operations Command Center</h2>

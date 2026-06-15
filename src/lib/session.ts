@@ -5,7 +5,7 @@
 import { authSecret } from './secret';
 
 const enc = new TextEncoder();
-const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // sessions self-expire after 7 days
+const MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000; // backstop self-expiry; the cookie maxAge (org sessionDays) is the real control
 
 function toB64url(bytes: Uint8Array): string {
   let s = '';

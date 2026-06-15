@@ -18,5 +18,5 @@ export default async function SettingsPage() {
     store: u?.store ? labelFor(STORE_LABELS, u.store) : '',
   };
 
-  return <SettingsClient user={user} />;
+  return <SettingsClient user={user} isOwner={(u?.role ?? session.user.role) === 'owner'} />;
 }

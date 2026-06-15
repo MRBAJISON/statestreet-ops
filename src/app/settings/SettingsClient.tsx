@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Spinner } from '@/components/ui/BrandedLoader';
+import { useOrg } from '@/components/providers/OrgProvider';
 
 interface UserInfo { name: string; email: string; role: string; store: string }
 
@@ -23,8 +24,9 @@ function Msg({ m }: { m: { ok: boolean; text: string } | null }) {
   );
 }
 
-export default function SettingsClient({ user }: { user: UserInfo }) {
+export default function SettingsClient({ user, isOwner }: { user: UserInfo; isOwner: boolean }) {
   const router = useRouter();
+  const { org, refresh: refreshOrg } = useOrg();
 
   // Profile
   const [name, setName] = useState(user.name);
@@ -80,6 +82,42 @@ export default function SettingsClient({ user }: { user: UserInfo }) {
       setPwMsg({ ok: false, text: (err as Error).message });
     }
     setSavingPw(false);
+  }
+
+  // Organization (owner only)
+  const [orgDraft, setOrgDraft] = useState(org);
+  useEffect(() => { setOrgDraft(org); }, [org]);
+  const [savingOrg, setSavingOrg] = useState(false);
+  const [orgMsg, setOrgMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  function onLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 200_000) { setOrgMsg({ ok: false, text: 'Logo too large (max ~200 KB). Use a smaller PNG/SVG.' }); return; }
+    const reader = new FileReader();
+    reader.onload = () => setOrgDraft((d) => ({ ...d, logo: String(reader.result) }));
+    reader.readAsDataURL(file);
+  }
+
+  async function saveOrg(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingOrg(true); setOrgMsg(null);
+    try {
+      const res = await fetch('/api/org', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyName: orgDraft.companyName, tagline: orgDraft.tagline, currency: orgDraft.currency,
+          logo: orgDraft.logo, weekStart: orgDraft.weekStart, security: orgDraft.security,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save');
+      setOrgMsg({ ok: true, text: 'Organization settings saved.' });
+      refreshOrg(); router.refresh();
+    } catch (err) {
+      setOrgMsg({ ok: false, text: (err as Error).message });
+    }
+    setSavingOrg(false);
   }
 
   return (
@@ -166,6 +204,64 @@ export default function SettingsClient({ user }: { user: UserInfo }) {
           </div>
         </div>
       </section>
+
+      {/* Organization (owner only) */}
+      {isOwner && (
+        <section className={cardCls}>
+          <h2 className={h2Cls}>Organization</h2>
+          <Msg m={orgMsg} />
+          <form onSubmit={saveOrg} className="space-y-4 max-w-md mx-auto">
+            <div className="flex flex-col items-center gap-2">
+              {orgDraft.logo ? (
+                <img src={orgDraft.logo} alt="Logo" className="w-16 h-16 rounded object-contain border border-[var(--c-border)] bg-[var(--c-card2)]" />
+              ) : (
+                <div className="w-16 h-16 bg-[#c8a951] rounded flex items-center justify-center text-black text-[0.6rem] font-bold">LOGO</div>
+              )}
+              <label className="text-xs text-[#c8a951] cursor-pointer hover:underline">
+                Upload logo
+                <input type="file" accept="image/*" className="hidden" onChange={onLogoFile} />
+              </label>
+              {orgDraft.logo && (
+                <button type="button" onClick={() => setOrgDraft((d) => ({ ...d, logo: '' }))} className="text-[0.6rem] text-gray-400 hover:text-red-400">Remove logo</button>
+              )}
+            </div>
+            <div>
+              <label className={labelCls}>Company Name</label>
+              <input className={inputCls} value={orgDraft.companyName} onChange={(e) => setOrgDraft((d) => ({ ...d, companyName: e.target.value }))} required />
+            </div>
+            <div>
+              <label className={labelCls}>Tagline</label>
+              <input className={inputCls} value={orgDraft.tagline} onChange={(e) => setOrgDraft((d) => ({ ...d, tagline: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Currency</label>
+                <input className={inputCls} value={orgDraft.currency} onChange={(e) => setOrgDraft((d) => ({ ...d, currency: e.target.value }))} />
+              </div>
+              <div>
+                <label className={labelCls}>Week Starts On</label>
+                <select className={inputCls} value={orgDraft.weekStart} onChange={(e) => setOrgDraft((d) => ({ ...d, weekStart: e.target.value === 'sunday' ? 'sunday' : 'monday' }))}>
+                  <option value="monday">Monday</option>
+                  <option value="sunday">Sunday</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Min Password Length</label>
+                <input type="number" min={6} className={inputCls} value={orgDraft.security.minPasswordLen} onChange={(e) => setOrgDraft((d) => ({ ...d, security: { ...d.security, minPasswordLen: Number(e.target.value) || 6 } }))} />
+              </div>
+              <div>
+                <label className={labelCls}>Session Length (days)</label>
+                <input type="number" min={1} className={inputCls} value={orgDraft.security.sessionDays} onChange={(e) => setOrgDraft((d) => ({ ...d, security: { ...d.security, sessionDays: Number(e.target.value) || 7 } }))} />
+              </div>
+            </div>
+            <div className="flex justify-center pt-1">
+              <button type="submit" disabled={savingOrg} className={btnCls}>{savingOrg ? <><Spinner /> Saving…</> : 'Save Organization'}</button>
+            </div>
+          </form>
+        </section>
+      )}
       </div>
     </div>
   );

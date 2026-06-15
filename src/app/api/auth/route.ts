@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticate, createSessionToken } from '@/lib/auth';
+import { getOrgSettings } from '@/lib/org-server';
 import { cookies } from 'next/headers';
 
 // Best-effort per-IP brute-force throttle (resets per serverless instance).
@@ -32,12 +33,13 @@ export async function POST(req: NextRequest) {
   }
 
   const token = await createSessionToken(user);
+  const sessionDays = (await getOrgSettings()).security.sessionDays;
   const cookieStore = await cookies();
   cookieStore.set('session', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: 60 * 60 * 24 * sessionDays,
     path: '/',
   });
 
