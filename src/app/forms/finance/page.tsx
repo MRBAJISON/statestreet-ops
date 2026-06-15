@@ -5,6 +5,7 @@ import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry, postEntries, useEntries } from '@/lib/api';
+import { Spinner } from '@/components/ui/BrandedLoader';
 import { EXPENSE_GROUPS, PRODUCT_CATEGORIES } from '@/lib/config';
 
 // Cashflow categories: inflow types + the budget-item list (for outflows).
@@ -27,6 +28,7 @@ const num =(v: FormDataEntryValue | null | undefined | string | number) =>
 export default function FinanceFormsPage() {
   const [activeForm, setActiveForm] = useState<string>('revenue');
   const [submitted, setSubmitted] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [uploadStatus, setUploadStatus] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -66,6 +68,7 @@ export default function FinanceFormsPage() {
       setTimeout(() => setSubmitted(false), 4000);
       return;
     }
+    setBusy(true);
     try {
       await submitEntry('finance', activeForm, form);
       setMessage('Saved to the live database. The Finance & Executive dashboards reflect it now.');
@@ -74,6 +77,8 @@ export default function FinanceFormsPage() {
       refreshFin();
     } catch (err) {
       setMessage('Could not save: ' + (err as Error).message);
+    } finally {
+      setBusy(false);
     }
     setSubmitted(true);
     setTimeout(() => setSubmitted(false), 4000);
@@ -385,8 +390,8 @@ export default function FinanceFormsPage() {
         )}
 
         <div className="flex gap-3 pt-2">
-          <button type="submit" className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg transition-colors text-sm">
-            Submit Entry
+          <button type="submit" disabled={busy} className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg transition-colors text-sm disabled:opacity-50">
+            {busy ? <><Spinner /> Saving…</> : 'Submit Entry'}
           </button>
           <button type="reset" className="bg-[var(--c-hover)] border border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)] px-6 py-2.5 rounded-lg transition-colors text-sm">
             Clear Form

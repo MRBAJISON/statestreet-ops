@@ -5,11 +5,13 @@ import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry } from '@/lib/api';
+import { Spinner } from '@/components/ui/BrandedLoader';
 import { STORES } from '@/lib/config';
 
 export default function MarketingFormsPage() {
   const [activeForm, setActiveForm] = useState('campaign');
   const [submitted, setSubmitted] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState(false);
 
@@ -39,12 +41,15 @@ export default function MarketingFormsPage() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
+    setBusy(true);
     try {
       await submitEntry('marketing', activeForm, form);
       setMessage('Saved to the live database. The dashboard reflects it now.');
       form.reset();
     } catch (err) {
       setMessage('Could not save: ' + (err as Error).message);
+    } finally {
+      setBusy(false);
     }
     setSubmitted(true);
     setTimeout(() => setSubmitted(false), 4000);
@@ -244,7 +249,7 @@ export default function MarketingFormsPage() {
         )}
 
         <div className="flex gap-3 pt-2">
-          <button type="submit" className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg transition-colors text-sm">Submit Entry</button>
+          <button type="submit" disabled={busy} className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg transition-colors text-sm disabled:opacity-50">{busy ? <><Spinner /> Saving…</> : 'Submit Entry'}</button>
           <button type="reset" className="bg-[var(--c-hover)] border border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)] px-6 py-2.5 rounded-lg transition-colors text-sm">Clear Form</button>
         </div>
       </form>
