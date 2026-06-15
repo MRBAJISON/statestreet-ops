@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { STORES, CATEGORY_LABELS } from '@/lib/config';
 import { postEntry, updateEntry } from '@/lib/api';
+import { Spinner } from '@/components/ui/BrandedLoader';
 
 export interface DailySale { date: string; category: string; grossRevenue: number; itemsSold: number }
 export interface WeekTarget { weekEnd: string; target: number }
@@ -328,7 +329,7 @@ export default function WeeklyReview({ assignedStore = '', managerName = '', dai
       <div className="flex items-center gap-3">
         <button type="button" onClick={submit} disabled={submitting}
           className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg text-sm disabled:opacity-50">
-          {submitting ? 'Saving…' : isFinalSection ? 'Submit Weekly Review' : 'Save Section'}
+          {submitting ? <><Spinner /> Saving…</> : isFinalSection ? 'Submit Weekly Review' : 'Save Section'}
         </button>
         {!isFinalSection && <span className="text-xs text-gray-500">Your header and entries stay until you submit Section 4.</span>}
       </div>

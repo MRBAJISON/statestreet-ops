@@ -9,6 +9,7 @@ import { SimpleLineChart, SimpleDonutChart, SimpleBarChart } from '@/components/
 import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, useEntries, type Period } from '@/lib/api';
+import BrandedLoader from '@/components/ui/BrandedLoader';
 import { STORES, STORE_LABELS, labelFor } from '@/lib/config';
 
 const fmtGHS = (n: number) =>
@@ -45,7 +46,7 @@ export default function InventoryPage() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
   const [store, setStore] = useState('');
-  const { data: m } = useMetrics<InventoryLive>('inventory', period, anchor, store);
+  const { data: m, loading } = useMetrics<InventoryLive>('inventory', period, anchor, store);
   const { entries: invEntries } = useEntries('inventory', 5000);
   // Only the Inventory team's transfers — store-manager transfers (store-transfer) never show here.
   const transfers = invEntries.filter((e) => e.formType === 'stock-transfer');
@@ -56,6 +57,8 @@ export default function InventoryPage() {
   const hasMovement = !!(mv.receivedUnits || mv.transferredUnits || mv.deadStockValue || mv.countedValue);
   const supplierPerformance = m?.supplierPerformance ?? [];
   const replenishments = m?.replenishments ?? [];
+
+  if (loading && !m) return <BrandedLoader fullScreen />;
 
   return (
     <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)]">

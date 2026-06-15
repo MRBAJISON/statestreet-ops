@@ -8,6 +8,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
 import { useMetrics, useEntries, type Period } from '@/lib/api';
+import BrandedLoader from '@/components/ui/BrandedLoader';
 import { STORE_LABELS, labelFor } from '@/lib/config';
 
 const fmtGHS = (n: number) => (!n ? '—' : n >= 1_000_000 ? `GHS ${(n / 1_000_000).toFixed(2)}M` : n >= 1_000 ? `GHS ${(n / 1_000).toFixed(0)}K` : `GHS ${Math.round(n)}`);
@@ -23,7 +24,7 @@ interface CommercialLite {
 export default function StoreDashboard({ assignedStore, managerName }: { assignedStore: string; managerName: string }) {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
-  const { data: m } = useMetrics<CommercialLite>('commercial', period, anchor, assignedStore);
+  const { data: m, loading } = useMetrics<CommercialLite>('commercial', period, anchor, assignedStore);
   const { entries: inv } = useEntries('inventory', 5000);
 
   const transfers = inv.filter((e) => e.formType === 'store-transfer' && (String(e.payload.fromStore) === assignedStore || String(e.payload.toStore) === assignedStore));
@@ -33,6 +34,8 @@ export default function StoreDashboard({ assignedStore, managerName }: { assigne
   const categorySales = m?.categorySales ?? [];
   const sellThroughCat = m?.sellThroughByCategory ?? [];
   const storeName = labelFor(STORE_LABELS, assignedStore);
+
+  if (loading && !m) return <BrandedLoader fullScreen />;
 
   return (
     <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)]">

@@ -11,6 +11,7 @@ import StoreLedger from '@/components/finance/StoreLedger';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { SimpleLineChart, SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
 import { useMetrics, type Period } from '@/lib/api';
+import BrandedLoader from '@/components/ui/BrandedLoader';
 import { TARGETS, ragStatus } from '@/lib/targets';
 import { rateRatio } from '@/lib/config';
 import { STORES } from '@/lib/config';
@@ -69,7 +70,7 @@ export default function FinancePage() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
   const [store, setStore] = useState('');
-  const { data: m } = useMetrics<FinanceMetricsData>('finance', period, anchor, store);
+  const { data: m, loading } = useMetrics<FinanceMetricsData>('finance', period, anchor, store);
 
   const revenueMtd = m?.revenueMtd ?? 0;
   const revenueByCategory = m?.revenueByCategory ?? [];
@@ -105,6 +106,8 @@ export default function FinancePage() {
     { name: 'Expenses', value: expensesTotal },
     { name: 'Net Profit', value: m?.netProfit ?? 0 },
   ];
+
+  if (loading && !m) return <BrandedLoader fullScreen />;
 
   return (
     <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)]">

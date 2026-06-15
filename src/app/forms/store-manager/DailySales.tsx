@@ -4,6 +4,7 @@ import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import { postEntry, deleteEntry, type EntryRow } from '@/lib/api';
+import { Spinner } from '@/components/ui/BrandedLoader';
 import { PRODUCT_CATEGORIES, CATEGORY_LABELS, labelFor } from '@/lib/config';
 
 const fmtGHS = (n: number) => `GHS ${Math.round(n).toLocaleString()}`;
@@ -67,7 +68,7 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
         </div>
         <button type="submit" disabled={submitting}
           className="mt-3 bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg text-sm disabled:opacity-50">
-          {submitting ? 'Saving…' : 'Save Daily Sales'}
+          {submitting ? <><Spinner /> Saving…</> : 'Save Daily Sales'}
         </button>
       </form>
 

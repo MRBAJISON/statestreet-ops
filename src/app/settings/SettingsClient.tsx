@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Spinner } from '@/components/ui/BrandedLoader';
 
 interface UserInfo { name: string; email: string; role: string; store: string }
 
@@ -113,7 +114,7 @@ export default function SettingsClient({ user }: { user: UserInfo }) {
             </div>
           </div>
           <div className="flex justify-center pt-1">
-            <button type="submit" disabled={savingName} className={btnCls}>{savingName ? 'Saving…' : 'Save Profile'}</button>
+            <button type="submit" disabled={savingName} className={btnCls}>{savingName ? <><Spinner /> Saving…</> : 'Save Profile'}</button>
           </div>
         </form>
       </section>
@@ -142,7 +143,7 @@ export default function SettingsClient({ user }: { user: UserInfo }) {
                 <input type="password" className={inputCls} value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={6} />
               </div>
               <div className="flex justify-center items-center gap-2 pt-1">
-                <button type="submit" disabled={savingPw} className={btnCls}>{savingPw ? 'Saving…' : 'Update Password'}</button>
+                <button type="submit" disabled={savingPw} className={btnCls}>{savingPw ? <><Spinner /> Saving…</> : 'Update Password'}</button>
                 <button type="button" onClick={() => { setShowPw(false); setCurrent(''); setNext(''); setConfirm(''); setPwMsg(null); }} className={cancelBtnCls}>Cancel</button>
               </div>
             </form>

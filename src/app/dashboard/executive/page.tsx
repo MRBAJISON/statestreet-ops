@@ -11,6 +11,7 @@ import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, useEntries, type Period } from '@/lib/api';
 import { STORES, rateRatio } from '@/lib/config';
 import { TARGETS } from '@/lib/targets';
+import BrandedLoader from '@/components/ui/BrandedLoader';
 
 const RETAIL_STORE_COUNT = STORES.filter((s) => s.value !== 'head-office').length;
 
@@ -75,7 +76,8 @@ export default function ExecutiveCommandCenter() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
   const [store, setStore] = useState('');
-  const fin = useMetrics<{ revenueMtd: number; netProfit: number; grossProfit: number; operatingProfit: number; grossMargin: number; cashNet: number; netMargin: number; roce: number; roi: number; revenueByCategory: { name: string; value: number }[] }>('finance', period, anchor, store).data;
+  const finQ = useMetrics<{ revenueMtd: number; netProfit: number; grossProfit: number; operatingProfit: number; grossMargin: number; cashNet: number; netMargin: number; roce: number; roi: number; revenueByCategory: { name: string; value: number }[] }>('finance', period, anchor, store);
+  const fin = finQ.data;
   const com = useMetrics<{ groupSales: number; convRate: number; sellThrough: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null; insights: { best: string[]; concern: string[]; risk: string[] } }[] } }>('commercial', period, anchor, store).data;
   const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[]; priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[]; peopleHealth: { score: number; attendance: number; punctuality: number; training: number; absences: number; count: number }; staffing: { total: number; onDuty: number; absent: number } }>('operations', period, anchor, store).data;
   const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory', period, anchor, store).data;
@@ -156,6 +158,8 @@ export default function ExecutiveCommandCenter() {
     { name: 'Inventory', href: '/dashboard/inventory', metric: 'Inventory Value', value: dash(inv?.inventoryValue ?? 0, fmtGHS) },
     { name: 'Brand Health', href: '/dashboard/brand-health', metric: 'Health Index', value: (brd?.healthIndex ?? 0) ? String(brd?.healthIndex) : '—' },
   ];
+
+  if (finQ.loading && !fin) return <BrandedLoader fullScreen />;
 
   return (
     <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)]">

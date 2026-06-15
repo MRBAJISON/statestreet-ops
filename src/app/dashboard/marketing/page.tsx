@@ -9,6 +9,7 @@ import { SimpleBarChart } from '@/components/charts/Charts';
 import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, type Period } from '@/lib/api';
+import BrandedLoader from '@/components/ui/BrandedLoader';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -46,7 +47,7 @@ interface MarketingLive {
 export default function MarketingPage() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
-  const { data: m } = useMetrics<MarketingLive>('marketing', period, anchor);
+  const { data: m, loading } = useMetrics<MarketingLive>('marketing', period, anchor);
   const leadChannelMix = m?.leadChannelMix ?? [];
   const funnel = m?.funnel ?? { reach: 0, engagement: 0, leads: 0, storeVisits: 0, revenueInfluenced: 0 };
   const socialByChannel = m?.socialByChannel ?? [];
@@ -66,6 +67,8 @@ export default function MarketingPage() {
     { label: 'Store Visits', value: numOrDash(funnel.storeVisits) },
     { label: 'Revenue Influenced', value: dash(funnel.revenueInfluenced, fmtGHS) },
   ];
+
+  if (loading && !m) return <BrandedLoader fullScreen />;
 
   return (
     <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)]">

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useEntries, postEntry, updateEntry, type EntryRow } from '@/lib/api';
+import { Spinner } from '@/components/ui/BrandedLoader';
 import { STORES } from '@/lib/config';
 
 const fmtGHS = (n: number) => `GHS ${Math.round(n).toLocaleString()}`;
@@ -174,7 +175,7 @@ export default function TargetsPage() {
               </div>
               <button onClick={saveWeekly} disabled={busy}
                 className="mt-4 bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg text-sm disabled:opacity-50">
-                {busy ? 'Saving…' : 'Save Targets'}
+                {busy ? <><Spinner /> Saving…</> : 'Save Targets'}
               </button>
             </>
           ) : (
@@ -213,7 +214,7 @@ export default function TargetsPage() {
 
               <button onClick={saveExecutive} disabled={busy}
                 className="mt-5 bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg text-sm disabled:opacity-50">
-                {busy ? 'Saving…' : 'Save Executive Targets'}
+                {busy ? <><Spinner /> Saving…</> : 'Save Executive Targets'}
               </button>
             </>
           ) : (

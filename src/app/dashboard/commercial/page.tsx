@@ -6,6 +6,7 @@ import Section from '@/components/ui/Section';
 import EmptyState from '@/components/ui/EmptyState';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { SimpleBarChart, SimpleDonutChart, CandlestickChart } from '@/components/charts/Charts';
+import BrandedLoader from '@/components/ui/BrandedLoader';
 import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, type Period } from '@/lib/api';
@@ -80,7 +81,7 @@ export default function CommercialPage() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
   const [store, setStore] = useState('');
-  const { data: m } = useMetrics<CommercialLive>('commercial', period, anchor, store);
+  const { data: m, loading } = useMetrics<CommercialLive>('commercial', period, anchor, store);
   const categorySales = m?.categorySales ?? [];
   const sellThroughCat = m?.sellThroughByCategory ?? [];
   const salesByStore = m?.salesByStore ?? [];
@@ -146,6 +147,8 @@ export default function CommercialPage() {
       )}
     </div>
   );
+
+  if (loading && !m) return <BrandedLoader fullScreen />;
 
   return (
     <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)]">

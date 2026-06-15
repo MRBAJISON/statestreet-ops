@@ -4,6 +4,7 @@ import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import { postEntry, deleteEntry, type EntryRow } from '@/lib/api';
+import { Spinner } from '@/components/ui/BrandedLoader';
 import { STORES, STORE_LABELS, labelFor } from '@/lib/config';
 
 // Store-to-store stock transfer. Saved as inventory/store-transfer (kept separate
@@ -65,7 +66,7 @@ export default function StockTransfer({ assignedStore, managerName, recent, onSa
         </div>
         <button type="submit" disabled={submitting}
           className="mt-3 bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg text-sm disabled:opacity-50">
-          {submitting ? 'Saving…' : 'Record Transfer'}
+          {submitting ? <><Spinner /> Saving…</> : 'Record Transfer'}
         </button>
       </form>
 

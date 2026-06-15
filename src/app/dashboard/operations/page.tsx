@@ -9,6 +9,7 @@ import { SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
 import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, type Period } from '@/lib/api';
+import BrandedLoader from '@/components/ui/BrandedLoader';
 import { STORES } from '@/lib/config';
 
 const pct = (n: number) => (n ? `${n}%` : '—');
@@ -46,7 +47,7 @@ export default function OperationsPage() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
   const [store, setStore] = useState('');
-  const { data: m } = useMetrics<OperationsLive>('operations', period, anchor, store);
+  const { data: m, loading } = useMetrics<OperationsLive>('operations', period, anchor, store);
   const vmByStore = m?.vmByStore ?? [];
   const storeScores = m?.storeScores ?? [];
   const risk = m?.risk ?? { high: 0, medium: 0, low: 0 };
@@ -64,6 +65,8 @@ export default function OperationsPage() {
   const sopDeviations = m?.sopDeviations ?? [];
   const correctiveRegister = m?.correctiveRegister ?? [];
   const reasonLabel = (v: string) => ({ sick: 'Sick', leave: 'Approved Leave', 'no-show': 'No-show', other: 'Other' }[v] ?? v);
+
+  if (loading && !m) return <BrandedLoader fullScreen />;
 
   return (
     <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)]">

@@ -12,6 +12,7 @@ import { SimpleBarChart, SimpleDonutChart, SimpleLineChart } from '@/components/
 import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, type Period } from '@/lib/api';
+import BrandedLoader from '@/components/ui/BrandedLoader';
 
 interface BrandLive {
   sentiment: { positive: number; neutral: number; negative: number };
@@ -32,7 +33,7 @@ interface BrandLive {
 export default function BrandHealthPage() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
-  const { data: m } = useMetrics<BrandLive>('brand', period, anchor);
+  const { data: m, loading } = useMetrics<BrandLive>('brand', period, anchor);
   const sentiment = m?.sentiment ?? { positive: 0, neutral: 0, negative: 0 };
   const portfolio = m?.portfolio ?? [];
   const sentimentTrend = m?.sentimentTrend ?? [];
@@ -46,6 +47,8 @@ export default function BrandHealthPage() {
   const risks = m?.risks ?? [];
   const opportunities = m?.opportunities ?? [];
   const ceoAttention = m?.ceoAttention ?? [];
+
+  if (loading && !m) return <BrandedLoader fullScreen />;
 
   return (
     <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)]">
