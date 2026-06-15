@@ -6,13 +6,11 @@ import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
-import { PRODUCT_CATEGORIES } from '@/lib/config';
 import { useOrg } from '@/components/providers/OrgProvider';
-
-const CATEGORIES = PRODUCT_CATEGORIES;
 
 export default function InventoryFormsPage() {
   const { org } = useOrg();
+  const CATEGORIES = org.categories;
   const [activeForm, setActiveForm] = useState('stock-count');
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);

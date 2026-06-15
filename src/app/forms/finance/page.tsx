@@ -6,26 +6,27 @@ import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry, postEntries, useEntries } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
-import { EXPENSE_GROUPS, PRODUCT_CATEGORIES } from '@/lib/config';
+import { useOrg } from '@/components/providers/OrgProvider';
+import { expenseGroups } from '@/lib/org';
 
-// Cashflow categories: inflow types + the budget-item list (for outflows).
-const CASHFLOW_GROUPS = [
-  {
-    label: 'Inflows',
-    options: [
-      { label: 'Sales Revenue', value: 'sales' },
-      { label: 'Customer Payment', value: 'customer-payment' },
-      { label: 'Capital Injection', value: 'capital-injection' },
-      { label: 'Loan / Other Inflow', value: 'inflow-other' },
-    ],
-  },
-  ...EXPENSE_GROUPS,
-];
+const INFLOW_GROUP = {
+  label: 'Inflows',
+  options: [
+    { label: 'Sales Revenue', value: 'sales' },
+    { label: 'Customer Payment', value: 'customer-payment' },
+    { label: 'Capital Injection', value: 'capital-injection' },
+    { label: 'Loan / Other Inflow', value: 'inflow-other' },
+  ],
+};
 
 const num =(v: FormDataEntryValue | null | undefined | string | number) =>
   Number(String(v ?? '').replace(/[, ]/g, '')) || 0;
 
 export default function FinanceFormsPage() {
+  const { org } = useOrg();
+  const EXPENSE_GROUPS = expenseGroups(org.expenseItems);
+  // Cashflow categories: inflow types + the budget-item list (for outflows).
+  const CASHFLOW_GROUPS = [INFLOW_GROUP, ...EXPENSE_GROUPS];
   const [activeForm, setActiveForm] = useState<string>('revenue');
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -232,16 +233,8 @@ export default function FinanceFormsPage() {
           <FormSection title="Daily Revenue Entry" description="Record daily revenue figures by store and category">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
-              <FormField label="Store" name="store" type="select" required options={[
-                { label: 'Dzorwulu Men', value: 'dzorwulu-men' },
-                { label: 'East Legon Men', value: 'east-legon-men' },
-                { label: 'Labone Men', value: 'labone-men' },
-                { label: 'Boulevard Women Labone', value: 'bw-labone' },
-                { label: 'Boulevard Women Dzorwulu', value: 'bw-dzorwulu' },
-                { label: "D'Angelo Palace", value: 'dangelo' },
-                { label: 'Woodpeckers', value: 'woodpeckers' },
-              ]} />
-              <FormField label="Category" name="category" type="select" required options={PRODUCT_CATEGORIES} />
+              <FormField label="Store" name="store" type="select" required options={org.stores} />
+              <FormField label="Category" name="category" type="select" required options={org.categories} />
               <FormField label="Gross Revenue" name="grossRevenue" type="number" prefix="GHS" required step={0.01} />
               <FormField label="Cost of Goods (COGS)" name="cogs" type="number" prefix="GHS" step={0.01} />
               <FormField label="Discounts Given" name="discounts" type="number" prefix="GHS" step={0.01} />
@@ -258,16 +251,7 @@ export default function FinanceFormsPage() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
               <FormField label="Category" name="category" type="select" required optgroups={EXPENSE_GROUPS} value={expCat} onChange={(e) => setExpCat(e.target.value)} />
-              <FormField label="Store / Department" name="store" type="select" options={[
-                { label: 'Head Office', value: 'hq' },
-                { label: 'Dzorwulu Men', value: 'dzorwulu-men' },
-                { label: 'East Legon Men', value: 'east-legon-men' },
-                { label: 'Labone Men', value: 'labone-men' },
-                { label: 'Boulevard Women Labone', value: 'bw-labone' },
-                { label: 'Boulevard Women Dzorwulu', value: 'bw-dzorwulu' },
-                { label: "D'Angelo Palace", value: 'dangelo' },
-                { label: 'Woodpeckers', value: 'woodpeckers' },
-              ]} />
+              <FormField label="Store / Department" name="store" type="select" options={org.stores} />
               <FormField label="Amount" name="amount" type="number" prefix="GHS" required step={0.01} value={expAmount} onChange={(e) => setExpAmount(e.target.value)} />
               <FormField label="Vendor / Payee" name="vendor" placeholder="Vendor name" />
               <FormField label="Invoice Number" name="invoice" placeholder="INV-XXXX" />

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { CATEGORY_LABELS } from '@/lib/config';
 import { useOrg } from '@/components/providers/OrgProvider';
+import { toLabelMap } from '@/lib/org';
 import { postEntry, updateEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 
@@ -99,8 +99,9 @@ export default function WeeklyReview({ assignedStore = '', managerName = '', dai
   const weekDaily = dailySales.filter((d) => inWeek(d.date));
   // Revenue + units per category (keyed by display label to match the grid rows).
   const perCat = new Map<string, { revenue: number; units: number }>();
+  const catLabels = toLabelMap(org.categories);
   for (const d of weekDaily) {
-    const label = CATEGORY_LABELS[d.category] ?? d.category;
+    const label = catLabels[d.category] ?? d.category;
     const e = perCat.get(label) ?? { revenue: 0, units: 0 };
     e.revenue += Number(d.grossRevenue) || 0;
     e.units += Number(d.itemsSold) || 0;

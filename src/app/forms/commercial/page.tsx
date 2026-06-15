@@ -6,11 +6,7 @@ import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
-import { PRODUCT_CATEGORIES } from '@/lib/config';
 import { useOrg } from '@/components/providers/OrgProvider';
-
-
-const CATEGORIES = PRODUCT_CATEGORIES;
 
 const numOf = (s: string) => Number(s) || 0;
 const fmt2 = (x: number) => (x ? x.toFixed(2) : '');
@@ -18,6 +14,7 @@ const fmt1 = (x: number) => (x ? x.toFixed(1) : '');
 
 export default function CommercialFormsPage() {
   const { org } = useOrg();
+  const CATEGORIES = org.categories;
   const [activeForm, setActiveForm] = useState('store-sales');
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -129,11 +126,7 @@ export default function CommercialFormsPage() {
               <FormField label="SKU Code" name="sku" required placeholder="e.g. ARB-101-BLK-42" />
               <FormField label="Product Name" name="name" required />
               <FormField label="Category" name="category" type="select" required options={CATEGORIES} />
-              <FormField label="Brand" name="brand" type="select" options={[
-                { label: 'Arbiter', value: 'arbiter' }, { label: 'Gianfranco Butteri', value: 'butteri' },
-                { label: 'Oliver Scotts', value: 'oliver-scotts' }, { label: 'Gianni Gallucci', value: 'gallucci' },
-                { label: 'Cucinera Fiorentina', value: 'cucinera' }, { label: 'Zecca Milano', value: 'zecca' },
-              ]} />
+              <FormField label="Brand" name="brand" type="select" options={org.brands} />
               <FormField label="Units Sold (MTD)" name="unitsSold" type="number" />
               <FormField label="Sales Value (MTD)" name="salesValue" type="number" prefix="GHS" step={0.01} />
               <FormField label="Current Stock" name="stock" type="number" />

@@ -6,8 +6,10 @@ import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
+import { useOrg } from '@/components/providers/OrgProvider';
 
 export default function BrandFormsPage() {
+  const { org } = useOrg();
   const [activeForm, setActiveForm] = useState('brand-score');
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -21,11 +23,7 @@ export default function BrandFormsPage() {
     { id: 'attention', label: 'CEO Attention Items' },
   ];
 
-  const BRANDS = [
-    { label: 'Boulevard Men', value: 'boulevard-men' }, { label: 'Boulevard Women', value: 'boulevard-women' },
-    { label: "D'Angelo", value: 'dangelo' }, { label: 'Woodpeckers', value: 'woodpeckers' },
-    { label: 'Carbon Shoes', value: 'carbon-shoes' },
-  ];
+  const BRANDS = org.brands;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

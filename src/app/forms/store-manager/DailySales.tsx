@@ -5,12 +5,16 @@ import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import { postEntry, deleteEntry, type EntryRow } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
-import { PRODUCT_CATEGORIES, CATEGORY_LABELS, labelFor } from '@/lib/config';
+import { labelFor } from '@/lib/config';
+import { useOrg } from '@/components/providers/OrgProvider';
+import { toLabelMap } from '@/lib/org';
 
 const fmtGHS = (n: number) => `GHS ${Math.round(n).toLocaleString()}`;
 
 // Daily sales capture (saved as finance/revenue). Store is fixed to the manager's store.
 export default function DailySales({ assignedStore, recent, onSaved }: { assignedStore: string; recent: EntryRow[]; onSaved: () => void }) {
+  const { org } = useOrg();
+  const categoryLabels = toLabelMap(org.categories);
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -57,7 +61,7 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-1">
           <FormField label="Date" name="date" type="date" required />
-          <FormField label="Category" name="category" type="select" required options={PRODUCT_CATEGORIES} />
+          <FormField label="Category" name="category" type="select" required options={org.categories} />
           <FormField label="Gross Revenue" name="grossRevenue" type="number" prefix="GHS" required step={0.01} value={gross} onChange={(e) => setGross(e.target.value)} />
           <FormField label="Cost of Goods (COGS)" name="cogs" type="number" prefix="GHS" step={0.01} />
           <FormField label="Discounts Given" name="discounts" type="number" prefix="GHS" step={0.01} value={discounts} onChange={(e) => setDiscounts(e.target.value)} />
@@ -90,7 +94,7 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
                 {recentSorted.map((e) => (
                   <tr key={e.id} className="border-b border-[var(--c-hover)]">
                     <td className="py-2 pr-3 whitespace-nowrap">{String(e.payload.date || '—')}</td>
-                    <td className="py-2 pr-3">{labelFor(CATEGORY_LABELS, e.payload.category)}</td>
+                    <td className="py-2 pr-3">{labelFor(categoryLabels, e.payload.category)}</td>
                     <td className="py-2 px-3 text-right">{fmtGHS(Number(e.payload.grossRevenue) || 0)}</td>
                     <td className="py-2 px-3 text-right">{String(e.payload.itemsSold || '—')}</td>
                     <td className="py-2 text-right">
