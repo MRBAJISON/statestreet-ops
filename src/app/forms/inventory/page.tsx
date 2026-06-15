@@ -7,17 +7,12 @@ import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { PRODUCT_CATEGORIES } from '@/lib/config';
-
-const STORES = [
-  { label: 'Dzorwulu Men', value: 'dzorwulu-men' }, { label: 'East Legon Men', value: 'east-legon-men' },
-  { label: 'Labone Men', value: 'labone-men' }, { label: 'Boulevard Women Labone', value: 'bw-labone' },
-  { label: 'Boulevard Women Dzorwulu', value: 'bw-dzorwulu' }, { label: "D'Angelo Palace", value: 'dangelo' },
-  { label: 'Woodpeckers', value: 'woodpeckers' },
-];
+import { useOrg } from '@/components/providers/OrgProvider';
 
 const CATEGORIES = PRODUCT_CATEGORIES;
 
 export default function InventoryFormsPage() {
+  const { org } = useOrg();
   const [activeForm, setActiveForm] = useState('stock-count');
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -75,7 +70,7 @@ export default function InventoryFormsPage() {
           <FormSection title="Physical Stock Count" description="Record stock count results per store">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Count Date" name="date" type="date" required />
-              <FormField label="Store" name="store" type="select" required options={STORES} />
+              <FormField label="Store" name="store" type="select" required options={org.stores} />
               <FormField label="Category" name="category" type="select" required options={CATEGORIES} />
               <FormField label="SKU Code" name="sku" required placeholder="e.g. ARB-101-BLK-42" />
               <FormField label="System Quantity" name="systemQty" type="number" required />
@@ -100,7 +95,7 @@ export default function InventoryFormsPage() {
               <FormField label="Total Value" name="totalValue" type="number" prefix="GHS" required step={0.01} />
               <FormField label="Receiving Store" name="store" type="select" required options={[
                 { label: 'Main Warehouse', value: 'warehouse' },
-                ...STORES,
+                ...org.stores,
               ]} />
               <FormField label="Condition" name="condition" type="select" options={[
                 { label: 'Good - All items OK', value: 'good' },
@@ -116,8 +111,8 @@ export default function InventoryFormsPage() {
           <FormSection title="Stock Transfer" description="Transfer inventory between stores">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Transfer Date" name="date" type="date" required />
-              <FormField label="From Store" name="fromStore" type="select" required options={[{ label: 'Main Warehouse', value: 'warehouse' }, ...STORES]} />
-              <FormField label="To Store" name="toStore" type="select" required options={STORES} />
+              <FormField label="From Store" name="fromStore" type="select" required options={[{ label: 'Main Warehouse', value: 'warehouse' }, ...org.stores]} />
+              <FormField label="To Store" name="toStore" type="select" required options={org.stores} />
               <FormField label="SKU Code" name="sku" required placeholder="e.g. ARB-101-BLK-42" />
               <FormField label="Product Description" name="description" required />
               <FormField label="Quantity" name="qty" type="number" required />
@@ -141,7 +136,7 @@ export default function InventoryFormsPage() {
               <FormField label="Current Stock" name="currentStock" type="number" required />
               <FormField label="Stock Value" name="stockValue" type="number" prefix="GHS" required step={0.01} />
               <FormField label="Days in Stock" name="daysInStock" type="number" required />
-              <FormField label="Store Location" name="store" type="select" options={STORES} />
+              <FormField label="Store Location" name="store" type="select" options={org.stores} />
               <FormField label="Recommended Action" name="action" type="select" required options={[
                 { label: 'Markdown 20%', value: 'markdown-20' }, { label: 'Markdown 40%', value: 'markdown-40' },
                 { label: 'Markdown 60%', value: 'markdown-60' }, { label: 'Transfer to Outlet', value: 'outlet' },
@@ -156,7 +151,7 @@ export default function InventoryFormsPage() {
           <FormSection title="Replenishment Request" description="Request stock replenishment">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Request Date" name="date" type="date" required />
-              <FormField label="Store" name="store" type="select" required options={STORES} />
+              <FormField label="Store" name="store" type="select" required options={org.stores} />
               <FormField label="SKU Code" name="sku" required />
               <FormField label="Product Description" name="description" required />
               <FormField label="Category" name="category" type="select" required options={CATEGORIES} />

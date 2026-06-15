@@ -5,14 +5,16 @@ import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import { postEntry, deleteEntry, type EntryRow } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
-import { STORES, STORE_LABELS, labelFor } from '@/lib/config';
+import { STORE_LABELS, labelFor } from '@/lib/config';
+import { useOrg } from '@/components/providers/OrgProvider';
 
 // Store-to-store stock transfer. Saved as inventory/store-transfer (kept separate
 // from the Inventory team's stock-transfer stream).
 export default function StockTransfer({ assignedStore, managerName, recent, onSaved }: { assignedStore: string; managerName: string; recent: EntryRow[]; onSaved: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const toStores = STORES.filter((s) => s.value !== assignedStore);
+  const { org } = useOrg();
+  const toStores = org.stores.filter((s) => s.value !== assignedStore);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

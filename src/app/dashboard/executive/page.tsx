@@ -9,11 +9,11 @@ import { SimpleDonutChart, SimpleBarChart } from '@/components/charts/Charts';
 import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, useEntries, type Period } from '@/lib/api';
-import { STORES, rateRatio } from '@/lib/config';
+import { rateRatio } from '@/lib/config';
+import { useOrg } from '@/components/providers/OrgProvider';
 import { TARGETS } from '@/lib/targets';
 import BrandedLoader from '@/components/ui/BrandedLoader';
 
-const RETAIL_STORE_COUNT = STORES.filter((s) => s.value !== 'head-office').length;
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -76,6 +76,8 @@ export default function ExecutiveCommandCenter() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
   const [store, setStore] = useState('');
+  const { org } = useOrg();
+  const retailStoreCount = org.stores.filter((s) => s.value !== 'head-office').length;
   const finQ = useMetrics<{ revenueMtd: number; netProfit: number; grossProfit: number; operatingProfit: number; grossMargin: number; cashNet: number; netMargin: number; roce: number; roi: number; revenueByCategory: { name: string; value: number }[] }>('finance', period, anchor, store);
   const fin = finQ.data;
   const com = useMetrics<{ groupSales: number; convRate: number; sellThrough: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null; insights: { best: string[]; concern: string[]; risk: string[] } }[] } }>('commercial', period, anchor, store).data;
@@ -172,7 +174,7 @@ export default function ExecutiveCommandCenter() {
 
       {/* GROUP KPI BAR */}
       <div className="px-6 pt-4 flex justify-end">
-        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={STORES} onStoreChange={setStore} />
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={org.stores} onStoreChange={setStore} />
       </div>
       <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
@@ -181,7 +183,7 @@ export default function ExecutiveCommandCenter() {
           <KpiProgress icon="📈" label="Operating Profit (MTD)" value={fin?.operatingProfit ?? 0} target={T.operatingProfit} />
           <KpiDelta icon="🧮" label="Group GM% (MTD)" value={fin?.grossMargin ?? 0} target={T.grossMargin} />
           <KpiDelta icon="🛒" label="Group Sell Through (YTD)" value={com?.sellThrough ?? 0} target={T.sellThrough} />
-          <KpiStat icon="🏬" label="Active Stores" value={String(RETAIL_STORE_COUNT)} sub1="Total Stores" sub2={`Open: ${RETAIL_STORE_COUNT}   Closed: 0`} />
+          <KpiStat icon="🏬" label="Active Stores" value={String(retailStoreCount)} sub1="Total Stores" sub2={`Open: ${retailStoreCount}   Closed: 0`} />
           <KpiStat icon="👥" label="Total Employees" value={(ops?.staffing?.total ?? 0) ? String(ops?.staffing?.total) : '—'}
             sub1={(ops?.staffing?.total ?? 0) ? `On Duty: ${ops?.staffing?.onDuty ?? 0}` : 'No HR data'}
             sub2={(ops?.staffing?.total ?? 0) ? `Absent: ${ops?.staffing?.absent ?? 0}` : ''} />

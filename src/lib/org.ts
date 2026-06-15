@@ -53,3 +53,14 @@ export function mergeOrg(raw: Partial<OrgSettings> | null | undefined): OrgSetti
 // value -> label maps from a list (mirrors config.ts labelFor usage).
 export const toLabelMap = (opts: Option[]): Record<string, string> =>
   Object.fromEntries(opts.map((o) => [o.value, o.label]));
+
+// Grouped <optgroup> structure for the Budget / Expense / Cashflow dropdowns.
+export function expenseGroups(items: ExpenseItem[]): { label: string; options: Option[] }[] {
+  const inG = (g: ExpenseItem['group']) => items.filter((i) => i.group === g).map(({ label, value }) => ({ label, value }));
+  return [
+    { label: 'Operating Expenses', options: inG('operating') },
+    { label: 'Capital Expenditure', options: inG('capital') },
+    { label: 'Below the Line', options: inG('below-line') },
+  ];
+}
+export const capitalValues = (items: ExpenseItem[]): string[] => items.filter((i) => i.group === 'capital').map((i) => i.value);

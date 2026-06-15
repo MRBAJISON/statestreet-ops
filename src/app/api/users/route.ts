@@ -3,13 +3,16 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { getSession } from '@/lib/auth';
 import { hashPassword } from '@/lib/password';
-import { STORES } from '@/lib/config';
+import { getOrgSettings } from '@/lib/org-server';
 import { asc } from 'drizzle-orm';
 
 const ROLES = ['owner', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand', 'store-manager'];
 const DEPARTMENTS = ['executive', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'];
-const STORE_VALUES = STORES.map((s) => s.value);
-const validStore = (s: unknown) => s === undefined || s === null || s === '' || STORE_VALUES.includes(String(s));
+async function validStore(s: unknown) {
+  if (s === undefined || s === null || s === '') return true;
+  const values = (await getOrgSettings()).stores.map((o) => o.value);
+  return values.includes(String(s));
+}
 
 async function requireOwner() {
   const session = await getSession();
@@ -36,7 +39,7 @@ export async function POST(req: NextRequest) {
     if (!ROLES.includes(role) || !DEPARTMENTS.includes(department)) {
       return NextResponse.json({ error: 'Invalid role or department' }, { status: 400 });
     }
-    if (!validStore(store)) {
+    if (!(await validStore(store))) {
       return NextResponse.json({ error: 'Invalid store' }, { status: 400 });
     }
     if (String(password).length < 6) {

@@ -3,12 +3,11 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { getSession } from '@/lib/auth';
 import { hashPassword } from '@/lib/password';
-import { STORES } from '@/lib/config';
+import { getOrgSettings } from '@/lib/org-server';
 import { eq } from 'drizzle-orm';
 
 const ROLES = ['owner', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand', 'store-manager'];
 const DEPARTMENTS = ['executive', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'];
-const STORE_VALUES = STORES.map((s) => s.value);
 
 async function requireOwner() {
   const session = await getSession();
@@ -35,7 +34,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     if ('store' in body) {
       const s = body.store;
-      if (s !== '' && s !== null && !STORE_VALUES.includes(String(s))) {
+      const storeValues = (await getOrgSettings()).stores.map((o) => o.value);
+      if (s !== '' && s !== null && !storeValues.includes(String(s))) {
         return NextResponse.json({ error: 'Invalid store' }, { status: 400 });
       }
       patch.store = s || null;

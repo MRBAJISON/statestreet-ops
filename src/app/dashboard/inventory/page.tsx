@@ -10,7 +10,8 @@ import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, useEntries, type Period } from '@/lib/api';
 import BrandedLoader from '@/components/ui/BrandedLoader';
-import { STORES, STORE_LABELS, labelFor } from '@/lib/config';
+import { STORE_LABELS, labelFor } from '@/lib/config';
+import { useOrg } from '@/components/providers/OrgProvider';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -46,6 +47,7 @@ export default function InventoryPage() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
   const [store, setStore] = useState('');
+  const { org } = useOrg();
   const { data: m, loading } = useMetrics<InventoryLive>('inventory', period, anchor, store);
   const { entries: invEntries } = useEntries('inventory', 5000);
   // Only the Inventory team's transfers — store-manager transfers (store-transfer) never show here.
@@ -70,7 +72,7 @@ export default function InventoryPage() {
       />
 
       <div className="px-6 pt-4 flex justify-end">
-        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={STORES} onStoreChange={setStore} />
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={org.stores} onStoreChange={setStore} />
       </div>
       <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

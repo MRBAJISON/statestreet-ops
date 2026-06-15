@@ -6,9 +6,10 @@ import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
-import { STORES } from '@/lib/config';
+import { useOrg } from '@/components/providers/OrgProvider';
 
 export default function OperationsForms({ managerName = '' }: { managerName?: string }) {
+  const { org } = useOrg();
   const [activeForm, setActiveForm] = useState('store-audit');
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -120,7 +121,7 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
               <FormSection title="Store Standards" description="Complete the store standards checklist">
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
                   <FormField label="Date" name="date" type="date" required />
-                  <FormField label="Store" name="store" type="select" required options={STORES} />
+                  <FormField label="Store" name="store" type="select" required options={org.stores} />
                   {personField('Auditor', 'auditor', true)}
                   <FormField label="Operations Score %" name="opsScore" type="number" suffix="%" required min={0} max={100} value={audit.opsScore} onChange={setA('opsScore')} />
                   <FormField label="VM Score %" name="vmScore" type="number" suffix="%" required min={0} max={100} value={audit.vmScore} onChange={setA('vmScore')} />
@@ -138,7 +139,7 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
               <FormSection title="Maintenance Request" description="Log a maintenance need for a store or location.">
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
                   <FormField label="Date" name="date" type="date" required />
-                  <FormField label="Store" name="store" type="select" required options={STORES} />
+                  <FormField label="Store" name="store" type="select" required options={org.stores} />
                   <FormField label="Category" name="category" type="select" options={[
                     { label: 'Electrical', value: 'electrical' }, { label: 'HVAC / Air Conditioning', value: 'hvac' },
                     { label: 'Plumbing', value: 'plumbing' }, { label: 'Carpentry', value: 'carpentry' },
@@ -167,7 +168,7 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
           <FormSection title="Visual Merchandising Compliance" description="Check VM standards per store">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
-              <FormField label="Store" name="store" type="select" required options={STORES} />
+              <FormField label="Store" name="store" type="select" required options={org.stores} />
               <FormField label="Window Display Compliance %" name="windowDisplay" type="number" suffix="%" min={0} max={100} value={vm.windowDisplay} onChange={setV('windowDisplay')} />
               <FormField label="Mannequin Styling %" name="mannequin" type="number" suffix="%" min={0} max={100} value={vm.mannequin} onChange={setV('mannequin')} />
               <FormField label="Product Presentation %" name="productPresentation" type="number" suffix="%" min={0} max={100} value={vm.productPresentation} onChange={setV('productPresentation')} />
@@ -182,7 +183,7 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
           <FormSection title="Customer Experience (In-Store, Staff-Assessed)" description="Manager/auditor assessment of the in-store customer experience. (The customer's own voice is captured separately via the Marketing survey.)">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
-              <FormField label="Store" name="store" type="select" required options={STORES} />
+              <FormField label="Store" name="store" type="select" required options={org.stores} />
               {personField('Assessed By', 'assessedBy', true)}
               <FormField label="Feedback Category" name="category" type="select" required options={[
                 { label: 'Store Cleanliness', value: 'cleanliness' }, { label: 'Staff Knowledge', value: 'staff-knowledge' },
@@ -204,7 +205,7 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
           <FormSection title="Incident Report" description="Report security, safety, or operational incidents">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date & Time" name="datetime" type="datetime-local" required />
-              <FormField label="Store" name="store" type="select" required options={STORES} />
+              <FormField label="Store" name="store" type="select" required options={org.stores} />
               <FormField label="Incident Type" name="type" type="select" required options={[
                 { label: 'Security', value: 'security' }, { label: 'Safety', value: 'safety' },
                 { label: 'Operational', value: 'operational' }, { label: 'Fire', value: 'fire' },
@@ -232,7 +233,7 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
           <FormSection title="SOP Compliance Check" description="Standard operating procedure compliance audit">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
-              <FormField label="Store" name="store" type="select" required options={STORES} />
+              <FormField label="Store" name="store" type="select" required options={org.stores} />
               <FormField label="SOP Area" name="area" type="select" required options={[
                 { label: 'Opening Procedures', value: 'opening' }, { label: 'Sales Floor Standards', value: 'sales-floor' },
                 { label: 'Cash Handling', value: 'cash' }, { label: 'Customer Service', value: 'service' },
@@ -252,7 +253,7 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
           <FormSection title="Human Resources" description="People health — staff attendance, punctuality, training and absences per location">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
-              <FormField label="Store / Location" name="store" type="select" required options={STORES} />
+              <FormField label="Store / Location" name="store" type="select" required options={org.stores} />
               <FormField label="Recorded By (name)" name="recordedBy" defaultValue={managerName} required placeholder="Person completing this record" />
               <FormField label="Number of Staff (at location)" name="staffTotal" type="number" min={0} required value={hr.staffTotal} onChange={setH('staffTotal')} />
               <FormField label="Number of Staff Present" name="staffPresent" type="number" min={0} required value={hr.staffPresent} onChange={setH('staffPresent')} />

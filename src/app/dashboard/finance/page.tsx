@@ -14,7 +14,7 @@ import { useMetrics, type Period } from '@/lib/api';
 import BrandedLoader from '@/components/ui/BrandedLoader';
 import { TARGETS, ragStatus } from '@/lib/targets';
 import { rateRatio } from '@/lib/config';
-import { STORES } from '@/lib/config';
+import { useOrg } from '@/components/providers/OrgProvider';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -70,6 +70,7 @@ export default function FinancePage() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
   const [store, setStore] = useState('');
+  const { org } = useOrg();
   const { data: m, loading } = useMetrics<FinanceMetricsData>('finance', period, anchor, store);
 
   const revenueMtd = m?.revenueMtd ?? 0;
@@ -119,7 +120,7 @@ export default function FinancePage() {
       />
 
       <div className="px-6 pt-4 flex justify-end">
-        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={STORES} onStoreChange={setStore} />
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={org.stores} onStoreChange={setStore} />
       </div>
 
       {/* KPI BAR */}

@@ -6,9 +6,10 @@ import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
-import { STORES } from '@/lib/config';
+import { useOrg } from '@/components/providers/OrgProvider';
 
 export default function MarketingFormsPage() {
+  const { org } = useOrg();
   const [activeForm, setActiveForm] = useState('campaign');
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -217,7 +218,7 @@ export default function MarketingFormsPage() {
                 { label: 'Yes - Promoter', value: 'promoter' }, { label: 'Maybe - Passive', value: 'passive' },
                 { label: 'No - Detractor', value: 'detractor' },
               ]} />
-              <FormField label="Store" name="store" type="select" options={[...STORES, { label: 'All Stores', value: 'all' }]} />
+              <FormField label="Store" name="store" type="select" options={[...org.stores, { label: 'All Stores', value: 'all' }]} />
               <FormField label="Frequency (How often heard)" name="frequency" type="select" options={[
                 { label: 'Very Frequent', value: 'very-frequent' }, { label: 'Frequent', value: 'frequent' },
                 { label: 'Occasional', value: 'occasional' }, { label: 'Rare', value: 'rare' },

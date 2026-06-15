@@ -10,7 +10,7 @@ import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, type Period } from '@/lib/api';
 import BrandedLoader from '@/components/ui/BrandedLoader';
-import { STORES } from '@/lib/config';
+import { useOrg } from '@/components/providers/OrgProvider';
 
 const pct = (n: number) => (n ? `${n}%` : '—');
 const score = (v: number): 'green' | 'yellow' | 'red' => (v >= 90 ? 'green' : v >= 70 ? 'yellow' : 'red');
@@ -47,6 +47,7 @@ export default function OperationsPage() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
   const [store, setStore] = useState('');
+  const { org } = useOrg();
   const { data: m, loading } = useMetrics<OperationsLive>('operations', period, anchor, store);
   const vmByStore = m?.vmByStore ?? [];
   const storeScores = m?.storeScores ?? [];
@@ -78,7 +79,7 @@ export default function OperationsPage() {
       />
 
       <div className="px-6 pt-4 flex justify-end">
-        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={STORES} onStoreChange={setStore} />
+        <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={org.stores} onStoreChange={setStore} />
       </div>
       <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">

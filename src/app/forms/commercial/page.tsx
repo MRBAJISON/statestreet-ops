@@ -7,16 +7,8 @@ import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { PRODUCT_CATEGORIES } from '@/lib/config';
+import { useOrg } from '@/components/providers/OrgProvider';
 
-const STORES = [
-  { label: 'Dzorwulu Men', value: 'dzorwulu-men' },
-  { label: 'East Legon Men', value: 'east-legon-men' },
-  { label: 'Labone Men', value: 'labone-men' },
-  { label: 'Boulevard Women Labone', value: 'bw-labone' },
-  { label: 'Boulevard Women Dzorwulu', value: 'bw-dzorwulu' },
-  { label: "D'Angelo Palace", value: 'dangelo' },
-  { label: 'Woodpeckers', value: 'woodpeckers' },
-];
 
 const CATEGORIES = PRODUCT_CATEGORIES;
 
@@ -25,6 +17,7 @@ const fmt2 = (x: number) => (x ? x.toFixed(2) : '');
 const fmt1 = (x: number) => (x ? x.toFixed(1) : '');
 
 export default function CommercialFormsPage() {
+  const { org } = useOrg();
   const [activeForm, setActiveForm] = useState('store-sales');
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -102,7 +95,7 @@ export default function CommercialFormsPage() {
           <FormSection title="Daily Store Sales" description="Record daily sales metrics per store">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
-              <FormField label="Store" name="store" type="select" required options={STORES} />
+              <FormField label="Store" name="store" type="select" required options={org.stores} />
               <FormField label="Total Sales" name="totalSales" type="number" prefix="GHS" required step={0.01} value={ssTotalSales} onChange={(e) => setSsTotalSales(e.target.value)} />
               <FormField label="Number of Transactions" name="transactions" type="number" required value={ssTxns} onChange={(e) => setSsTxns(e.target.value)} />
               <FormField label="Footfall" name="footfall" type="number" required value={ssFootfall} onChange={(e) => setSsFootfall(e.target.value)} />
@@ -118,7 +111,7 @@ export default function CommercialFormsPage() {
           <FormSection title="Category Performance" description="Weekly category sales breakdown">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Week Ending" name="weekEnd" type="date" required />
-              <FormField label="Store" name="store" type="select" required options={STORES} />
+              <FormField label="Store" name="store" type="select" required options={org.stores} />
               <FormField label="Category" name="category" type="select" required options={CATEGORIES} />
               <FormField label="Sales Value" name="sales" type="number" prefix="GHS" required step={0.01} value={cpSales} onChange={(e) => setCpSales(e.target.value)} />
               <FormField label="Units Sold" name="units" type="number" required value={cpUnits} onChange={(e) => setCpUnits(e.target.value)} />
@@ -161,7 +154,7 @@ export default function CommercialFormsPage() {
               <FormField label="Category" name="category" type="select" required options={CATEGORIES} />
               <FormField label="Total Quantity" name="qty" type="number" required />
               <FormField label="Stock Value" name="stockValue" type="number" prefix="GHS" required step={0.01} />
-              <FormField label="Store Deployed To" name="store" type="select" options={STORES} />
+              <FormField label="Store Deployed To" name="store" type="select" options={org.stores} />
               <FormField label="Supplier" name="supplier" />
               <FormField label="PO Number" name="poNumber" placeholder="PO-XXXX" />
               <FormField label="Notes" name="notes" type="textarea" placeholder="Style notes, size breakdown, etc." />

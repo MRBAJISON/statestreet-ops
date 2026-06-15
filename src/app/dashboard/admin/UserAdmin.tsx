@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Modal, { ConfirmModal } from '@/components/ui/Modal';
-import { STORES, labelFor, STORE_LABELS } from '@/lib/config';
+import { labelFor, STORE_LABELS } from '@/lib/config';
+import { useOrg } from '@/components/providers/OrgProvider';
 
 interface User {
   id: number;
@@ -19,6 +20,7 @@ const selectClass = 'bg-[var(--c-card)] border border-[var(--c-border)] text-xs 
 const inputClass = 'bg-[var(--c-card)] border border-[var(--c-border)] text-sm text-[var(--c-fg)] rounded-lg px-3 py-2 focus:outline-none focus:border-[#c8a951]';
 
 export default function UserAdmin() {
+  const { org } = useOrg();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -131,7 +133,7 @@ export default function UserAdmin() {
           {form.role === 'store-manager' && (
             <select className={inputClass} value={form.store} onChange={(e) => setForm({ ...form, store: e.target.value })}>
               <option value="">Assign store…</option>
-              {STORES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              {org.stores.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           )}
           <button type="submit" className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold rounded-lg px-4 py-2 text-sm">Add User</button>
@@ -175,7 +177,7 @@ export default function UserAdmin() {
                       {u.role === 'store-manager' ? (
                         <select className={selectClass} value={u.store ?? ''} onChange={(e) => patchUser(u.id, { store: e.target.value })}>
                           <option value="">— None —</option>
-                          {STORES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                          {org.stores.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
                       ) : (
                         <span className="text-gray-600">{u.store ? labelFor(STORE_LABELS, u.store) : '—'}</span>

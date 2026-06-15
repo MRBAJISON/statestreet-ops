@@ -1,7 +1,3 @@
-'use client';
-
-import { useOrg } from '@/components/providers/OrgProvider';
-
 interface DashboardHeaderProps {
   title: string;
   subtitle: string;
@@ -11,15 +7,11 @@ interface DashboardHeaderProps {
 }
 
 export default function DashboardHeader({ title, subtitle, mission, missionDetail, date }: DashboardHeaderProps) {
-  const { org } = useOrg();
   const now = date || new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
     <div className="bg-[var(--c-card2)] border-b border-[var(--c-hover)] px-6 py-4">
       <div className="relative flex items-center justify-center">
-        {org.logo && (
-          <img src={org.logo} alt="" className="hidden lg:block w-10 h-10 rounded object-contain absolute left-0" />
-        )}
         <div className="text-center">
           <h1 className="text-xl font-bold tracking-wide">{title}</h1>
           <p className="text-xs text-[#c8a951] tracking-wider mt-0.5">{subtitle}</p>

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useEntries, postEntry, updateEntry, type EntryRow } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
-import { STORES } from '@/lib/config';
+import { useOrg } from '@/components/providers/OrgProvider';
 
 const fmtGHS = (n: number) => `GHS ${Math.round(n).toLocaleString()}`;
 const num = (s: string) => Number(String(s).replace(/[, ]/g, '')) || 0;
@@ -25,6 +25,7 @@ const MONTHLY_FIELDS: { key: string; label: string; unit: 'ghs' | 'pct' }[] = [
 ];
 
 export default function TargetsPage() {
+  const { org } = useOrg();
   const { entries, refresh } = useEntries('commercial', 5000);
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('weekly');
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -52,7 +53,7 @@ export default function TargetsPage() {
     }
     setBusy(true);
     try {
-      for (const s of STORES) {
+      for (const s of org.stores) {
         const raw = drafts[s.value];
         if (raw === undefined) continue; // unchanged
         const payload = { store: s.value, weekEnd, target: raw };
@@ -68,7 +69,7 @@ export default function TargetsPage() {
     }
     setBusy(false);
   }
-  const total = STORES.reduce((s, st) => s + num(valueFor(st.value)), 0);
+  const total = org.stores.reduce((s, st) => s + num(valueFor(st.value)), 0);
 
   /* ---------------------- Tab 2: Executive Targets ------------------------- */
   const [execMonth, setExecMonth] = useState('');
@@ -155,7 +156,7 @@ export default function TargetsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {STORES.map((s) => (
+                    {org.stores.map((s) => (
                       <tr key={s.value} className="border-b border-[var(--c-hover)]">
                         <td className="py-2 pr-3">{s.label}</td>
                         <td className="py-2 pl-3 text-right">

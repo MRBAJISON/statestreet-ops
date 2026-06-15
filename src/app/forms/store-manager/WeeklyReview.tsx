@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { STORES, CATEGORY_LABELS } from '@/lib/config';
+import { CATEGORY_LABELS } from '@/lib/config';
+import { useOrg } from '@/components/providers/OrgProvider';
 import { postEntry, updateEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 
@@ -76,6 +77,7 @@ const headInputCls = 'bg-[var(--c-card)] border border-[var(--c-border)] rounded
 const num = (s: string) => Number(s) || 0;
 
 export default function WeeklyReview({ assignedStore = '', managerName = '', dailySales = [], targets = [] }: { assignedStore?: string; managerName?: string; dailySales?: DailySale[]; targets?: WeekTarget[] }) {
+  const { org } = useOrg();
   const [header, setHeader] = useState({ store: assignedStore, manager: managerName, weekEnd: '' });
   // rows[category][colKey] = manually entered value
   const [rows, setRows] = useState<Record<string, Record<string, string>>>({});
@@ -229,12 +231,12 @@ export default function WeeklyReview({ assignedStore = '', managerName = '', dai
         <label className="text-xs text-gray-400">Store
           {assignedStore ? (
             <div className={`${headInputCls} w-full mt-1 opacity-70 cursor-not-allowed`}>
-              {STORES.find((s) => s.value === assignedStore)?.label ?? assignedStore}
+              {org.stores.find((s) => s.value === assignedStore)?.label ?? assignedStore}
             </div>
           ) : (
             <select value={header.store} onChange={(e) => setHeader({ ...header, store: e.target.value })} className={`${headInputCls} w-full mt-1`}>
               <option value="">Select…</option>
-              {STORES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              {org.stores.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           )}
         </label>

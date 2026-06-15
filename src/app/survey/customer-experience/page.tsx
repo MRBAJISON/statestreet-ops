@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { STORES } from '@/lib/config';
+import { useOrg } from '@/components/providers/OrgProvider';
 
 const CATEGORIES = [
   { label: 'Store Cleanliness', value: 'cleanliness' },
@@ -21,6 +21,7 @@ const RECOMMEND = [
 const inputCls = 'w-full bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg px-3 py-2.5 text-sm text-[var(--c-fg)] focus:outline-none focus:border-[#c8a951]';
 
 export default function CustomerExperienceSurvey() {
+  const { org } = useOrg();
   const [form, setForm] = useState({ store: '', category: '', nps: '', recommend: '', detail: '', name: '', contact: '', company: '' });
   const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
   const [error, setError] = useState('');
@@ -90,7 +91,7 @@ export default function CustomerExperienceSurvey() {
               <label className="block text-sm text-gray-400 mb-1">Which store did you visit?</label>
               <select value={form.store} onChange={set('store')} className={inputCls}>
                 <option value="">Select store…</option>
-                {STORES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                {org.stores.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
 
