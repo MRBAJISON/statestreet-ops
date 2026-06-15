@@ -128,7 +128,8 @@ export default function SettingsClient({ user, isOwner }: { user: UserInfo; isOw
         <p className="text-sm text-gray-500 mt-1">Manage your profile, password and appearance.</p>
       </div>
 
-      {/* Profile */}
+      {/* Profile (hidden for owner) */}
+      {!isOwner && (
       <section className={cardCls}>
         <h2 className={h2Cls}>Profile</h2>
         <Msg m={nameMsg} />
@@ -156,8 +157,10 @@ export default function SettingsClient({ user, isOwner }: { user: UserInfo; isOw
           </div>
         </form>
       </section>
+      )}
 
-      {/* Password — collapsed until the user chooses to change it */}
+      {/* Password (hidden for owner) — collapsed until the user chooses to change it */}
+      {!isOwner && (
       <section className={cardCls}>
         <h2 className={h2Cls}>Change Password</h2>
         {!showPw ? (
@@ -188,20 +191,17 @@ export default function SettingsClient({ user, isOwner }: { user: UserInfo; isOw
           </>
         )}
       </section>
+      )}
 
       {/* Appearance */}
       <section className={cardCls}>
         <h2 className={h2Cls}>Appearance</h2>
-        <div className="text-center">
+        <div className="max-w-sm mx-auto">
           <label className={labelCls}>Theme</label>
-          <div className="inline-flex rounded-lg border border-[var(--c-border)] overflow-hidden">
-            {(['light', 'dark'] as const).map((t) => (
-              <button key={t} onClick={() => applyTheme(t)} type="button"
-                className={`px-5 py-2 text-sm capitalize transition-colors ${theme === t ? 'bg-[#c8a951] text-black font-semibold' : 'bg-[var(--c-card2)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
-                {t === 'light' ? '☀️ Light' : '🌙 Dark'}
-              </button>
-            ))}
-          </div>
+          <select className={inputCls} value={theme} onChange={(e) => applyTheme(e.target.value === 'light' ? 'light' : 'dark')}>
+            <option value="light">☀️ Light</option>
+            <option value="dark">🌙 Dark</option>
+          </select>
         </div>
       </section>
 
