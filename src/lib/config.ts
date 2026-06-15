@@ -121,7 +121,12 @@ export const EXPENSE_LABELS: Record<string, string> = toMap(EXPENSE_CATEGORIES);
 
 export const labelFor = (map: Record<string, string>, value: unknown): string => {
   const key = String(value ?? '');
-  return map[key] ?? (key || '—');
+  if (map[key]) return map[key];
+  if (!key) return '—';
+  // Graceful fallback for org-added codes not in the static map: prettify the slug.
+  return /[a-z0-9]+(?:[-_][a-z0-9]+)+/i.test(key)
+    ? key.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+    : key;
 };
 
 // Financial-ratio performance bands → label + RAG tone.

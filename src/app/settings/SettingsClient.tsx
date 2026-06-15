@@ -24,6 +24,62 @@ function Msg({ m }: { m: { ok: boolean; text: string } | null }) {
   );
 }
 
+const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+type Opt = { label: string; value: string };
+
+// Editable label/value list (Stores, Brands, Categories). Value auto-derives from the label.
+function ListEditor({ title, items, onChange }: { title: string; items: Opt[]; onChange: (next: Opt[]) => void }) {
+  const set = (i: number, label: string) => onChange(items.map((it, k) => (k === i ? { label, value: it.value || slugify(label) } : it)));
+  const remove = (i: number) => onChange(items.filter((_, k) => k !== i));
+  const add = () => onChange([...items, { label: '', value: '' }]);
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs text-gray-400">{title}</span>
+        <button type="button" onClick={add} className="text-xs text-[#c8a951] hover:underline">+ Add</button>
+      </div>
+      <div className="space-y-2">
+        {items.map((it, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <input className={inputCls} value={it.label} placeholder="Name" onChange={(e) => set(i, e.target.value)} />
+            <button type="button" onClick={() => remove(i)} className="text-gray-400 hover:text-red-400 text-sm px-1" aria-label="Remove">✕</button>
+          </div>
+        ))}
+        {items.length === 0 && <p className="text-xs text-gray-500">None yet — click “Add”.</p>}
+      </div>
+    </div>
+  );
+}
+
+type ExpOpt = { label: string; value: string; group: 'operating' | 'capital' | 'below-line' };
+function ExpenseEditor({ items, onChange }: { items: ExpOpt[]; onChange: (next: ExpOpt[]) => void }) {
+  const set = (i: number, patch: Partial<ExpOpt>) => onChange(items.map((it, k) => (k === i ? { ...it, ...patch, value: (patch.label !== undefined ? (it.value || slugify(patch.label)) : it.value) } : it)));
+  const remove = (i: number) => onChange(items.filter((_, k) => k !== i));
+  const add = () => onChange([...items, { label: '', value: '', group: 'operating' }]);
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs text-gray-400">Expense Items</span>
+        <button type="button" onClick={add} className="text-xs text-[#c8a951] hover:underline">+ Add</button>
+      </div>
+      <div className="space-y-2">
+        {items.map((it, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <input className={inputCls} value={it.label} placeholder="Name" onChange={(e) => set(i, { label: e.target.value })} />
+            <select className={`${inputCls} w-40`} value={it.group} onChange={(e) => set(i, { group: e.target.value as ExpOpt['group'] })}>
+              <option value="operating">Operating</option>
+              <option value="capital">Capital</option>
+              <option value="below-line">Below-line</option>
+            </select>
+            <button type="button" onClick={() => remove(i)} className="text-gray-400 hover:text-red-400 text-sm px-1" aria-label="Remove">✕</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsClient({ user, isOwner }: { user: UserInfo; isOwner: boolean }) {
   const router = useRouter();
   const { org, refresh: refreshOrg } = useOrg();
@@ -108,6 +164,10 @@ export default function SettingsClient({ user, isOwner }: { user: UserInfo; isOw
         body: JSON.stringify({
           companyName: orgDraft.companyName, tagline: orgDraft.tagline, currency: orgDraft.currency,
           logo: orgDraft.logo, weekStart: orgDraft.weekStart, security: orgDraft.security,
+          stores: orgDraft.stores.filter((s) => s.label.trim()),
+          brands: orgDraft.brands.filter((s) => s.label.trim()),
+          categories: orgDraft.categories.filter((s) => s.label.trim()),
+          expenseItems: orgDraft.expenseItems.filter((s) => s.label.trim()),
         }),
       });
       const data = await res.json();
@@ -243,6 +303,12 @@ export default function SettingsClient({ user, isOwner }: { user: UserInfo; isOw
                 <label className={labelCls}>Session Length (days)</label>
                 <input type="number" min={1} className={inputCls} value={orgDraft.security.sessionDays} onChange={(e) => setOrgDraft((d) => ({ ...d, security: { ...d.security, sessionDays: Number(e.target.value) || 7 } }))} />
               </div>
+            </div>
+            <div className="pt-2 border-t border-[var(--c-border)] space-y-4">
+              <ListEditor title="Stores / Locations" items={orgDraft.stores} onChange={(stores) => setOrgDraft((d) => ({ ...d, stores }))} />
+              <ListEditor title="Brands" items={orgDraft.brands} onChange={(brands) => setOrgDraft((d) => ({ ...d, brands }))} />
+              <ListEditor title="Product Categories" items={orgDraft.categories} onChange={(categories) => setOrgDraft((d) => ({ ...d, categories }))} />
+              <ExpenseEditor items={orgDraft.expenseItems} onChange={(expenseItems) => setOrgDraft((d) => ({ ...d, expenseItems }))} />
             </div>
             <div className="flex justify-center pt-1">
               <button type="submit" disabled={savingOrg} className={btnCls}>{savingOrg ? <><Spinner /> Saving…</> : 'Save Organization'}</button>
