@@ -14,10 +14,12 @@ export async function GET() {
   return NextResponse.json(org);
 }
 
-// Owner-only update (partial patch merged over current settings).
+// Update (partial patch merged over current settings).
+// Owner, Commercial and Operations may edit organization settings.
+const ORG_EDITORS = ['owner', 'commercial', 'operations'];
 export async function PATCH(req: NextRequest) {
   const session = await getSession();
-  if (session?.user.role !== 'owner') {
+  if (!session || !ORG_EDITORS.includes(session.user.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   let body: Partial<OrgSettings>;

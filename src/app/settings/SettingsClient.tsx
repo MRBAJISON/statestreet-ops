@@ -80,7 +80,48 @@ function ExpenseEditor({ items, onChange }: { items: ExpOpt[]; onChange: (next: 
   );
 }
 
-export default function SettingsClient({ user, isOwner }: { user: UserInfo; isOwner: boolean }) {
+// Maps each brand to a subset of items (categories or stores) via checkboxes.
+// value is Record<brandValue, itemValue[]>; onChange returns the next map.
+function MappingEditor({ title, hint, brands, items, value, onChange }: {
+  title: string; hint: string; brands: Opt[]; items: Opt[];
+  value: Record<string, string[]>; onChange: (next: Record<string, string[]>) => void;
+}) {
+  const toggle = (brand: string, item: string) => {
+    const cur = value[brand] ?? [];
+    const next = cur.includes(item) ? cur.filter((v) => v !== item) : [...cur, item];
+    onChange({ ...value, [brand]: next });
+  };
+  return (
+    <div>
+      <div className="mb-1">
+        <span className="text-xs text-gray-400">{title}</span>
+        <p className="text-[0.65rem] text-gray-500">{hint}</p>
+      </div>
+      <div className="space-y-3">
+        {brands.filter((b) => b.label.trim()).map((b) => (
+          <div key={b.value} className="border border-[var(--c-border)] rounded-lg p-2.5">
+            <div className="text-xs font-semibold text-[var(--c-fg)] mb-1.5">{b.label}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {items.filter((it) => it.label.trim()).map((it) => {
+                const on = (value[b.value] ?? []).includes(it.value);
+                return (
+                  <button type="button" key={it.value} onClick={() => toggle(b.value, it.value)}
+                    className={`text-[0.7rem] px-2 py-1 rounded border transition-colors ${on ? 'bg-[#c8a951] text-black border-[#c8a951] font-medium' : 'border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
+                    {it.label}
+                  </button>
+                );
+              })}
+              {items.filter((it) => it.label.trim()).length === 0 && <span className="text-[0.65rem] text-gray-500">No items yet.</span>}
+            </div>
+          </div>
+        ))}
+        {brands.filter((b) => b.label.trim()).length === 0 && <p className="text-xs text-gray-500">Add brands above first.</p>}
+      </div>
+    </div>
+  );
+}
+
+export default function SettingsClient({ user, isOwner, canEditOrg }: { user: UserInfo; isOwner: boolean; canEditOrg: boolean }) {
   const router = useRouter();
   const { org, refresh: refreshOrg } = useOrg();
 
@@ -168,6 +209,8 @@ export default function SettingsClient({ user, isOwner }: { user: UserInfo; isOw
           brands: orgDraft.brands.filter((s) => s.label.trim()),
           categories: orgDraft.categories.filter((s) => s.label.trim()),
           expenseItems: orgDraft.expenseItems.filter((s) => s.label.trim()),
+          brandCategories: orgDraft.brandCategories,
+          brandStores: orgDraft.brandStores,
         }),
       });
       const data = await res.json();
@@ -253,8 +296,8 @@ export default function SettingsClient({ user, isOwner }: { user: UserInfo; isOw
       </section>
       )}
 
-      {/* Organization (owner only) */}
-      {isOwner && (
+      {/* Organization (owner + commercial + operations) */}
+      {canEditOrg && (
         <section className={cardCls}>
           <h2 className={h2Cls}>Organization</h2>
           <Msg m={orgMsg} />
@@ -309,6 +352,10 @@ export default function SettingsClient({ user, isOwner }: { user: UserInfo; isOw
               <ListEditor title="Brands" items={orgDraft.brands} onChange={(brands) => setOrgDraft((d) => ({ ...d, brands }))} />
               <ListEditor title="Product Categories" items={orgDraft.categories} onChange={(categories) => setOrgDraft((d) => ({ ...d, categories }))} />
               <ExpenseEditor items={orgDraft.expenseItems} onChange={(expenseItems) => setOrgDraft((d) => ({ ...d, expenseItems }))} />
+            </div>
+            <div className="pt-2 border-t border-[var(--c-border)] space-y-4">
+              <MappingEditor title="Brand → Categories" hint="Tap to assign categories to each brand. Sales forms show only a brand's categories once mapped." brands={orgDraft.brands} items={orgDraft.categories} value={orgDraft.brandCategories} onChange={(brandCategories) => setOrgDraft((d) => ({ ...d, brandCategories }))} />
+              <MappingEditor title="Brand → Stores" hint="Group stores under a brand. Stock transfers are allowed only between stores of the same brand (Head Office reaches all)." brands={orgDraft.brands} items={orgDraft.stores} value={orgDraft.brandStores} onChange={(brandStores) => setOrgDraft((d) => ({ ...d, brandStores }))} />
             </div>
             <div className="flex justify-center pt-1">
               <button type="submit" disabled={savingOrg} className={btnCls}>{savingOrg ? <><Spinner /> Saving…</> : 'Save Organization'}</button>
