@@ -7,14 +7,18 @@ import { postEntry, deleteEntry, type EntryRow } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { STORE_LABELS, labelFor } from '@/lib/config';
 import { useOrg } from '@/components/providers/OrgProvider';
+import { transferTargets } from '@/lib/org';
 
 // Store-to-store stock transfer. Saved as inventory/store-transfer (kept separate
-// from the Inventory team's stock-transfer stream).
+// from the Inventory team's stock-transfer stream). Transfers are restricted to
+// stores of the same brand; Head Office reaches all stores; single-store brands
+// get no transfer option.
 export default function StockTransfer({ assignedStore, managerName, recent, onSaved }: { assignedStore: string; managerName: string; recent: EntryRow[]; onSaved: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const { org } = useOrg();
-  const toStores = org.stores.filter((s) => s.value !== assignedStore);
+  const toStores = transferTargets(org, assignedStore);
+  const canTransfer = toStores.length > 0;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -48,6 +52,7 @@ export default function StockTransfer({ assignedStore, managerName, recent, onSa
       {msg && (
         <div className={`mb-3 text-sm p-3 rounded-lg border ${msg.ok ? 'border-green-500/30 bg-green-500/10 text-green-400' : 'border-red-500/30 bg-red-500/10 text-red-400'}`}>{msg.text}</div>
       )}
+      {canTransfer ? (
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-1">
           <FormField label="Date" name="date" type="date" required />
@@ -71,6 +76,11 @@ export default function StockTransfer({ assignedStore, managerName, recent, onSa
           {submitting ? <><Spinner /> Saving…</> : 'Record Transfer'}
         </button>
       </form>
+      ) : (
+        <div className="mt-1 text-sm p-4 rounded-lg border border-[var(--c-border)] bg-[var(--c-card2)] text-gray-400">
+          Stock transfer isn’t available for your store — it’s the only store in its brand. Inter-store transfers run between shops of the same brand; please contact Head Office to move stock.
+        </div>
+      )}
 
       {recentSorted.length > 0 && (
         <div className="mt-4">
