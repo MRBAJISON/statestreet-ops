@@ -15,6 +15,9 @@ export interface OrgSettings {
   brands: Option[];
   categories: Option[];
   expenseItems: ExpenseItem[];
+  // Relationships (owner/commercial/operations-editable in Settings):
+  brandCategories: Record<string, string[]>; // brandValue -> [categoryValue,...]
+  brandStores: Record<string, string[]>;     // brandValue -> [storeValue,...]
 }
 
 export const DEFAULT_ORG: OrgSettings = {
@@ -28,6 +31,8 @@ export const DEFAULT_ORG: OrgSettings = {
   brands: BRANDS,
   categories: PRODUCT_CATEGORIES,
   expenseItems: EXPENSE_ITEMS,
+  brandCategories: {},
+  brandStores: {},
 };
 
 // Merge a stored (possibly partial) record over the defaults.
@@ -47,6 +52,8 @@ export function mergeOrg(raw: Partial<OrgSettings> | null | undefined): OrgSetti
     brands: r.brands?.length ? r.brands : DEFAULT_ORG.brands,
     categories: r.categories?.length ? r.categories : DEFAULT_ORG.categories,
     expenseItems: r.expenseItems?.length ? r.expenseItems : DEFAULT_ORG.expenseItems,
+    brandCategories: r.brandCategories ?? {},
+    brandStores: r.brandStores ?? {},
   };
 }
 
@@ -64,3 +71,33 @@ export function expenseGroups(items: ExpenseItem[]): { label: string; options: O
   ];
 }
 export const capitalValues = (items: ExpenseItem[]): string[] => items.filter((i) => i.group === 'capital').map((i) => i.value);
+
+// Categories available for a brand. If the brand has a mapping, return only the
+// mapped categories (in the org's category order); otherwise return all categories.
+export function categoriesForBrand(org: OrgSettings, brandValue: string): Option[] {
+  const allowed = org.brandCategories?.[brandValue];
+  if (!brandValue || !allowed?.length) return org.categories;
+  const set = new Set(allowed);
+  return org.categories.filter((c) => set.has(c.value));
+}
+
+// The brand a store belongs to (first brand whose store list includes it), or null.
+export function brandOfStore(org: OrgSettings, storeValue: string): string | null {
+  for (const [brand, stores] of Object.entries(org.brandStores ?? {})) {
+    if (stores.includes(storeValue)) return brand;
+  }
+  return null;
+}
+
+// Valid stock-transfer destinations for a store. Head Office reaches every other
+// store; otherwise only other stores sharing the same brand. Empty = no transfer
+// (single-store brand or unmapped store).
+export function transferTargets(org: OrgSettings, fromStore: string): Option[] {
+  if (fromStore === 'head-office') {
+    return org.stores.filter((s) => s.value !== fromStore);
+  }
+  const brand = brandOfStore(org, fromStore);
+  if (!brand) return [];
+  const peers = new Set((org.brandStores?.[brand] ?? []).filter((v) => v !== fromStore));
+  return org.stores.filter((s) => peers.has(s.value));
+}

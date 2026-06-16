@@ -111,6 +111,30 @@ export const EXPENSE_GROUPS: { label: string; options: Option[] }[] = [
   { label: 'Below the Line', options: itemsIn('below-line') },
 ];
 
+// Payment modes for the daily-sales "closing report" and customer acquisition
+// sources. Fixed in code by design (not owner-editable). Amounts per mode are
+// stored as flat numeric payload fields keyed by payKey() so they flow into the
+// Excel export and monthly summaries.
+export const PAYMENT_MODES: Option[] = [
+  { label: 'Bank Transfer', value: 'bank-transfer' },
+  { label: 'Cheque', value: 'cheque' },
+  { label: 'Cash', value: 'cash' },
+  { label: 'Mobile Money', value: 'mobile-money' },
+  { label: 'POS UMB', value: 'pos-umb' },
+  { label: 'POS OmniBSIC', value: 'pos-omnibsic' },
+];
+
+export const DISCOVERY_SOURCES: Option[] = [
+  { label: 'Instagram', value: 'instagram' },
+  { label: 'Facebook', value: 'facebook' },
+  { label: 'Billboard', value: 'billboard' },
+  { label: 'Referral', value: 'referral' },
+  { label: 'Walk-in', value: 'walk-in' },
+];
+
+// Payload field name for a payment mode's amount, e.g. 'bank-transfer' -> 'pay_bank_transfer'.
+export const payKey = (v: string) => 'pay_' + v.replace(/-/g, '_');
+
 // value -> label maps (for turning stored form values back into display names)
 const toMap = (opts: Option[]) => Object.fromEntries(opts.map((o) => [o.value, o.label]));
 
