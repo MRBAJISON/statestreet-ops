@@ -5,9 +5,9 @@ import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import { postEntry, deleteEntry, type EntryRow } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
-import { labelFor } from '@/lib/config';
+import { labelFor, PAYMENT_MODES, DISCOVERY_SOURCES, payKey } from '@/lib/config';
 import { useOrg } from '@/components/providers/OrgProvider';
-import { toLabelMap } from '@/lib/org';
+import { toLabelMap, categoriesForBrand } from '@/lib/org';
 
 const fmtGHS = (n: number) => `GHS ${Math.round(n).toLocaleString()}`;
 
@@ -22,8 +22,14 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
   // (COGS is captured for gross-profit metrics, not deducted from net revenue.)
   const [gross, setGross] = useState('');
   const [discounts, setDiscounts] = useState('');
+  // Brand drives the available categories (Brand → Categories mapping in Settings).
+  const [brand, setBrand] = useState('');
+  const [category, setCategory] = useState('');
+  // Closing report — amount per payment mode (auto-totalled).
+  const [payments, setPayments] = useState<Record<string, string>>({});
   const num = (s: string) => Number(s) || 0;
   const netRevenue = num(gross) ? Math.round((num(gross) - num(discounts)) * 100) / 100 : 0;
+  const paymentsTotal = Math.round(PAYMENT_MODES.reduce((s, m) => s + num(payments[m.value] ?? ''), 0) * 100) / 100;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -39,6 +45,9 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
       form.reset();
       setGross('');
       setDiscounts('');
+      setBrand('');
+      setCategory('');
+      setPayments({});
       onSaved();
     } catch (err) {
       setMsg({ ok: false, text: 'Could not save: ' + (err as Error).message });
@@ -61,7 +70,9 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-1">
           <FormField label="Date" name="date" type="date" required />
-          <FormField label="Category" name="category" type="select" required options={org.categories} />
+          <FormField label="Brand" name="brand" type="select" value={brand} onChange={(e) => { setBrand(e.target.value); setCategory(''); }} options={org.brands} />
+          <FormField label="Category" name="category" type="select" required value={category} onChange={(e) => setCategory(e.target.value)} options={categoriesForBrand(org, brand)} />
+          <FormField label="Opening Stock" name="openingStock" type="number" />
           <FormField label="Gross Revenue" name="grossRevenue" type="number" prefix="GHS" required step={0.01} value={gross} onChange={(e) => setGross(e.target.value)} />
           <FormField label="Cost of Goods (COGS)" name="cogs" type="number" prefix="GHS" step={0.01} />
           <FormField label="Discounts Given" name="discounts" type="number" prefix="GHS" step={0.01} value={discounts} onChange={(e) => setDiscounts(e.target.value)} />
@@ -70,6 +81,28 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
           <FormField label="Footfall" name="footfall" type="number" />
           <FormField label="Items Sold" name="itemsSold" type="number" />
         </div>
+
+        <div className="mt-5">
+          <h4 className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Customers</h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <FormField label="Total Customers" name="customers" type="number" />
+            <FormField label="New Customers" name="newCustomers" type="number" />
+            <FormField label="Returning Customers" name="returningCustomers" type="number" />
+            <FormField label="How They Found Us" name="discoverySource" type="select" options={DISCOVERY_SOURCES} />
+          </div>
+        </div>
+
+        <div className="mt-5">
+          <h4 className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Closing Report — Payments</h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {PAYMENT_MODES.map((m) => (
+              <FormField key={m.value} label={m.label} name={payKey(m.value)} type="number" prefix={org.currency} step={0.01}
+                value={payments[m.value] ?? ''} onChange={(e) => setPayments((p) => ({ ...p, [m.value]: e.target.value }))} />
+            ))}
+            <FormField label="Payments Total (auto)" name="paymentsTotal" type="number" prefix={org.currency} value={paymentsTotal ? String(paymentsTotal) : ''} readOnly />
+          </div>
+        </div>
+
         <button type="submit" disabled={submitting}
           className="mt-3 bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg text-sm disabled:opacity-50">
           {submitting ? <><Spinner /> Saving…</> : 'Save Daily Sales'}

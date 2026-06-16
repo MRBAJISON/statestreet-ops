@@ -7,6 +7,8 @@ import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { useOrg } from '@/components/providers/OrgProvider';
+import { categoriesForBrand } from '@/lib/org';
+import { PAYMENT_MODES, DISCOVERY_SOURCES, payKey } from '@/lib/config';
 
 const numOf = (s: string) => Number(s) || 0;
 const fmt2 = (x: number) => (x ? x.toFixed(2) : '');
@@ -14,7 +16,6 @@ const fmt1 = (x: number) => (x ? x.toFixed(1) : '');
 
 export default function CommercialFormsPage() {
   const { org } = useOrg();
-  const CATEGORIES = org.categories;
   const [activeForm, setActiveForm] = useState('store-sales');
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -27,6 +28,12 @@ export default function CommercialFormsPage() {
   const [cpSales, setCpSales] = useState('');
   const [cpUnits, setCpUnits] = useState('');
 
+  // Brand → Category filter (shared across the category forms) + closing payments.
+  const [brand, setBrand] = useState('');
+  const [category, setCategory] = useState('');
+  const [payments, setPayments] = useState<Record<string, string>>({});
+  const paymentsTotal = Math.round(PAYMENT_MODES.reduce((s, m) => s + numOf(payments[m.value] ?? ''), 0) * 100) / 100;
+
   const ssAtv = numOf(ssTxns) ? numOf(ssTotalSales) / numOf(ssTxns) : 0;
   const ssConv = numOf(ssFootfall) ? (numOf(ssTxns) / numOf(ssFootfall)) * 100 : 0;
   const cpAsp = numOf(cpUnits) ? numOf(cpSales) / numOf(cpUnits) : 0;
@@ -37,6 +44,14 @@ export default function CommercialFormsPage() {
     setSsFootfall('');
     setCpSales('');
     setCpUnits('');
+    setBrand('');
+    setCategory('');
+    setPayments({});
+  }
+
+  function switchForm(id: string) {
+    setActiveForm(id);
+    resetAutoCalc();
   }
 
   const forms = [
@@ -74,7 +89,7 @@ export default function CommercialFormsPage() {
 
       <div className="flex gap-2 mb-6 flex-wrap">
         {forms.map(f => (
-          <button key={f.id} onClick={() => setActiveForm(f.id)}
+          <button key={f.id} onClick={() => switchForm(f.id)}
             className={`px-4 py-2 rounded-lg text-sm transition-colors ${activeForm === f.id ? 'bg-[#c8a951] text-black font-semibold' : 'bg-[var(--c-card)] border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
             {f.label}
           </button>
@@ -93,6 +108,7 @@ export default function CommercialFormsPage() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
               <FormField label="Store" name="store" type="select" required options={org.stores} />
+              <FormField label="Opening Stock" name="openingStock" type="number" />
               <FormField label="Total Sales" name="totalSales" type="number" prefix="GHS" required step={0.01} value={ssTotalSales} onChange={(e) => setSsTotalSales(e.target.value)} />
               <FormField label="Number of Transactions" name="transactions" type="number" required value={ssTxns} onChange={(e) => setSsTxns(e.target.value)} />
               <FormField label="Footfall" name="footfall" type="number" required value={ssFootfall} onChange={(e) => setSsFootfall(e.target.value)} />
@@ -100,6 +116,27 @@ export default function CommercialFormsPage() {
               <FormField label="Returns Value" name="returns" type="number" prefix="GHS" step={0.01} />
               <FormField label="Conversion Rate % (auto)" name="convRate" type="number" suffix="%" value={fmt1(ssConv)} readOnly />
               <FormField label="Avg Transaction Value (auto)" name="atv" type="number" prefix="GHS" value={fmt2(ssAtv)} readOnly />
+            </div>
+
+            <div className="mt-5">
+              <h4 className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Customers</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <FormField label="Total Customers" name="customers" type="number" />
+                <FormField label="New Customers" name="newCustomers" type="number" />
+                <FormField label="Returning Customers" name="returningCustomers" type="number" />
+                <FormField label="How They Found Us" name="discoverySource" type="select" options={DISCOVERY_SOURCES} />
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <h4 className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Closing Report — Payments</h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {PAYMENT_MODES.map((m) => (
+                  <FormField key={m.value} label={m.label} name={payKey(m.value)} type="number" prefix={org.currency} step={0.01}
+                    value={payments[m.value] ?? ''} onChange={(e) => setPayments((p) => ({ ...p, [m.value]: e.target.value }))} />
+                ))}
+                <FormField label="Payments Total (auto)" name="paymentsTotal" type="number" prefix={org.currency} value={paymentsTotal ? String(paymentsTotal) : ''} readOnly />
+              </div>
             </div>
           </FormSection>
         )}
@@ -109,7 +146,8 @@ export default function CommercialFormsPage() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Week Ending" name="weekEnd" type="date" required />
               <FormField label="Store" name="store" type="select" required options={org.stores} />
-              <FormField label="Category" name="category" type="select" required options={CATEGORIES} />
+              <FormField label="Brand" name="brand" type="select" value={brand} onChange={(e) => { setBrand(e.target.value); setCategory(''); }} options={org.brands} />
+              <FormField label="Category" name="category" type="select" required value={category} onChange={(e) => setCategory(e.target.value)} options={categoriesForBrand(org, brand)} />
               <FormField label="Sales Value" name="sales" type="number" prefix="GHS" required step={0.01} value={cpSales} onChange={(e) => setCpSales(e.target.value)} />
               <FormField label="Units Sold" name="units" type="number" required value={cpUnits} onChange={(e) => setCpUnits(e.target.value)} />
               <FormField label="Gross Margin %" name="gm" type="number" suffix="%" step={0.1} />
@@ -125,8 +163,8 @@ export default function CommercialFormsPage() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="SKU Code" name="sku" required placeholder="e.g. ARB-101-BLK-42" />
               <FormField label="Product Name" name="name" required />
-              <FormField label="Category" name="category" type="select" required options={CATEGORIES} />
-              <FormField label="Brand" name="brand" type="select" options={org.brands} />
+              <FormField label="Brand" name="brand" type="select" value={brand} onChange={(e) => { setBrand(e.target.value); setCategory(''); }} options={org.brands} />
+              <FormField label="Category" name="category" type="select" required value={category} onChange={(e) => setCategory(e.target.value)} options={categoriesForBrand(org, brand)} />
               <FormField label="Units Sold (MTD)" name="unitsSold" type="number" />
               <FormField label="Sales Value (MTD)" name="salesValue" type="number" prefix="GHS" step={0.01} />
               <FormField label="Current Stock" name="stock" type="number" />
@@ -143,8 +181,8 @@ export default function CommercialFormsPage() {
           <FormSection title="New Arrivals Registration" description="Register new stock arrivals">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Arrival Date" name="date" type="date" required />
-              <FormField label="Brand" name="brand" required />
-              <FormField label="Category" name="category" type="select" required options={CATEGORIES} />
+              <FormField label="Brand" name="brand" type="select" required value={brand} onChange={(e) => { setBrand(e.target.value); setCategory(''); }} options={org.brands} />
+              <FormField label="Category" name="category" type="select" required value={category} onChange={(e) => setCategory(e.target.value)} options={categoriesForBrand(org, brand)} />
               <FormField label="Total Quantity" name="qty" type="number" required />
               <FormField label="Stock Value" name="stockValue" type="number" prefix="GHS" required step={0.01} />
               <FormField label="Store Deployed To" name="store" type="select" options={org.stores} />
