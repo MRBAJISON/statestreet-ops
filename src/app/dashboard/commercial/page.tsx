@@ -12,6 +12,7 @@ import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, type Period } from '@/lib/api';
 import { TARGETS, ragStatus } from '@/lib/targets';
 import { useOrg } from '@/components/providers/OrgProvider';
+import { toLabelMap } from '@/lib/org';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -92,6 +93,24 @@ export default function CommercialPage() {
   const newArrivals = m?.newArrivals ?? [];
   const deploymentByStore = m?.deploymentByStore ?? [];
   const accountability = m?.accountability ?? [];
+
+  // Brand Performance — roll the category sales mix up to brand using the
+  // Brand → Categories mapping from Settings (client-side; no metrics change).
+  const catLabelToValue = new Map(org.categories.map((c) => [c.label, c.value]));
+  const catValueToBrand: Record<string, string> = {};
+  for (const [brandVal, cats] of Object.entries(org.brandCategories ?? {})) {
+    for (const c of cats) catValueToBrand[c] = brandVal;
+  }
+  const brandLabels = toLabelMap(org.brands);
+  const brandAgg = new Map<string, number>();
+  for (const cs of categorySales) {
+    const val = catLabelToValue.get(cs.name) ?? cs.name;
+    const bv = catValueToBrand[val];
+    const name = bv ? (brandLabels[bv] ?? bv) : 'Unassigned';
+    brandAgg.set(name, (brandAgg.get(name) ?? 0) + cs.value);
+  }
+  const brandPerformance = [...brandAgg].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+  const brandTotal = brandPerformance.reduce((s, b) => s + b.value, 0);
   const wr = m?.weeklyReview;
   const wrReviews = wr?.reviews ?? [];
   const [wrWeek, setWrWeek] = useState<number | 'all'>('all');
@@ -198,6 +217,32 @@ export default function CommercialPage() {
                 <SimpleBarChart data={categorySales} height={240} color="#c8a951" prefix="GHS " />
               ) : (
                 <EmptyState message="No category sales yet" hint="Submit Category Performance in the Commercial form." height={240} />
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Brand Performance</div>
+              {brandPerformance.length ? (
+                <SimpleBarChart data={brandPerformance} height={240} color="#3b82f6" horizontal prefix="GHS " />
+              ) : (
+                <EmptyState message="No brand sales yet" hint="Map Brand → Categories in Settings, then submit Category Performance." height={240} />
+              )}
+            </div>
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Brand Share of Sales</div>
+              {brandPerformance.length ? (
+                <div className="grid grid-cols-1 gap-2">
+                  {brandPerformance.map((b) => (
+                    <div key={b.name} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3 flex justify-between items-center">
+                      <span className="text-xs text-gray-400">{b.name}</span>
+                      <span className="text-sm font-bold text-[#c8a951]">{fmtGHS(b.value)} <span className="text-gray-500 font-normal">· {brandTotal ? Math.round((b.value / brandTotal) * 100) : 0}%</span></span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState height={240} />
               )}
             </div>
           </div>
