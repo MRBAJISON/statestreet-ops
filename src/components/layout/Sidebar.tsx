@@ -12,6 +12,18 @@ interface SidebarProps {
   departments: Department[];
 }
 
+// Per-role entry-report export (mirrors /api/export scopes). Owner sees full data
+// elsewhere; each department/store pulls only its own.
+const REPORT_LINK: Record<string, { scope: string; label: string }> = {
+  operations: { scope: 'all', label: 'All Data' },
+  finance: { scope: 'finance', label: 'Finance & Stores' },
+  commercial: { scope: 'commercial', label: 'Commercial Report' },
+  marketing: { scope: 'marketing', label: 'Marketing Report' },
+  inventory: { scope: 'inventory', label: 'Inventory Report' },
+  brand: { scope: 'brand', label: 'Brand Report' },
+  'store-manager': { scope: 'store', label: 'My Store Report' },
+};
+
 const DEPT_CONFIG: Record<Department, { label: string; icon: string; color: string }> = {
   executive: { label: 'Executive Command', icon: '⚡', color: '#c8a951' },
   finance: { label: 'Finance', icon: '💰', color: '#22c55e' },
@@ -123,21 +135,13 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
           </Link>
         )}
 
-        {(userRole === 'finance' || userRole === 'operations') && (
+        {REPORT_LINK[userRole] && (
           <>
-            <div className="text-[0.6rem] text-gray-600 uppercase tracking-wider px-3 py-2 mt-4">Export</div>
-            {userRole === 'operations' && (
-              <a href="/api/export?scope=all" className={linkCls(false)}>
-                <span>📊</span>
-                <span>All Data</span>
-              </a>
-            )}
-            {userRole === 'finance' && (
-              <a href="/api/export?scope=finance" className={linkCls(false)}>
-                <span>📊</span>
-                <span>Finance &amp; Stores</span>
-              </a>
-            )}
+            <div className="text-[0.6rem] text-gray-600 uppercase tracking-wider px-3 py-2 mt-4">Entry Report</div>
+            <a href={`/api/export?scope=${REPORT_LINK[userRole].scope}`} className={linkCls(false)}>
+              <span>📊</span>
+              <span>{REPORT_LINK[userRole].label}</span>
+            </a>
           </>
         )}
 

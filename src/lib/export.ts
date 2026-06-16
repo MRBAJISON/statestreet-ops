@@ -3,10 +3,15 @@
 // a monthly-summary block followed by detailed day-by-day rows (grouped by month).
 import ExcelJS from 'exceljs';
 import type { Entry } from './db/schema';
-import { STORE_LABELS, BRAND_LABELS, CATEGORY_LABELS, EXPENSE_LABELS, labelFor } from './config';
+import { STORE_LABELS, BRAND_LABELS, CATEGORY_LABELS, EXPENSE_LABELS, labelFor, PAYMENT_MODES, payKey } from './config';
 
 type P = Record<string, unknown>;
-export type ExportScope = 'all' | 'finance';
+export type ExportScope = 'all' | 'finance' | 'commercial' | 'marketing' | 'inventory' | 'brand' | 'store';
+
+const SCOPE_LABEL: Record<ExportScope, string> = {
+  all: 'All departments', finance: 'Finance & Stores', commercial: 'Commercial',
+  marketing: 'Marketing', inventory: 'Inventory', brand: 'Brand', store: 'My Store',
+};
 
 // Target types are configuration, not captured operational data — leave them out.
 const EXCLUDED_TYPES = new Set(['weekly-target', 'exec-target', 'exec-target-annual']);
@@ -50,6 +55,10 @@ const FIELD_LABELS: Record<string, string> = {
   staffTotal: 'Staff (Total)', staffPresent: 'Staff Present', absences: 'Absences', attendance: 'Attendance %',
   punctuality: 'Punctuality %', training: 'Training %', qty: 'Quantity', units: 'Units', unitValue: 'Unit Value',
   totalValue: 'Total Value', systemQty: 'System Qty', physicalQty: 'Physical Qty', variance: 'Variance',
+  openingStock: 'Opening Stock', customers: 'Customers', newCustomers: 'New Customers',
+  returningCustomers: 'Returning Customers', discoverySource: 'Discovered Via', paymentsTotal: 'Payments Total',
+  // Closing-report payment modes (pay_*):
+  ...Object.fromEntries(PAYMENT_MODES.map((m) => [payKey(m.value), `Pay: ${m.label}`])),
 };
 
 // Numeric fields that must NOT be summed in the monthly block (years, %, rates, scores,
@@ -59,7 +68,7 @@ const NON_ADDITIVE = new Set([
   'convRate', 'rating', 'nps', 'compliance', 'opsScore', 'vmScore', 'readinessScore', 'cxScore',
   'cleanScore', 'safetyScore', 'overallVM', 'windowDisplay', 'mannequin', 'productPresentation', 'signage',
   'unitValue', 'googleRating', 'trustpilot', 'responseRate', 'instaSentiment', 'momentum', 'sov', 'roas',
-  'daysInStock', 'currentStock', 'reorderQty', 'staffTotal', 'staffPresent',
+  'daysInStock', 'currentStock', 'reorderQty', 'staffTotal', 'staffPresent', 'openingStock',
 ]);
 
 const prettify = (k: string) =>
@@ -104,7 +113,7 @@ function buildSheet(wb: ExcelJS.Workbook, name: string, entries: Entry[], scope:
   // Title
   const title = ws.addRow([`${name.toUpperCase()} — DATA EXPORT`]);
   title.font = { bold: true, size: 14 };
-  ws.addRow([`Generated ${isoDate(new Date())} · Scope: ${scope === 'all' ? 'All departments' : 'Finance & Stores'}`]).font = { italic: true, color: { argb: 'FF6B7280' } };
+  ws.addRow([`Generated ${isoDate(new Date())} · Scope: ${SCOPE_LABEL[scope]}`]).font = { italic: true, color: { argb: 'FF6B7280' } };
   ws.addRow([]);
 
   if (entries.length === 0) {
@@ -203,16 +212,30 @@ function buildSheet(wb: ExcelJS.Workbook, name: string, entries: Entry[], scope:
   ws.columns.forEach((col, i) => { col.width = Math.min(42, Math.max(12, widths[i] ?? 14)); });
 }
 
-export async function buildWorkbook(scope: ExportScope, entries: Entry[]): Promise<ArrayBuffer> {
+// A store's own submissions span store (sales), fromStore (transfers) and reviews.
+const storeMatches = (e: Entry, store: string) => {
+  const p = e.payload as P;
+  return String(p.store ?? '') === store || String(p.fromStore ?? '') === store;
+};
+
+export async function buildWorkbook(scope: ExportScope, entries: Entry[], opts?: { store?: string }): Promise<ArrayBuffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'StateStreet Ops';
   wb.created = new Date();
 
-  const sheets = scope === 'finance' ? DEPT_SHEETS.filter((s) => s.dept === 'finance') : DEPT_SHEETS;
-  for (const s of sheets) {
-    buildSheet(wb, s.name, entries.filter((e) => e.department === s.dept), scope);
+  if (scope === 'store') {
+    const store = opts?.store ?? '';
+    buildSheet(wb, 'My Store', entries.filter((e) => isStoreEntry(e) && storeMatches(e, store)), scope);
+  } else {
+    const sheets = scope === 'all' ? DEPT_SHEETS : DEPT_SHEETS.filter((s) => s.dept === scope);
+    for (const s of sheets) {
+      buildSheet(wb, s.name, entries.filter((e) => e.department === s.dept), scope);
+    }
+    // Stores roll-up alongside the full export and the finance scope (as before).
+    if (scope === 'all' || scope === 'finance') {
+      buildSheet(wb, 'Stores', entries.filter(isStoreEntry), scope);
+    }
   }
-  buildSheet(wb, 'Stores', entries.filter(isStoreEntry), scope);
 
   const buf = await wb.xlsx.writeBuffer();
   return buf as ArrayBuffer;
