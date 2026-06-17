@@ -15,6 +15,9 @@ export default function InventoryFormsPage() {
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  // Stock-transfer can span multiple categories.
+  const [transferCats, setTransferCats] = useState<string[]>([]);
+  const toggleTransferCat = (v: string) => setTransferCats((c) => (c.includes(v) ? c.filter((x) => x !== v) : [...c, v]));
 
   const forms = [
     { id: 'stock-count', label: 'Stock Count' },
@@ -32,6 +35,7 @@ export default function InventoryFormsPage() {
       await submitEntry('inventory', activeForm, form);
       setMessage('Saved to the live database. The dashboard reflects it now.');
       form.reset();
+      setTransferCats([]);
     } catch (err) {
       setMessage('Could not save: ' + (err as Error).message);
     } finally {
@@ -120,6 +124,21 @@ export default function InventoryFormsPage() {
                 { label: 'Low Stock at Destination', value: 'low-stock' }, { label: 'Consolidation', value: 'consolidation' },
               ]} />
               <FormField label="Authorized By" name="authorizedBy" required />
+            </div>
+            <input type="hidden" name="categories" value={transferCats.join(', ')} />
+            <div className="mt-4">
+              <label className="block text-xs text-gray-400 mb-1.5">Categories <span className="text-gray-600">(select all that apply)</span></label>
+              <div className="flex flex-wrap gap-1.5">
+                {CATEGORIES.map((c) => {
+                  const on = transferCats.includes(c.value);
+                  return (
+                    <button type="button" key={c.value} onClick={() => toggleTransferCat(c.value)}
+                      className={`text-[0.7rem] px-2.5 py-1 rounded border transition-colors ${on ? 'bg-[#c8a951] text-black border-[#c8a951] font-medium' : 'border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
+                      {c.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </FormSection>
         )}

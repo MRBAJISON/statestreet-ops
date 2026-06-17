@@ -7,7 +7,7 @@ import { postEntry, deleteEntry, type EntryRow } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { STORE_LABELS, labelFor } from '@/lib/config';
 import { useOrg } from '@/components/providers/OrgProvider';
-import { transferTargets } from '@/lib/org';
+import { transferTargets, categoriesForStore } from '@/lib/org';
 
 // Store-to-store stock transfer. Saved as inventory/store-transfer (kept separate
 // from the Inventory team's stock-transfer stream). Transfers are restricted to
@@ -19,6 +19,9 @@ export default function StockTransfer({ assignedStore, managerName, recent, onSa
   const { org } = useOrg();
   const toStores = transferTargets(org, assignedStore);
   const canTransfer = toStores.length > 0;
+  const catOptions = categoriesForStore(org, assignedStore);
+  const [cats, setCats] = useState<string[]>([]);
+  const toggleCat = (v: string) => setCats((c) => (c.includes(v) ? c.filter((x) => x !== v) : [...c, v]));
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -28,11 +31,13 @@ export default function StockTransfer({ assignedStore, managerName, recent, onSa
     fd.forEach((v, k) => { payload[k] = typeof v === 'string' ? v : ''; });
     payload.fromStore = assignedStore;
     payload.authorizedBy = managerName;
+    payload.categories = cats.join(', ');
     setSubmitting(true);
     try {
       await postEntry('inventory', 'store-transfer', payload);
       setMsg({ ok: true, text: 'Stock transfer recorded.' });
       form.reset();
+      setCats([]);
       onSaved();
     } catch (err) {
       setMsg({ ok: false, text: 'Could not save: ' + (err as Error).message });
@@ -70,6 +75,20 @@ export default function StockTransfer({ assignedStore, managerName, recent, onSa
             { label: 'Rebalancing', value: 'rebalance' }, { label: 'Customer Request', value: 'customer' },
             { label: 'Low Stock at Destination', value: 'low-stock' }, { label: 'Consolidation', value: 'consolidation' },
           ]} />
+        </div>
+        <div className="mt-4">
+          <label className="block text-xs text-gray-400 mb-1.5">Categories <span className="text-gray-600">(select all that apply)</span></label>
+          <div className="flex flex-wrap gap-1.5">
+            {catOptions.map((c) => {
+              const on = cats.includes(c.value);
+              return (
+                <button type="button" key={c.value} onClick={() => toggleCat(c.value)}
+                  className={`text-[0.7rem] px-2.5 py-1 rounded border transition-colors ${on ? 'bg-[#c8a951] text-black border-[#c8a951] font-medium' : 'border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <button type="submit" disabled={submitting}
           className="mt-3 bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg text-sm disabled:opacity-50">
