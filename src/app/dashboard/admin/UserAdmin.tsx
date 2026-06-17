@@ -93,6 +93,21 @@ export default function UserAdmin() {
     closeModal();
   }
 
+  async function openAccount(id: number) {
+    setMenu(null);
+    const res = await fetch('/api/impersonate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: id }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok) {
+      window.location.href = json.redirect || '/';
+    } else {
+      setMsg({ ok: false, text: json.error || 'Could not open account' });
+    }
+  }
+
   async function confirmDelete() {
     if (!modal) return;
     setBusy(true);
@@ -210,7 +225,8 @@ export default function UserAdmin() {
         return (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setMenu(null)} aria-hidden="true" />
-            <div className="fixed z-50 w-40 bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg shadow-xl py-1 text-left" style={{ top: menu.top, right: menu.right }}>
+            <div className="fixed z-50 w-44 bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg shadow-xl py-1 text-left" style={{ top: menu.top, right: menu.right }}>
+              <button onClick={() => openAccount(u.id)} className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-[var(--c-hover)] hover:text-[#c8a951]">👁 Open account</button>
               <button onClick={() => openModal('password', u)} className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-[var(--c-hover)] hover:text-[#c8a951]">Edit password</button>
               <button onClick={() => openModal('delete', u)} className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-[var(--c-hover)] hover:text-red-400">Delete user</button>
             </div>

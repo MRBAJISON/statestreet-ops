@@ -51,5 +51,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE() {
   const cookieStore = await cookies();
   cookieStore.delete('session');
+  cookieStore.delete('admin_session');
+  cookieStore.delete('impersonating');
   return NextResponse.json({ ok: true });
 }

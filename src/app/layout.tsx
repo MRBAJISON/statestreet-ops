@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import OrgProvider from "@/components/providers/OrgProvider";
+import ImpersonationBanner from "@/components/layout/ImpersonationBanner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,7 +39,10 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <OrgProvider>{children}</OrgProvider>
+        <OrgProvider>
+          <ImpersonationBanner />
+          {children}
+        </OrgProvider>
       </body>
     </html>
   );
