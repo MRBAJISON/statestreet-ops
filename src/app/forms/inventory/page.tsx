@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
+import MultiSelectDropdown from '@/components/forms/MultiSelectDropdown';
 import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
@@ -17,7 +18,6 @@ export default function InventoryFormsPage() {
   const [message, setMessage] = useState('');
   // Stock-transfer can span multiple categories.
   const [transferCats, setTransferCats] = useState<string[]>([]);
-  const toggleTransferCat = (v: string) => setTransferCats((c) => (c.includes(v) ? c.filter((x) => x !== v) : [...c, v]));
 
   const forms = [
     { id: 'stock-count', label: 'Stock Count' },
@@ -116,6 +116,7 @@ export default function InventoryFormsPage() {
               <FormField label="From Store" name="fromStore" type="select" required options={[{ label: 'Main Warehouse', value: 'warehouse' }, ...org.stores]} />
               <FormField label="To Store" name="toStore" type="select" required options={org.stores} />
               <FormField label="SKU Code" name="sku" placeholder="e.g. ARB-101-BLK-42" />
+              <MultiSelectDropdown label="Categories" options={CATEGORIES} value={transferCats} onChange={setTransferCats} />
               <FormField label="Product Description" name="description" required />
               <FormField label="Quantity" name="qty" type="number" required />
               <FormField label="Unit Value" name="unitValue" type="number" prefix="GHS" step={0.01} />
@@ -126,20 +127,6 @@ export default function InventoryFormsPage() {
               <FormField label="Authorized By" name="authorizedBy" required />
             </div>
             <input type="hidden" name="categories" value={transferCats.join(', ')} />
-            <div className="mt-4">
-              <label className="block text-xs text-gray-400 mb-1.5">Categories <span className="text-gray-600">(select all that apply)</span></label>
-              <div className="flex flex-wrap gap-1.5">
-                {CATEGORIES.map((c) => {
-                  const on = transferCats.includes(c.value);
-                  return (
-                    <button type="button" key={c.value} onClick={() => toggleTransferCat(c.value)}
-                      className={`text-[0.7rem] px-2.5 py-1 rounded border transition-colors ${on ? 'bg-[#c8a951] text-black border-[#c8a951] font-medium' : 'border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
-                      {c.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
           </FormSection>
         )}
 
