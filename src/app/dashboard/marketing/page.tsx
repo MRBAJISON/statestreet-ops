@@ -5,10 +5,10 @@ import KPICard from '@/components/ui/KPICard';
 import Section from '@/components/ui/Section';
 import EmptyState from '@/components/ui/EmptyState';
 import RecentEntries from '@/components/ui/RecentEntries';
-import { SimpleBarChart } from '@/components/charts/Charts';
+import { SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
 import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
-import { useMetrics, type Period } from '@/lib/api';
+import { useMetrics, useEntries, type Period } from '@/lib/api';
 import BrandedLoader from '@/components/ui/BrandedLoader';
 
 const fmtGHS = (n: number) =>
