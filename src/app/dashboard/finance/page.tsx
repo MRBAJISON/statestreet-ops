@@ -65,6 +65,7 @@ interface FinanceMetricsData {
   weeklyForecast: { revenue: number; grossProfit: number; netProfit: number; cash: number };
   paymentsByMode: { name: string; value: number }[];
   paymentsTotal: number;
+  dailySalesByStore: { name: string; gross: number; tx: number; units: number; count: number }[];
   entryCount: number;
 }
 
@@ -472,7 +473,49 @@ export default function FinancePage() {
           </Section>
         )}
 
-        {/* 6. Recent Entries */}
+        {/* Daily sales entered by the various stores — per-store summary */}
+        <Section title="Daily Sales by Store" subtitle="entered by the stores">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 overflow-x-auto">
+              {(m?.dailySalesByStore?.length ?? 0) ? (
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-[var(--c-border)] text-gray-500">
+                      <th className="text-left py-2 pr-3 font-medium">Store</th>
+                      <th className="text-right py-2 px-3 font-medium">Entries</th>
+                      <th className="text-right py-2 px-3 font-medium">Units</th>
+                      <th className="text-right py-2 px-3 font-medium">Transactions</th>
+                      <th className="text-right py-2 font-medium">Gross Sales</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(m?.dailySalesByStore ?? []).map((s) => (
+                      <tr key={s.name} className="border-b border-[var(--c-hover)]">
+                        <td className="py-2 pr-3">{s.name}</td>
+                        <td className="py-2 px-3 text-right">{s.count}</td>
+                        <td className="py-2 px-3 text-right">{s.units || '—'}</td>
+                        <td className="py-2 px-3 text-right">{s.tx || '—'}</td>
+                        <td className="py-2 text-right font-semibold text-[#c8a951]">{fmtGHS(s.gross)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <EmptyState message="No store daily sales yet" hint="Stores log these on the Daily Sales form." height={200} />
+              )}
+            </div>
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Gross by Store</div>
+              {(m?.dailySalesByStore?.length ?? 0) ? (
+                <SimpleBarChart data={(m?.dailySalesByStore ?? []).map((s) => ({ name: s.name, value: s.gross }))} height={220} color="#22c55e" horizontal prefix="GHS " />
+              ) : (
+                <EmptyState height={220} />
+              )}
+            </div>
+          </div>
+        </Section>
+
+        {/* Store Ledger — detailed audit trail */}
         <Section number={hasForecast ? 7 : 6} title="Daily Sales — Store Ledger" subtitle="Audit">
           <StoreLedger />
         </Section>

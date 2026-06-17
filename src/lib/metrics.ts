@@ -215,9 +215,20 @@ function financeMetrics(rows: Entry[]) {
     .filter((x) => x.value > 0);
   const paymentsTotal = paymentsByMode.reduce((s, x) => s + x.value, 0);
 
+  // Daily sales entered by the stores (finance/revenue), summarised per store.
+  const dsMap = new Map<string, { gross: number; tx: number; units: number; count: number }>();
+  for (const p of payloads(rows, 'revenue')) {
+    const k = labelFor(STORE_LABELS, p.store);
+    const e = dsMap.get(k) ?? { gross: 0, tx: 0, units: 0, count: 0 };
+    e.gross += num(p.grossRevenue); e.tx += num(p.transactions); e.units += num(p.itemsSold); e.count += 1;
+    dsMap.set(k, e);
+  }
+  const dailySalesByStore = [...dsMap].map(([name, v]) => ({ name, ...v })).sort((a, b) => b.gross - a.gross);
+
   return {
     paymentsByMode,
     paymentsTotal,
+    dailySalesByStore,
     revenueMtd,
     cogs: cogsTotal,
     revenueByCategory: [...catMap].map(([name, value]) => ({ name, value })),
