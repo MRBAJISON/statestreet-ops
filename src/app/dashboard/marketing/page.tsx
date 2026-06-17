@@ -60,6 +60,28 @@ export default function MarketingPage() {
   const hasFunnel = !!(funnel.reach || funnel.engagement || funnel.leads || funnel.storeVisits);
   const hasClienteling = !!(cl.contacted || cl.responses || cl.appointments || cl.estRevenue);
 
+  // Customer Insights — walk-in captures (commercial/customer-capture), analysed client-side.
+  const { entries: comEntries } = useEntries('commercial', 5000);
+  const captures = comEntries.filter((e) => e.formType === 'customer-capture');
+  const capTotal = captures.length;
+  const capBuyers = captures.filter((e) => String(e.payload.leadBuyer) === 'buyer').length;
+  const capConv = capTotal ? Math.round((capBuyers / capTotal) * 100) : 0;
+  const countField = (key: string) => {
+    const map = new Map<string, number>();
+    for (const e of captures) {
+      const v = String(e.payload[key] ?? '').trim();
+      if (!v) continue;
+      map.set(v, (map.get(v) ?? 0) + 1);
+    }
+    return [...map].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+  };
+  const topItems = countField('item').slice(0, 8);
+  const sizeDist = countField('size').slice(0, 10);
+  const CAP_SOURCE_LABELS: Record<string, string> = { 'social-media': 'Social Media', billboard: 'Billboard', sms: 'SMS', calls: 'Calls', referral: 'Referral', 'walk-drive': 'Walk / Drive by', other: 'Other' };
+  const sourceMap = new Map<string, number>();
+  for (const e of captures) { const k = String(e.payload.source || 'other'); sourceMap.set(k, (sourceMap.get(k) ?? 0) + 1); }
+  const capBySource = [...sourceMap].map(([k, value]) => ({ name: CAP_SOURCE_LABELS[k] ?? k, value })).sort((a, b) => b.value - a.value);
+
   const funnelSteps = [
     { label: 'Reach', value: numOrDash(funnel.reach) },
     { label: 'Engagement', value: numOrDash(funnel.engagement) },
@@ -297,7 +319,42 @@ export default function MarketingPage() {
           )}
         </Section>
 
-        <Section number={7} title="Recent Entries">
+        <Section number={7} title="Customer Insights" subtitle="walk-in captures from stores">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <KPICard label="Captured" value={capTotal ? String(capTotal) : '—'} small />
+            <KPICard label="Buyers" value={capBuyers ? String(capBuyers) : '—'} small />
+            <KPICard label="Lead→Buyer" value={capTotal ? `${capConv}%` : '—'} status={capConv >= 50 ? 'green' : 'yellow'} small />
+            <KPICard label="Top Source" value={capBySource[0]?.name ?? '—'} small />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Most Requested Items</div>
+              {topItems.length ? (
+                <SimpleBarChart data={topItems} height={240} color="#8b5cf6" horizontal />
+              ) : (
+                <EmptyState message="No captures yet" hint="Stores log walk-ins on the Customer Capture form." height={240} />
+              )}
+            </div>
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Requested Sizes</div>
+              {sizeDist.length ? (
+                <SimpleBarChart data={sizeDist} height={240} color="#3b82f6" horizontal />
+              ) : (
+                <EmptyState message="No sizes captured yet" height={240} />
+              )}
+            </div>
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Acquisition Source</div>
+              {capBySource.length ? (
+                <SimpleDonutChart data={capBySource} height={200} innerRadius={45} outerRadius={65} centerLabel="Captured" centerValue={String(capTotal)} />
+              ) : (
+                <EmptyState height={200} />
+              )}
+            </div>
+          </div>
+        </Section>
+
+        <Section number={8} title="Recent Entries">
           <RecentEntries department="marketing" />
         </Section>
       </div>
