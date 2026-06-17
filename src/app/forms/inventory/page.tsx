@@ -85,8 +85,8 @@ export default function InventoryFormsPage() {
           <FormSection title="Goods Received Note" description="Record incoming inventory">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Receipt Date" name="date" type="date" required />
-              <FormField label="PO Number" name="poNumber" required placeholder="PO-XXXX" />
-              <FormField label="Supplier" name="supplier" required />
+              <FormField label="PO Number" name="poNumber" placeholder="PO-XXXX" />
+              <FormField label="Supplier" name="supplier" />
               <FormField label="Brand" name="brand" placeholder="Type the brand" />
               <FormField label="Category" name="category" type="select" required options={CATEGORIES} />
               <FormField label="Total Units Received" name="units" type="number" required />
@@ -111,7 +111,7 @@ export default function InventoryFormsPage() {
               <FormField label="Transfer Date" name="date" type="date" required />
               <FormField label="From Store" name="fromStore" type="select" required options={[{ label: 'Main Warehouse', value: 'warehouse' }, ...org.stores]} />
               <FormField label="To Store" name="toStore" type="select" required options={org.stores} />
-              <FormField label="SKU Code" name="sku" required placeholder="e.g. ARB-101-BLK-42" />
+              <FormField label="SKU Code" name="sku" placeholder="e.g. ARB-101-BLK-42" />
               <FormField label="Product Description" name="description" required />
               <FormField label="Quantity" name="qty" type="number" required />
               <FormField label="Unit Value" name="unitValue" type="number" prefix="GHS" step={0.01} />
