@@ -5,18 +5,24 @@ import { useEntries } from '@/lib/api';
 import RecentEntries from '@/components/ui/RecentEntries';
 import DailySales from './DailySales';
 import StockTransfer from './StockTransfer';
+import CustomerCapture from './CustomerCapture';
 import WeeklyReview, { type DailySale, type WeekTarget } from './WeeklyReview';
 
 const FORMS = [
   { id: 'daily-sales', label: 'Daily Sales' },
   { id: 'stock-transfer', label: 'Stock Transfer' },
+  { id: 'customer-capture', label: 'Customer Capture' },
   { id: 'weekly-review', label: 'Weekly Review' },
 ];
 
 export default function StoreManagerForms({ managerName, assignedStore }: { managerName: string; assignedStore: string }) {
   const { entries: finEntries, refresh } = useEntries('finance', 5000);
-  const { entries: comEntries } = useEntries('commercial', 5000);
+  const { entries: comEntries, refresh: refreshCom } = useEntries('commercial', 5000);
   const { entries: invEntries, refresh: refreshInv } = useEntries('inventory', 5000);
+  const myCaptures = useMemo(
+    () => comEntries.filter((e) => e.formType === 'customer-capture' && String(e.payload.store) === assignedStore),
+    [comEntries, assignedStore]
+  );
   const myTransfers = useMemo(
     () => invEntries.filter((e) => e.formType === 'store-transfer' && String(e.payload.fromStore) === assignedStore),
     [invEntries, assignedStore]
@@ -68,6 +74,10 @@ export default function StoreManagerForms({ managerName, assignedStore }: { mana
 
         {activeForm === 'stock-transfer' && (
           <StockTransfer assignedStore={assignedStore} managerName={managerName} recent={myTransfers} onSaved={refreshInv} />
+        )}
+
+        {activeForm === 'customer-capture' && (
+          <CustomerCapture assignedStore={assignedStore} managerName={managerName} recent={myCaptures} onSaved={refreshCom} />
         )}
 
         {activeForm === 'weekly-review' && (
