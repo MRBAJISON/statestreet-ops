@@ -31,6 +31,7 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
   // Daily closing report (submitted once a day, not per category): customers +
   // the day's takings by payment mode. Saved as finance/closing.
   const [closing, setClosing] = useState(false);
+  const [showClosing, setShowClosing] = useState(false);
   const [closingMsg, setClosingMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [payments, setPayments] = useState<Record<string, string>>({});
   const paymentsTotal = Math.round(PAYMENT_MODES.reduce((s, m) => s + num(payments[m.value] ?? ''), 0) * 100) / 100;
@@ -105,10 +106,16 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
           <FormField label="Items Sold" name="itemsSold" type="number" />
         </div>
 
-        <button type="submit" disabled={submitting}
-          className="mt-3 bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg text-sm disabled:opacity-50">
-          {submitting ? <><Spinner /> Saving…</> : 'Save Daily Sales'}
-        </button>
+        <div className="flex gap-3 mt-3 flex-wrap">
+          <button type="submit" disabled={submitting}
+            className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg text-sm disabled:opacity-50">
+            {submitting ? <><Spinner /> Saving…</> : 'Save Daily Sales'}
+          </button>
+          <button type="button" onClick={() => setShowClosing((s) => !s)}
+            className={`px-6 py-2.5 rounded-lg text-sm border transition-colors ${showClosing ? 'bg-[var(--c-hover)] border-[#c8a951] text-[var(--c-fg)]' : 'border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
+            {showClosing ? '✕ Close Daily Closing' : '+ Daily Closing Report'}
+          </button>
+        </div>
       </form>
 
       {recentSorted.length > 0 && (
@@ -144,6 +151,7 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
       )}
     </FormSection>
 
+    {showClosing && (
     <FormSection title="Daily Closing Report" description="Submit once at the end of the day — total customers and the day's takings by payment mode. Not per category.">
       {closingMsg && (
         <div className={`mb-3 text-sm p-3 rounded-lg border ${closingMsg.ok ? 'border-green-500/30 bg-green-500/10 text-green-400' : 'border-red-500/30 bg-red-500/10 text-red-400'}`}>{closingMsg.text}</div>
@@ -174,6 +182,7 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
         </button>
       </form>
     </FormSection>
+    )}
    </>
   );
 }

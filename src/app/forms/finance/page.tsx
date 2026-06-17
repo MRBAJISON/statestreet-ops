@@ -49,7 +49,8 @@ export default function FinanceFormsPage() {
   const [revStore, setRevStore] = useState('');
   const [revCat, setRevCat] = useState('');
 
-  // Daily closing — its own form (sits under Daily Revenue Entry), submitted once a day.
+  // Daily closing — opens on demand under Daily Revenue Entry (its own save).
+  const [showClosing, setShowClosing] = useState(false);
   const [closingBusy, setClosingBusy] = useState(false);
   const [closingMsg, setClosingMsg] = useState('');
   const [closingSubmitted, setClosingSubmitted] = useState(false);
@@ -413,11 +414,17 @@ export default function FinanceFormsPage() {
           <button type="reset" className="bg-[var(--c-hover)] border border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)] px-6 py-2.5 rounded-lg transition-colors text-sm">
             Clear Form
           </button>
+          {activeForm === 'revenue' && (
+            <button type="button" onClick={() => setShowClosing((s) => !s)}
+              className={`px-6 py-2.5 rounded-lg text-sm border transition-colors ${showClosing ? 'bg-[var(--c-hover)] border-[#c8a951] text-[var(--c-fg)]' : 'border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
+              {showClosing ? '✕ Close Daily Closing' : '+ Daily Closing'}
+            </button>
+          )}
         </div>
       </form>
 
-      {/* Daily Closing — sits under the Daily Revenue Entry (like the Store form), its own save. */}
-      {activeForm === 'revenue' && (
+      {/* Daily Closing — opens under the Daily Revenue Entry (like the Store form), its own save. */}
+      {activeForm === 'revenue' && showClosing && (
         <form onSubmit={handleClosing} className="space-y-4 max-w-4xl mt-6">
           {closingSubmitted && (
             <div className="bg-green-500/10 border border-green-500/30 text-green-400 p-3 rounded-lg text-sm">{closingMsg}</div>

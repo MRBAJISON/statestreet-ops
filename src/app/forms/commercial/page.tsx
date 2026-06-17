@@ -8,6 +8,7 @@ import { submitEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { useOrg } from '@/components/providers/OrgProvider';
 import { categoriesForBrand, categoriesForStore } from '@/lib/org';
+import { PAYMENT_MODES, DISCOVERY_SOURCES, payKey } from '@/lib/config';
 
 const numOf = (s: string) => Number(s) || 0;
 const fmt2 = (x: number) => (x ? x.toFixed(2) : '');
@@ -32,6 +33,14 @@ export default function CommercialFormsPage() {
   const [brand, setBrand] = useState('');
   const [category, setCategory] = useState('');
   const [cpStore, setCpStore] = useState('');
+
+  // Daily Closing — opens on demand under Daily Store Sales (saved as finance/closing).
+  const [showClosing, setShowClosing] = useState(false);
+  const [closingBusy, setClosingBusy] = useState(false);
+  const [closingMsg, setClosingMsg] = useState('');
+  const [closingSubmitted, setClosingSubmitted] = useState(false);
+  const [payments, setPayments] = useState<Record<string, string>>({});
+  const paymentsTotal = Math.round(PAYMENT_MODES.reduce((s, m) => s + numOf(payments[m.value] ?? ''), 0) * 100) / 100;
 
   const ssAtv = numOf(ssTxns) ? numOf(ssTotalSales) / numOf(ssTxns) : 0;
   const ssConv = numOf(ssFootfall) ? (numOf(ssTxns) / numOf(ssFootfall)) * 100 : 0;
@@ -77,6 +86,24 @@ export default function CommercialFormsPage() {
     }
     setSubmitted(true);
     setTimeout(() => setSubmitted(false), 4000);
+  }
+
+  async function handleClosing(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    setClosingBusy(true);
+    try {
+      await submitEntry('finance', 'closing', form);
+      setClosingMsg('Daily closing saved. The Finance dashboard sums each payment mode across all stores.');
+      form.reset();
+      setPayments({});
+    } catch (err) {
+      setClosingMsg('Could not save: ' + (err as Error).message);
+    } finally {
+      setClosingBusy(false);
+    }
+    setClosingSubmitted(true);
+    setTimeout(() => setClosingSubmitted(false), 4000);
   }
 
   return (
@@ -194,11 +221,50 @@ export default function CommercialFormsPage() {
           </FormSection>
         )}
 
-        <div className="flex gap-3 pt-2">
+        <div className="flex gap-3 pt-2 flex-wrap">
           <button type="submit" disabled={busy} className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg transition-colors text-sm disabled:opacity-50">{busy ? <><Spinner /> Saving…</> : 'Submit Entry'}</button>
           <button type="reset" className="bg-[var(--c-hover)] border border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)] px-6 py-2.5 rounded-lg transition-colors text-sm">Clear Form</button>
+          {activeForm === 'store-sales' && (
+            <button type="button" onClick={() => setShowClosing((s) => !s)}
+              className={`px-6 py-2.5 rounded-lg text-sm border transition-colors ${showClosing ? 'bg-[var(--c-hover)] border-[#c8a951] text-[var(--c-fg)]' : 'border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
+              {showClosing ? '✕ Close Daily Closing' : '+ Daily Closing'}
+            </button>
+          )}
         </div>
       </form>
+
+      {activeForm === 'store-sales' && showClosing && (
+        <form onSubmit={handleClosing} className="space-y-4 max-w-4xl mt-6">
+          {closingSubmitted && (
+            <div className="bg-green-500/10 border border-green-500/30 text-green-400 p-3 rounded-lg text-sm">{closingMsg}</div>
+          )}
+          <FormSection title="Daily Closing" description="A store's end-of-day takings by payment mode + customer counts. One per store per day; the Finance dashboard sums each mode across all stores.">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
+              <FormField label="Date" name="date" type="date" required />
+              <FormField label="Store" name="store" type="select" required options={org.stores} />
+              <FormField label="Total Customers" name="customers" type="number" />
+              <FormField label="New Customers" name="newCustomers" type="number" />
+              <FormField label="Returning Customers" name="returningCustomers" type="number" />
+              <FormField label="How They Found Us" name="discoverySource" type="select" options={DISCOVERY_SOURCES} />
+            </div>
+            <div className="mt-4">
+              <h4 className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Payments by Mode</h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {PAYMENT_MODES.map((mode) => (
+                  <FormField key={mode.value} label={mode.label} name={payKey(mode.value)} type="number" prefix={org.currency} step={0.01}
+                    value={payments[mode.value] ?? ''} onChange={(e) => setPayments((p) => ({ ...p, [mode.value]: e.target.value }))} />
+                ))}
+                <FormField label="Payments Total (auto)" name="paymentsTotal" type="number" prefix={org.currency} value={paymentsTotal ? String(paymentsTotal) : ''} readOnly />
+              </div>
+            </div>
+            <div className="flex pt-3">
+              <button type="submit" disabled={closingBusy} className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg transition-colors text-sm disabled:opacity-50">
+                {closingBusy ? <><Spinner /> Saving…</> : 'Save Closing Report'}
+              </button>
+            </div>
+          </FormSection>
+        </form>
+      )}
 
       <div className="mt-8 max-w-4xl">
         <h2 className="text-sm font-bold uppercase tracking-wide mb-3">Your Submissions</h2>
