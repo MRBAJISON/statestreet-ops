@@ -7,7 +7,7 @@ import { postEntry, deleteEntry, type EntryRow } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { labelFor, PAYMENT_MODES, DISCOVERY_SOURCES, payKey } from '@/lib/config';
 import { useOrg } from '@/components/providers/OrgProvider';
-import { toLabelMap, categoriesForBrand } from '@/lib/org';
+import { toLabelMap, categoriesForStore } from '@/lib/org';
 
 const fmtGHS = (n: number) => `GHS ${Math.round(n).toLocaleString()}`;
 
@@ -22,8 +22,8 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
   // (COGS is captured for gross-profit metrics, not deducted from net revenue.)
   const [gross, setGross] = useState('');
   const [discounts, setDiscounts] = useState('');
-  // Brand drives the available categories (Brand → Categories mapping in Settings).
-  const [brand, setBrand] = useState('');
+  // The store's brand drives the available categories (Brand → Stores + Brand →
+  // Categories mappings in Settings). Store is fixed, so it filters automatically.
   const [category, setCategory] = useState('');
   const num = (s: string) => Number(s) || 0;
   const netRevenue = num(gross) ? Math.round((num(gross) - num(discounts)) * 100) / 100 : 0;
@@ -49,7 +49,6 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
       form.reset();
       setGross('');
       setDiscounts('');
-      setBrand('');
       setCategory('');
       onSaved();
     } catch (err) {
@@ -95,8 +94,7 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-1">
           <FormField label="Date" name="date" type="date" required />
-          <FormField label="Brand" name="brand" type="select" value={brand} onChange={(e) => { setBrand(e.target.value); setCategory(''); }} options={org.brands} />
-          <FormField label="Category" name="category" type="select" required value={category} onChange={(e) => setCategory(e.target.value)} options={categoriesForBrand(org, brand)} />
+          <FormField label="Category" name="category" type="select" required value={category} onChange={(e) => setCategory(e.target.value)} options={categoriesForStore(org, assignedStore)} />
           <FormField label="Opening Stock" name="openingStock" type="number" />
           <FormField label="Gross Revenue" name="grossRevenue" type="number" prefix="GHS" required step={0.01} value={gross} onChange={(e) => setGross(e.target.value)} />
           <FormField label="Cost of Goods (COGS)" name="cogs" type="number" prefix="GHS" step={0.01} />

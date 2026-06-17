@@ -81,6 +81,13 @@ export function categoriesForBrand(org: OrgSettings, brandValue: string): Option
   return org.categories.filter((c) => set.has(c.value));
 }
 
+// Categories available at a store = the categories of the store's brand. Falls
+// back to all categories if the store isn't mapped to a brand.
+export function categoriesForStore(org: OrgSettings, storeValue: string): Option[] {
+  const brand = brandOfStore(org, storeValue);
+  return brand ? categoriesForBrand(org, brand) : org.categories;
+}
+
 // The brand a store belongs to (first brand whose store list includes it), or null.
 export function brandOfStore(org: OrgSettings, storeValue: string): string | null {
   for (const [brand, stores] of Object.entries(org.brandStores ?? {})) {

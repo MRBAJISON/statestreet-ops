@@ -7,7 +7,7 @@ import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry, postEntries, useEntries } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { useOrg } from '@/components/providers/OrgProvider';
-import { expenseGroups } from '@/lib/org';
+import { expenseGroups, categoriesForStore } from '@/lib/org';
 import { PAYMENT_MODES, DISCOVERY_SOURCES, payKey } from '@/lib/config';
 
 const INFLOW_GROUP = {
@@ -45,6 +45,10 @@ export default function FinanceFormsPage() {
   const [payments, setPayments] = useState<Record<string, string>>({});
   const paymentsTotal = Math.round(PAYMENT_MODES.reduce((s, m) => s + num(payments[m.value] ?? ''), 0) * 100) / 100;
 
+  // Daily revenue: the selected store's brand drives the category list.
+  const [revStore, setRevStore] = useState('');
+  const [revCat, setRevCat] = useState('');
+
   const annualBudget = finEntries
     .filter((e) => e.formType === 'budget' && String(e.payload.item) === expCat && num(e.payload.year as string) === budgetYear)
     .reduce((s, e) => s + num(e.payload.amount as string), 0);
@@ -80,7 +84,7 @@ export default function FinanceFormsPage() {
       await submitEntry('finance', activeForm, form);
       setMessage('Saved to the live database. The Finance & Executive dashboards reflect it now.');
       form.reset();
-      setExpCat(''); setExpAmount(''); setOverspendReason(''); setPayments({});
+      setExpCat(''); setExpAmount(''); setOverspendReason(''); setPayments({}); setRevStore(''); setRevCat('');
       refreshFin();
     } catch (err) {
       setMessage('Could not save: ' + (err as Error).message);
@@ -239,8 +243,8 @@ export default function FinanceFormsPage() {
           <FormSection title="Daily Revenue Entry" description="Record daily revenue figures by store and category">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
-              <FormField label="Store" name="store" type="select" required options={org.stores} />
-              <FormField label="Category" name="category" type="select" required options={org.categories} />
+              <FormField label="Store" name="store" type="select" required value={revStore} onChange={(e) => { setRevStore(e.target.value); setRevCat(''); }} options={org.stores} />
+              <FormField label="Category" name="category" type="select" required value={revCat} onChange={(e) => setRevCat(e.target.value)} options={categoriesForStore(org, revStore)} />
               <FormField label="Gross Revenue" name="grossRevenue" type="number" prefix="GHS" required step={0.01} />
               <FormField label="Cost of Goods (COGS)" name="cogs" type="number" prefix="GHS" step={0.01} />
               <FormField label="Discounts Given" name="discounts" type="number" prefix="GHS" step={0.01} />

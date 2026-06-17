@@ -7,7 +7,7 @@ import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { useOrg } from '@/components/providers/OrgProvider';
-import { categoriesForBrand } from '@/lib/org';
+import { categoriesForBrand, categoriesForStore } from '@/lib/org';
 
 const numOf = (s: string) => Number(s) || 0;
 const fmt2 = (x: number) => (x ? x.toFixed(2) : '');
@@ -27,9 +27,11 @@ export default function CommercialFormsPage() {
   const [cpSales, setCpSales] = useState('');
   const [cpUnits, setCpUnits] = useState('');
 
-  // Brand → Category filter (shared across the category forms).
+  // Category filtering: SKU & New Arrivals filter by the product's Brand; Category
+  // Performance filters by the selected Store's brand. `category` is shared.
   const [brand, setBrand] = useState('');
   const [category, setCategory] = useState('');
+  const [cpStore, setCpStore] = useState('');
 
   const ssAtv = numOf(ssTxns) ? numOf(ssTotalSales) / numOf(ssTxns) : 0;
   const ssConv = numOf(ssFootfall) ? (numOf(ssTxns) / numOf(ssFootfall)) * 100 : 0;
@@ -43,6 +45,7 @@ export default function CommercialFormsPage() {
     setCpUnits('');
     setBrand('');
     setCategory('');
+    setCpStore('');
   }
 
   function switchForm(id: string) {
@@ -121,9 +124,8 @@ export default function CommercialFormsPage() {
           <FormSection title="Category Performance" description="Weekly category sales breakdown">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Week Ending" name="weekEnd" type="date" required />
-              <FormField label="Store" name="store" type="select" required options={org.stores} />
-              <FormField label="Brand" name="brand" type="select" value={brand} onChange={(e) => { setBrand(e.target.value); setCategory(''); }} options={org.brands} />
-              <FormField label="Category" name="category" type="select" required value={category} onChange={(e) => setCategory(e.target.value)} options={categoriesForBrand(org, brand)} />
+              <FormField label="Store" name="store" type="select" required value={cpStore} onChange={(e) => { setCpStore(e.target.value); setCategory(''); }} options={org.stores} />
+              <FormField label="Category" name="category" type="select" required value={category} onChange={(e) => setCategory(e.target.value)} options={categoriesForStore(org, cpStore)} />
               <FormField label="Sales Value" name="sales" type="number" prefix="GHS" required step={0.01} value={cpSales} onChange={(e) => setCpSales(e.target.value)} />
               <FormField label="Units Sold" name="units" type="number" required value={cpUnits} onChange={(e) => setCpUnits(e.target.value)} />
               <FormField label="Gross Margin %" name="gm" type="number" suffix="%" step={0.1} />
