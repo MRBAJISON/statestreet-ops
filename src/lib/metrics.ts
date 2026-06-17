@@ -480,6 +480,28 @@ function commercialMetrics(rows: Entry[]) {
     value: x.value,
   }));
 
+  // Customer database / walk-in captures (commercial/customer-capture).
+  const SOURCE_LABELS_LOCAL: Record<string, string> = {
+    'social-media': 'Social Media', billboard: 'Billboard', sms: 'SMS', calls: 'Calls',
+    referral: 'Referral', 'walk-drive': 'Walk / Drive by', other: 'Other',
+  };
+  const capt = payloads(rows, 'customer-capture');
+  const leadsTotal = capt.length;
+  const buyersCount = capt.filter((p) => String(p.leadBuyer) === 'buyer').length;
+  const leadsOnly = capt.filter((p) => String(p.leadBuyer) === 'lead').length;
+  const srcMap = new Map<string, number>();
+  for (const p of capt) { const k = String(p.source || 'other'); srcMap.set(k, (srcMap.get(k) ?? 0) + 1); }
+  const leadsBySource = [...srcMap].map(([k, value]) => ({ name: SOURCE_LABELS_LOCAL[k] ?? k, value }));
+  const leads = capt
+    .map((p) => ({
+      date: String(p.date ?? ''), name: String(p.name ?? ''), leadBuyer: String(p.leadBuyer ?? ''),
+      occupation: String(p.occupation ?? ''), number: String(p.number ?? ''), size: String(p.size ?? ''),
+      item: String(p.item ?? ''), source: SOURCE_LABELS_LOCAL[String(p.source)] ?? String(p.source ?? ''),
+      sourceDetail: String(p.sourceDetail ?? ''), staff: String(p.staff ?? ''), store: labelFor(STORE_LABELS, p.store),
+    }))
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .slice(0, 30);
+
   return {
     groupSales,
     atv: tx ? Math.round(groupSales / tx) : Math.round(avg(ss.map((p) => num(p.atv)))),
@@ -515,6 +537,11 @@ function commercialMetrics(rows: Entry[]) {
       status: String(p.status || ''),
     })),
     weeklyReview,
+    leads,
+    leadsBySource,
+    leadsTotal,
+    buyersCount,
+    leadsOnly,
     entryCount: rows.length,
   };
 }

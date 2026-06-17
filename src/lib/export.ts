@@ -30,7 +30,8 @@ const isStoreEntry = (e: Entry) =>
   (e.department === 'finance' && e.formType === 'revenue') ||
   (e.department === 'finance' && e.formType === 'closing') ||
   (e.department === 'inventory' && e.formType === 'store-transfer') ||
-  (e.department === 'commercial' && e.formType === 'weekly-review');
+  (e.department === 'commercial' && e.formType === 'weekly-review') ||
+  (e.department === 'commercial' && e.formType === 'customer-capture');
 
 const FORM_TYPE_LABELS: Record<string, string> = {
   revenue: 'Daily Revenue', expenses: 'Expenses', cashflow: 'Cash Flow', debtors: 'Debtors & Creditors',
@@ -44,7 +45,7 @@ const FORM_TYPE_LABELS: Record<string, string> = {
   'brand-score': 'Brand Scores', sentiment: 'Sentiment', competitor: 'Competitor Watch', digital: 'Digital Reputation',
   voice: 'Customer Voice', attention: 'CEO Attention', leads: 'Leads', campaign: 'Campaigns', social: 'Social Media',
   clienteling: 'Clienteling', 'customer-experience': 'Customer Experience', 'customer-intel': 'Customer Intel',
-  priorities: 'Action Tracker',
+  priorities: 'Action Tracker', 'customer-capture': 'Customer Database',
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -58,6 +59,8 @@ const FIELD_LABELS: Record<string, string> = {
   totalValue: 'Total Value', systemQty: 'System Qty', physicalQty: 'Physical Qty', variance: 'Variance',
   openingStock: 'Opening Stock', customers: 'Customers', newCustomers: 'New Customers',
   returningCustomers: 'Returning Customers', discoverySource: 'Discovered Via', paymentsTotal: 'Payments Total',
+  name: 'Customer', leadBuyer: 'Lead/Buyer', occupation: 'Occupation', number: 'Phone',
+  size: 'Size', item: 'Item of Interest', source: 'Source', sourceDetail: 'Source Detail', staff: 'Captured By',
   // Closing-report payment modes (pay_*):
   ...Object.fromEntries(PAYMENT_MODES.map((m) => [payKey(m.value), `Pay: ${m.label}`])),
 };

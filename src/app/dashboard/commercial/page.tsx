@@ -61,6 +61,11 @@ interface CommercialLive {
     latest: { store: string; weekEnd: string; manager: string; achievement: number; actualSales: number; salesTarget: number } | null;
     ceo: Record<string, string> | null;
   };
+  leads: { date: string; name: string; leadBuyer: string; occupation: string; number: string; size: string; item: string; source: string; sourceDetail: string; staff: string; store: string }[];
+  leadsBySource: { name: string; value: number }[];
+  leadsTotal: number;
+  buyersCount: number;
+  leadsOnly: number;
 }
 interface WeeklyReviewRecord {
   id: number;
@@ -93,6 +98,8 @@ export default function CommercialPage() {
   const newArrivals = m?.newArrivals ?? [];
   const deploymentByStore = m?.deploymentByStore ?? [];
   const accountability = m?.accountability ?? [];
+  const leads = m?.leads ?? [];
+  const leadsBySource = m?.leadsBySource ?? [];
 
   // Brand Performance — roll the category sales mix up to brand using the
   // Brand → Categories mapping from Settings (client-side; no metrics change).
@@ -436,7 +443,62 @@ export default function CommercialPage() {
           )}
         </Section>
 
-        <Section number={8} title="Recent Entries">
+        <Section number={8} title="Customer Database" subtitle="Walk-in captures">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+            <KPICard label="Captured" value={(m?.leadsTotal ?? 0) ? String(m?.leadsTotal) : '—'} small />
+            <KPICard label="Buyers" value={(m?.buyersCount ?? 0) ? String(m?.buyersCount) : '—'} small />
+            <KPICard label="Leads" value={(m?.leadsOnly ?? 0) ? String(m?.leadsOnly) : '—'} small />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div>
+              <div className="text-xs text-gray-400 mb-2">By Source</div>
+              {leadsBySource.length ? (
+                <SimpleBarChart data={leadsBySource} height={220} color="#3b82f6" horizontal />
+              ) : (
+                <EmptyState message="No captures yet" hint="Stores log walk-ins on the Customer Capture form." height={220} />
+              )}
+            </div>
+            <div className="lg:col-span-2">
+              <div className="text-xs text-gray-400 mb-2">Recent Customers</div>
+              {leads.length ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[var(--c-border)] text-gray-500">
+                        <th className="text-left py-2 pr-3 font-medium">Date</th>
+                        <th className="text-left py-2 pr-3 font-medium">Name</th>
+                        <th className="text-left py-2 pr-3 font-medium">Type</th>
+                        <th className="text-left py-2 pr-3 font-medium">Phone</th>
+                        <th className="text-left py-2 pr-3 font-medium">Item</th>
+                        <th className="text-left py-2 pr-3 font-medium">Source</th>
+                        <th className="text-left py-2 pr-3 font-medium">Store</th>
+                        <th className="text-left py-2 font-medium">Staff</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {leads.map((l, i) => (
+                        <tr key={i} className="border-b border-[var(--c-hover)]">
+                          <td className="py-2 pr-3 whitespace-nowrap">{l.date || '—'}</td>
+                          <td className="py-2 pr-3">{l.name || '—'}</td>
+                          <td className="py-2 pr-3 capitalize">{l.leadBuyer || '—'}</td>
+                          <td className="py-2 pr-3 whitespace-nowrap">{l.number || '—'}</td>
+                          <td className="py-2 pr-3">{l.item || '—'}</td>
+                          <td className="py-2 pr-3">{l.source}{l.sourceDetail ? ` · ${l.sourceDetail}` : ''}</td>
+                          <td className="py-2 pr-3">{l.store}</td>
+                          <td className="py-2">{l.staff || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <EmptyState message="No customers captured yet" height={220} />
+              )}
+            </div>
+          </div>
+        </Section>
+
+        <Section number={9} title="Recent Entries">
           <RecentEntries department="commercial" />
         </Section>
       </div>
