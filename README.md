@@ -9,10 +9,17 @@ No mock data — empty states show until real data is entered.
 - **Neon Postgres** via **Drizzle ORM** (`@neondatabase/serverless`)
 - **Recharts** for analytics; HMAC-signed session cookies for auth
 
+## Requirements
+- Node.js **24.13.0** (`nvm use`)
+- npm **11.x**
+- A Neon development database URL
+
 ## Departments
 Executive (overview), Finance, Commercial, Marketing, Operations, Inventory, Brand Health.
 Each has a data-entry form and a live dashboard. The Executive/CEO sees all dashboards but
 no forms; department managers see only their own dashboard + form (Marketing also sees Brand).
+Finance sees every main department dashboard, including Executive Command, but data entry
+stays scoped to Finance forms.
 
 ## How it works
 - Forms POST submissions to `POST /api/entries` → stored in the `entries` table (jsonb payload).
@@ -32,25 +39,51 @@ Create `.env.local` (see `.env.example`):
 
 ## Local development
 ```bash
+nvm use
 npm install
+cp .env.example .env.local
 npm run db:push                 # create tables in your Neon DB
-node scripts/seed-users.mjs     # seed login accounts (run with DATABASE_URL set)
+npm run db:seed                 # seed demo login accounts
 npm run dev                     # http://localhost:3000
 ```
+
+Fill `.env.local` before running database commands. `npm run db:push` loads
+`.env.local` through the Next.js env loader, so you do not need to manually export
+`DATABASE_URL`.
 
 ## Database scripts
 - `npm run db:push` — sync schema to the database
 - `npm run db:studio` — open Drizzle Studio
+- `npm run db:seed` — seed demo users (updates seeded passwords on conflict)
+- `npm run db:seed:all` — seed users plus sample operating data
 - `node scripts/reset-db.mjs` — clear all entries (keeps users)
 
+## Verification
+```bash
+npm run lint
+npm run build
+npm run verify:fast
+```
+
+`npm run verify:fast` is the default local and CI gate. For schema/setup changes,
+also run `npm run db:push` against the intended development database.
+
+## Claude-assisted workflow
+This repo is primarily edited through Claude. Start with:
+
+- [`AGENTS.md`](AGENTS.md) for repo-wide instructions
+- [`CLAUDE.md`](CLAUDE.md) for Claude behavior
+- [`docs/conventions.md`](docs/conventions.md) for shared engineering rules
+- [`docs/claude-workflow.md`](docs/claude-workflow.md) for setup and verification
+- [`docs/code-review.md`](docs/code-review.md) for the review checklist
+- [`docs/deployment.md`](docs/deployment.md) for the current Vercel setup
+
 ## Deployment (Vercel)
-1. Push to GitHub and import the repo at vercel.com/new (framework auto-detected).
-2. In **Settings → Environment Variables** (Production scope), set:
-   - `DATABASE_URL` — Neon connection string
-   - `AUTH_SECRET` — long random string (`openssl rand -hex 32`)
-   - `RESEND_API_KEY` — (optional) for password-reset emails
-   - `EMAIL_FROM` — (optional) verified sender address
-3. Deploy. The same Neon database is used in production.
+This repo is already connected to Vercel. Current project details live in
+[`docs/deployment.md`](docs/deployment.md).
+
+Important: Vercel production deploys are tied to the GitHub `main` branch.
+Do not push to `main` unless the user explicitly wants a production deploy.
 
 ### Enabling password-reset emails (Resend)
 1. Create an account at resend.com → **API Keys** → create a key (`re_…`).

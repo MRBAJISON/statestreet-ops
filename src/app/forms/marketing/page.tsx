@@ -177,7 +177,6 @@ export default function MarketingFormsPage() {
           {/* Public survey share panel */}
           <div className="bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg p-4 mb-4">
             <div className="flex flex-col md:flex-row md:items-center gap-4">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={qrUrl} alt="Customer survey QR code" width={110} height={110} className="rounded bg-white p-1 shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-bold mb-1">Customer Survey Link</div>

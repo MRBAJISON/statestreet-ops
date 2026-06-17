@@ -1,6 +1,7 @@
-// One-off: clear all entries. Run with DATABASE_URL set.
+// One-off: clear all entries.
 //   node scripts/reset-db.mjs
 import { neon } from '@neondatabase/serverless';
+import './load-env.mjs';
 
 const url = process.env.DATABASE_URL;
 if (!url) {

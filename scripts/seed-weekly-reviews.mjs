@@ -1,16 +1,8 @@
 // One-off: seed sample Store Manager Weekly Reviews (dev only).
 //   node scripts/seed-weekly-reviews.mjs
 import { neon } from '@neondatabase/serverless';
-import { readFileSync } from 'node:fs';
+import './load-env.mjs';
 
-// Load DATABASE_URL from .env.local if not already in env.
-if (!process.env.DATABASE_URL) {
-  try {
-    const env = readFileSync(new URL('../.env.local', import.meta.url), 'utf8');
-    const m = env.match(/^DATABASE_URL=(.*)$/m);
-    if (m) process.env.DATABASE_URL = m[1].trim().replace(/^["']|["']$/g, '');
-  } catch {}
-}
 const url = process.env.DATABASE_URL;
 if (!url) {
   console.error('DATABASE_URL not set');

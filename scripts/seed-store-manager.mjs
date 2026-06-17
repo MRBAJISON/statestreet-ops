@@ -1,15 +1,8 @@
 // Add a Store Manager user (idempotent upsert by email). Run with .env.local loaded.
 //   node scripts/seed-store-manager.mjs
 import { neon } from '@neondatabase/serverless';
-import { readFileSync } from 'node:fs';
+import './load-env.mjs';
 
-if (!process.env.DATABASE_URL) {
-  try {
-    const env = readFileSync(new URL('../.env.local', import.meta.url), 'utf8');
-    const m = env.match(/^DATABASE_URL=(.*)$/m);
-    if (m) process.env.DATABASE_URL = m[1].trim().replace(/^["']|["']$/g, '');
-  } catch {}
-}
 const url = process.env.DATABASE_URL;
 if (!url) { console.error('DATABASE_URL not set'); process.exit(1); }
 const sql = neon(url);

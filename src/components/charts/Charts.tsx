@@ -25,7 +25,6 @@ interface SimpleLineChartProps {
 
 export function SimpleLineChart({ data, height = 200, color = '#c8a951', color2, dataKey = 'value', dataKey2 = 'value2', showGrid = true, showAxis = true, area = false, prefix = '' }: SimpleLineChartProps) {
   const Chart = area ? AreaChart : LineChart;
-  const Element = area ? Area : Line;
 
   return (
     <ResponsiveContainer width="100%" height={height}>

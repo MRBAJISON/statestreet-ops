@@ -1,6 +1,7 @@
 // Seed initial users with hashed passwords. Idempotent (upsert by email).
 //   node scripts/seed-users.mjs
 import { neon } from '@neondatabase/serverless';
+import './load-env.mjs';
 
 const url = process.env.DATABASE_URL;
 if (!url) {

@@ -23,6 +23,85 @@ const INFLOW_GROUP = {
 const num =(v: FormDataEntryValue | null | undefined | string | number) =>
   Number(String(v ?? '').replace(/[, ]/g, '')) || 0;
 
+const normalizeColumnKey = (key: string) => key.toLowerCase().replace(/[\s_]/g, '');
+
+const parseCsvLine = (line: string) => {
+  const values: string[] = [];
+  let current = '';
+  let quoted = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    const next = line[i + 1];
+    if (char === '"' && quoted && next === '"') {
+      current += '"';
+      i += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === ',' && !quoted) {
+      values.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  values.push(current);
+  return values.map((value) => value.trim());
+};
+
+const parseCsvRows = (text: string): Record<string, unknown>[] => {
+  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim());
+  if (!lines.length) return [];
+  const headers = parseCsvLine(lines[0]);
+  return lines.slice(1).map((line) => {
+    const values = parseCsvLine(line);
+    return Object.fromEntries(headers.map((header, index) => [header, values[index] ?? '']));
+  });
+};
+
+const cellValue = (value: unknown) => {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (!value || typeof value !== 'object') return value ?? '';
+  if ('text' in value) return String(value.text ?? '');
+  if ('result' in value) return (value as { result?: unknown }).result ?? '';
+  if ('richText' in value && Array.isArray((value as { richText?: { text?: string }[] }).richText)) {
+    return (value as { richText: { text?: string }[] }).richText.map((part) => part.text ?? '').join('');
+  }
+  return String(value);
+};
+
+const readSpreadsheetRows = async (file: File): Promise<Record<string, unknown>[]> => {
+  const lowerName = file.name.toLowerCase();
+  if (lowerName.endsWith('.csv') || file.type === 'text/csv') {
+    return parseCsvRows(await file.text());
+  }
+
+  const ExcelJS = (await import('exceljs')).default;
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await file.arrayBuffer());
+  const sheet = workbook.worksheets[0];
+  if (!sheet) return [];
+
+  const headers = (sheet.getRow(1).values as unknown[]).slice(1).map((value) => String(cellValue(value)));
+  const rows: Record<string, unknown>[] = [];
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return;
+    const values = (row.values as unknown[]).slice(1);
+    rows.push(Object.fromEntries(headers.map((header, index) => [header, cellValue(values[index])])));
+  });
+  return rows;
+};
+
+const downloadBlob = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
 export default function FinanceFormsPage() {
   const { org } = useOrg();
   const EXPENSE_GROUPS = expenseGroups(org.expenseItems);
@@ -124,18 +203,14 @@ export default function FinanceFormsPage() {
     if (!file) return;
     setUploadStatus({ ok: true, text: `Reading ${file.name}…` });
     try {
-      const XLSX = await import('xlsx');
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: 'array' });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+      const rows = await readSpreadsheetRows(file);
 
       // Case-insensitive column lookup helper.
       const pick = (row: Record<string, unknown>, ...keys: string[]) => {
         const map: Record<string, unknown> = {};
-        for (const k of Object.keys(row)) map[k.toLowerCase().replace(/[\s_]/g, '')] = row[k];
+        for (const k of Object.keys(row)) map[normalizeColumnKey(k)] = row[k];
         for (const k of keys) {
-          const v = map[k.toLowerCase().replace(/[\s_]/g, '')];
+          const v = map[normalizeColumnKey(k)];
           if (v !== undefined && v !== '') return v;
         }
         return '';
@@ -177,24 +252,35 @@ export default function FinanceFormsPage() {
   }
 
   async function downloadTemplate() {
-    const XLSX = await import('xlsx');
-    const ws = XLSX.utils.json_to_sheet([
-      {
-        Date: '2026-06-05',
-        Store: 'Labone Men',
-        Category: 'Watches',
-        GrossRevenue: 18500,
-        COGS: 9800,
-        Discounts: 500,
-        NetRevenue: 18000,
-        Transactions: 42,
-        Footfall: 130,
-        ItemsSold: 88,
-      },
-    ]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Revenue');
-    XLSX.writeFile(wb, 'revenue-template.xlsx');
+    const ExcelJS = (await import('exceljs')).default;
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Revenue');
+    sheet.columns = [
+      { header: 'Date', key: 'date' },
+      { header: 'Store', key: 'store' },
+      { header: 'Category', key: 'category' },
+      { header: 'GrossRevenue', key: 'grossRevenue' },
+      { header: 'COGS', key: 'cogs' },
+      { header: 'Discounts', key: 'discounts' },
+      { header: 'NetRevenue', key: 'netRevenue' },
+      { header: 'Transactions', key: 'transactions' },
+      { header: 'Footfall', key: 'footfall' },
+      { header: 'ItemsSold', key: 'itemsSold' },
+    ];
+    sheet.addRow({
+      date: '2026-06-05',
+      store: 'Labone Men',
+      category: 'Watches',
+      grossRevenue: 18500,
+      cogs: 9800,
+      discounts: 500,
+      netRevenue: 18000,
+      transactions: 42,
+      footfall: 130,
+      itemsSold: 88,
+    });
+    const buffer = await workbook.xlsx.writeBuffer();
+    downloadBlob(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'revenue-template.xlsx');
   }
 
   return (
@@ -241,7 +327,7 @@ export default function FinanceFormsPage() {
                 Upload Excel
                 <input
                   type="file"
-                  accept=".xlsx,.xls,.csv"
+                  accept=".xlsx,.csv"
                   onChange={handleExcelUpload}
                   className="hidden"
                 />

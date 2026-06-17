@@ -1,6 +1,9 @@
 import type { Config } from 'drizzle-kit';
+import { loadEnvConfig } from '@next/env';
 
 // DATABASE_URL is supplied at run time (see package.json db:* scripts / .env.local).
+loadEnvConfig(process.cwd(), true);
+
 export default {
   schema: './src/lib/db/schema.ts',
   out: './drizzle',

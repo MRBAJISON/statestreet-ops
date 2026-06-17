@@ -102,7 +102,7 @@ export default function UserAdmin() {
     });
     const json = await res.json().catch(() => ({}));
     if (res.ok) {
-      window.location.href = json.redirect || '/';
+      window.location.assign(typeof json.redirect === 'string' ? json.redirect : '/');
     } else {
       setMsg({ ok: false, text: json.error || 'Could not open account' });
     }

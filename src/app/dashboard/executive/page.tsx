@@ -446,7 +446,7 @@ export default function ExecutiveCommandCenter() {
                 {/* Store manager's judgement answers */}
                 {wrAnswers.length > 0 && (
                   <div className="space-y-3">
-                    <div className="text-xs text-gray-400 uppercase tracking-wide">Manager's Plan</div>
+                    <div className="text-xs text-gray-400 uppercase tracking-wide">Manager&apos;s Plan</div>
                     {wrAnswers.map((x, i) => (
                       <div key={i} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                         <div className="text-xs text-[#c8a951] mb-1">{x.q}</div>

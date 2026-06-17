@@ -2,14 +2,24 @@
   "name": "statestreet-ops",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@11.6.2",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint --max-warnings=0",
+    "lint:fix": "eslint --fix",
+    "verify": "node scripts/verify.mjs",
+    "verify:fast": "node scripts/verify.mjs fast",
+    "verify:db": "node scripts/verify.mjs db",
+    "verify:all": "node scripts/verify.mjs all",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "node --experimental-strip-types src/lib/db/seed.ts"
+    "db:seed": "node scripts/seed-users.mjs",
+    "db:seed:all": "npm run db:seed && node scripts/seed-all.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
@@ -20,8 +30,7 @@
     "next": "16.2.7",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "recharts": "^3.8.1",
-    "xlsx": "^0.18.5"
+    "recharts": "^3.8.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
