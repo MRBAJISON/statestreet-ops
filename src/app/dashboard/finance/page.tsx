@@ -63,6 +63,8 @@ interface FinanceMetricsData {
   runwayDays: number;
   forecast: { revenue: number; grossProfit: number; netProfit: number; cash: number };
   weeklyForecast: { revenue: number; grossProfit: number; netProfit: number; cash: number };
+  paymentsByMode: { name: string; value: number }[];
+  paymentsTotal: number;
   entryCount: number;
 }
 
@@ -278,6 +280,33 @@ export default function FinancePage() {
                 </div>
                 <div className="text-[0.6rem] text-gray-600 mt-1">Position ÷ operating expense run-rate</div>
               </div>
+            </div>
+          </div>
+        </Section>
+
+        {/* Payments collected by mode — summed across all stores' daily closings */}
+        <Section title="Payments Collected" subtitle="by mode · all stores">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2">
+              <div className="text-xs text-gray-400 mb-2">Takings by Payment Mode</div>
+              {(m?.paymentsByMode ?? []).length ? (
+                <SimpleBarChart data={m?.paymentsByMode ?? []} height={220} color="#22c55e" horizontal prefix="GHS " />
+              ) : (
+                <EmptyState message="No closing reports yet" hint="Stores submit a Daily Closing Report; or use the Finance form's Daily Closing." height={220} />
+              )}
+            </div>
+            <div className="space-y-2">
+              <div className="bg-[var(--c-card2)] border border-[#c8a951]/30 rounded-lg p-3">
+                <div className="text-[0.65rem] text-[#c8a951]">Total Collected</div>
+                <div className="text-lg font-bold text-[#c8a951]">{dash(m?.paymentsTotal ?? 0, fmtGHS)}</div>
+                <div className="text-[0.6rem] text-gray-600 mt-1">All payment modes, all stores</div>
+              </div>
+              {(m?.paymentsByMode ?? []).map((p) => (
+                <div key={p.name} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-2.5 flex justify-between items-center">
+                  <span className="text-[0.65rem] text-gray-400">{p.name}</span>
+                  <span className="text-sm font-bold text-[var(--c-fg)]">{fmtGHS(p.value)}</span>
+                </div>
+              ))}
             </div>
           </div>
         </Section>

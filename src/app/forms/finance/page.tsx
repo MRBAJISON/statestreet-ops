@@ -8,6 +8,7 @@ import { submitEntry, postEntries, useEntries } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { useOrg } from '@/components/providers/OrgProvider';
 import { expenseGroups } from '@/lib/org';
+import { PAYMENT_MODES, DISCOVERY_SOURCES, payKey } from '@/lib/config';
 
 const INFLOW_GROUP = {
   label: 'Inflows',
@@ -40,6 +41,10 @@ export default function FinanceFormsPage() {
   const [overspendReason, setOverspendReason] = useState('');
   const budgetYear = new Date().getFullYear();
 
+  // Daily closing — payment-mode takings (auto-totalled).
+  const [payments, setPayments] = useState<Record<string, string>>({});
+  const paymentsTotal = Math.round(PAYMENT_MODES.reduce((s, m) => s + num(payments[m.value] ?? ''), 0) * 100) / 100;
+
   const annualBudget = finEntries
     .filter((e) => e.formType === 'budget' && String(e.payload.item) === expCat && num(e.payload.year as string) === budgetYear)
     .reduce((s, e) => s + num(e.payload.amount as string), 0);
@@ -58,6 +63,7 @@ export default function FinanceFormsPage() {
     { id: 'cashflow', label: 'Cash Flow Entry' },
     { id: 'debtors', label: 'Debtors / Creditors' },
     { id: 'forecast', label: 'Forecast Update' },
+    { id: 'closing', label: 'Daily Closing' },
   ];
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -74,7 +80,7 @@ export default function FinanceFormsPage() {
       await submitEntry('finance', activeForm, form);
       setMessage('Saved to the live database. The Finance & Executive dashboards reflect it now.');
       form.reset();
-      setExpCat(''); setExpAmount(''); setOverspendReason('');
+      setExpCat(''); setExpAmount(''); setOverspendReason(''); setPayments({});
       refreshFin();
     } catch (err) {
       setMessage('Could not save: ' + (err as Error).message);
@@ -369,6 +375,29 @@ export default function FinanceFormsPage() {
                 { label: 'Low', value: 'low' },
               ]} />
               <FormField label="Key Assumptions" name="assumptions" type="textarea" placeholder="Key assumptions behind the forecast" />
+            </div>
+          </FormSection>
+        )}
+
+        {activeForm === 'closing' && (
+          <FormSection title="Daily Closing" description="A store's end-of-day takings by payment mode + customer counts. One per store per day; the Finance dashboard sums each mode across all stores.">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
+              <FormField label="Date" name="date" type="date" required />
+              <FormField label="Store" name="store" type="select" required options={org.stores} />
+              <FormField label="Total Customers" name="customers" type="number" />
+              <FormField label="New Customers" name="newCustomers" type="number" />
+              <FormField label="Returning Customers" name="returningCustomers" type="number" />
+              <FormField label="How They Found Us" name="discoverySource" type="select" options={DISCOVERY_SOURCES} />
+            </div>
+            <div className="mt-4">
+              <h4 className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Payments by Mode</h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {PAYMENT_MODES.map((mode) => (
+                  <FormField key={mode.value} label={mode.label} name={payKey(mode.value)} type="number" prefix={org.currency} step={0.01}
+                    value={payments[mode.value] ?? ''} onChange={(e) => setPayments((p) => ({ ...p, [mode.value]: e.target.value }))} />
+                ))}
+                <FormField label="Payments Total (auto)" name="paymentsTotal" type="number" prefix={org.currency} value={paymentsTotal ? String(paymentsTotal) : ''} readOnly />
+              </div>
             </div>
           </FormSection>
         )}

@@ -28,12 +28,13 @@ const DEPT_SHEETS: { name: string; dept: string }[] = [
 // The Stores sheet = everything store managers submit.
 const isStoreEntry = (e: Entry) =>
   (e.department === 'finance' && e.formType === 'revenue') ||
+  (e.department === 'finance' && e.formType === 'closing') ||
   (e.department === 'inventory' && e.formType === 'store-transfer') ||
   (e.department === 'commercial' && e.formType === 'weekly-review');
 
 const FORM_TYPE_LABELS: Record<string, string> = {
   revenue: 'Daily Revenue', expenses: 'Expenses', cashflow: 'Cash Flow', debtors: 'Debtors & Creditors',
-  budget: 'Budget', capital: 'Capital & Investment', forecast: 'Forecast',
+  budget: 'Budget', capital: 'Capital & Investment', forecast: 'Forecast', closing: 'Daily Closing',
   'store-sales': 'Store Sales', 'category-perf': 'Category Performance', 'sku-entry': 'SKU Performance',
   'new-arrivals': 'New Arrivals', accountability: 'Accountability', 'weekly-review': 'Weekly Reviews',
   'store-audit': 'Store Standards', 'vm-check': 'VM Compliance', maintenance: 'Maintenance',

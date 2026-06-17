@@ -25,10 +25,14 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
   // Brand drives the available categories (Brand → Categories mapping in Settings).
   const [brand, setBrand] = useState('');
   const [category, setCategory] = useState('');
-  // Closing report — amount per payment mode (auto-totalled).
-  const [payments, setPayments] = useState<Record<string, string>>({});
   const num = (s: string) => Number(s) || 0;
   const netRevenue = num(gross) ? Math.round((num(gross) - num(discounts)) * 100) / 100 : 0;
+
+  // Daily closing report (submitted once a day, not per category): customers +
+  // the day's takings by payment mode. Saved as finance/closing.
+  const [closing, setClosing] = useState(false);
+  const [closingMsg, setClosingMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [payments, setPayments] = useState<Record<string, string>>({});
   const paymentsTotal = Math.round(PAYMENT_MODES.reduce((s, m) => s + num(payments[m.value] ?? ''), 0) * 100) / 100;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -47,13 +51,33 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
       setDiscounts('');
       setBrand('');
       setCategory('');
-      setPayments({});
       onSaved();
     } catch (err) {
       setMsg({ ok: false, text: 'Could not save: ' + (err as Error).message });
     }
     setSubmitting(false);
     setTimeout(() => setMsg(null), 4000);
+  }
+
+  async function handleClosing(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    const payload: Record<string, unknown> = {};
+    fd.forEach((v, k) => { payload[k] = typeof v === 'string' ? v : ''; });
+    payload.store = assignedStore;
+    setClosing(true);
+    try {
+      await postEntry('finance', 'closing', payload);
+      setClosingMsg({ ok: true, text: 'Closing report saved for the day.' });
+      form.reset();
+      setPayments({});
+      onSaved();
+    } catch (err) {
+      setClosingMsg({ ok: false, text: 'Could not save: ' + (err as Error).message });
+    }
+    setClosing(false);
+    setTimeout(() => setClosingMsg(null), 4000);
   }
 
   async function remove(id: number) {
@@ -63,6 +87,7 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
   const recentSorted = [...recent].sort((a, b) => (String(a.payload.date) < String(b.payload.date) ? 1 : -1)).slice(0, 8);
 
   return (
+   <>
     <FormSection title="Daily Sales" description="Log each day’s sales by category. These build up into this week’s Actual Sales and Section 1 of the review below.">
       {msg && (
         <div className={`mb-3 text-sm p-3 rounded-lg border ${msg.ok ? 'border-green-500/30 bg-green-500/10 text-green-400' : 'border-red-500/30 bg-red-500/10 text-red-400'}`}>{msg.text}</div>
@@ -80,27 +105,6 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
           <FormField label="Transactions" name="transactions" type="number" />
           <FormField label="Footfall" name="footfall" type="number" />
           <FormField label="Items Sold" name="itemsSold" type="number" />
-        </div>
-
-        <div className="mt-5">
-          <h4 className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Customers</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <FormField label="Total Customers" name="customers" type="number" />
-            <FormField label="New Customers" name="newCustomers" type="number" />
-            <FormField label="Returning Customers" name="returningCustomers" type="number" />
-            <FormField label="How They Found Us" name="discoverySource" type="select" options={DISCOVERY_SOURCES} />
-          </div>
-        </div>
-
-        <div className="mt-5">
-          <h4 className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Closing Report — Payments</h4>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {PAYMENT_MODES.map((m) => (
-              <FormField key={m.value} label={m.label} name={payKey(m.value)} type="number" prefix={org.currency} step={0.01}
-                value={payments[m.value] ?? ''} onChange={(e) => setPayments((p) => ({ ...p, [m.value]: e.target.value }))} />
-            ))}
-            <FormField label="Payments Total (auto)" name="paymentsTotal" type="number" prefix={org.currency} value={paymentsTotal ? String(paymentsTotal) : ''} readOnly />
-          </div>
         </div>
 
         <button type="submit" disabled={submitting}
@@ -141,5 +145,37 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
         </div>
       )}
     </FormSection>
+
+    <FormSection title="Daily Closing Report" description="Submit once at the end of the day — total customers and the day's takings by payment mode. Not per category.">
+      {closingMsg && (
+        <div className={`mb-3 text-sm p-3 rounded-lg border ${closingMsg.ok ? 'border-green-500/30 bg-green-500/10 text-green-400' : 'border-red-500/30 bg-red-500/10 text-red-400'}`}>{closingMsg.text}</div>
+      )}
+      <form onSubmit={handleClosing}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-1">
+          <FormField label="Date" name="date" type="date" required />
+          <FormField label="Total Customers" name="customers" type="number" />
+          <FormField label="New Customers" name="newCustomers" type="number" />
+          <FormField label="Returning Customers" name="returningCustomers" type="number" />
+          <FormField label="How They Found Us" name="discoverySource" type="select" options={DISCOVERY_SOURCES} />
+        </div>
+
+        <div className="mt-5">
+          <h4 className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Payments by Mode</h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {PAYMENT_MODES.map((m) => (
+              <FormField key={m.value} label={m.label} name={payKey(m.value)} type="number" prefix={org.currency} step={0.01}
+                value={payments[m.value] ?? ''} onChange={(e) => setPayments((p) => ({ ...p, [m.value]: e.target.value }))} />
+            ))}
+            <FormField label="Payments Total (auto)" name="paymentsTotal" type="number" prefix={org.currency} value={paymentsTotal ? String(paymentsTotal) : ''} readOnly />
+          </div>
+        </div>
+
+        <button type="submit" disabled={closing}
+          className="mt-3 bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg text-sm disabled:opacity-50">
+          {closing ? <><Spinner /> Saving…</> : 'Save Closing Report'}
+        </button>
+      </form>
+    </FormSection>
+   </>
   );
 }

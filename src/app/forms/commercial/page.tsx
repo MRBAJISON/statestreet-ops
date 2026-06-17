@@ -8,7 +8,6 @@ import { submitEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { useOrg } from '@/components/providers/OrgProvider';
 import { categoriesForBrand } from '@/lib/org';
-import { PAYMENT_MODES, DISCOVERY_SOURCES, payKey } from '@/lib/config';
 
 const numOf = (s: string) => Number(s) || 0;
 const fmt2 = (x: number) => (x ? x.toFixed(2) : '');
@@ -28,11 +27,9 @@ export default function CommercialFormsPage() {
   const [cpSales, setCpSales] = useState('');
   const [cpUnits, setCpUnits] = useState('');
 
-  // Brand → Category filter (shared across the category forms) + closing payments.
+  // Brand → Category filter (shared across the category forms).
   const [brand, setBrand] = useState('');
   const [category, setCategory] = useState('');
-  const [payments, setPayments] = useState<Record<string, string>>({});
-  const paymentsTotal = Math.round(PAYMENT_MODES.reduce((s, m) => s + numOf(payments[m.value] ?? ''), 0) * 100) / 100;
 
   const ssAtv = numOf(ssTxns) ? numOf(ssTotalSales) / numOf(ssTxns) : 0;
   const ssConv = numOf(ssFootfall) ? (numOf(ssTxns) / numOf(ssFootfall)) * 100 : 0;
@@ -46,7 +43,6 @@ export default function CommercialFormsPage() {
     setCpUnits('');
     setBrand('');
     setCategory('');
-    setPayments({});
   }
 
   function switchForm(id: string) {
@@ -117,27 +113,7 @@ export default function CommercialFormsPage() {
               <FormField label="Conversion Rate % (auto)" name="convRate" type="number" suffix="%" value={fmt1(ssConv)} readOnly />
               <FormField label="Avg Transaction Value (auto)" name="atv" type="number" prefix="GHS" value={fmt2(ssAtv)} readOnly />
             </div>
-
-            <div className="mt-5">
-              <h4 className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Customers</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <FormField label="Total Customers" name="customers" type="number" />
-                <FormField label="New Customers" name="newCustomers" type="number" />
-                <FormField label="Returning Customers" name="returningCustomers" type="number" />
-                <FormField label="How They Found Us" name="discoverySource" type="select" options={DISCOVERY_SOURCES} />
-              </div>
-            </div>
-
-            <div className="mt-5">
-              <h4 className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Closing Report — Payments</h4>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {PAYMENT_MODES.map((m) => (
-                  <FormField key={m.value} label={m.label} name={payKey(m.value)} type="number" prefix={org.currency} step={0.01}
-                    value={payments[m.value] ?? ''} onChange={(e) => setPayments((p) => ({ ...p, [m.value]: e.target.value }))} />
-                ))}
-                <FormField label="Payments Total (auto)" name="paymentsTotal" type="number" prefix={org.currency} value={paymentsTotal ? String(paymentsTotal) : ''} readOnly />
-              </div>
-            </div>
+            <p className="text-xs text-gray-500 mt-3">Customers and payment-mode takings are captured once a day on the store’s <span className="text-gray-400">Daily Closing Report</span> (Store Manager form) or on the Finance form.</p>
           </FormSection>
         )}
 

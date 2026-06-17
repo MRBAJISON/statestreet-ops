@@ -1,5 +1,5 @@
 import type { Entry } from './db/schema';
-import { BRAND_LABELS, STORE_LABELS, CATEGORY_LABELS, EXPENSE_LABELS, CAPITAL_CATEGORIES, labelFor } from './config';
+import { BRAND_LABELS, STORE_LABELS, CATEGORY_LABELS, EXPENSE_LABELS, CAPITAL_CATEGORIES, labelFor, PAYMENT_MODES, payKey } from './config';
 
 const num = (v: unknown) => Number(String(v ?? '').replace(/[, ]/g, '')) || 0;
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
@@ -208,7 +208,16 @@ function financeMetrics(rows: Entry[]) {
   const lastFc = fc[fc.length - 1] ?? {};
   const lastWeekly = [...fc].reverse().find((p) => String(p.period) === 'weekly') ?? {};
 
+  // Daily closing — sum each payment mode across all stores' closing entries.
+  const closing = payloads(rows, 'closing');
+  const paymentsByMode = PAYMENT_MODES
+    .map((m) => ({ name: m.label, value: closing.reduce((s, p) => s + num(p[payKey(m.value)]), 0) }))
+    .filter((x) => x.value > 0);
+  const paymentsTotal = paymentsByMode.reduce((s, x) => s + x.value, 0);
+
   return {
+    paymentsByMode,
+    paymentsTotal,
     revenueMtd,
     cogs: cogsTotal,
     revenueByCategory: [...catMap].map(([name, value]) => ({ name, value })),
