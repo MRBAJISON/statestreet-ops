@@ -4,7 +4,7 @@ import { verifySession } from './lib/session';
 // Role -> departments map (mirrors src/lib/auth.ts; kept inline so proxy stays edge-safe).
 const ROLE_DEPARTMENTS: Record<string, string[]> = {
   owner: ['executive', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'],
-  finance: ['finance'],
+  finance: ['finance', 'executive', 'commercial', 'marketing', 'operations', 'inventory', 'brand'],
   commercial: ['commercial'],
   marketing: ['marketing', 'brand'],
   operations: ['finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'],
@@ -73,8 +73,8 @@ export async function proxy(req: NextRequest) {
     const segment = match[2];
     const dept = SEGMENT_TO_DEPT[segment];
 
-    // Executive area is owner-only.
-    if (segment === 'executive' && role !== 'owner') {
+    // Executive area is for the owner and the finance manager.
+    if (segment === 'executive' && role !== 'owner' && role !== 'finance') {
       return NextResponse.redirect(new URL(landingPath(role, allowed), req.url));
     }
 
@@ -85,6 +85,10 @@ export async function proxy(req: NextRequest) {
       }
       if (role === 'store-manager' && segment !== 'store-manager') {
         return NextResponse.redirect(new URL('/forms/store-manager', req.url));
+      }
+      // Finance sees all dashboards but only enters the Finance form (forms aren't widened with dashboards).
+      if (role === 'finance' && segment !== 'finance') {
+        return NextResponse.redirect(new URL('/forms/finance', req.url));
       }
     }
 

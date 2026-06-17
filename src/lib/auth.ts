@@ -8,7 +8,8 @@ import { users } from './db/schema';
 
 const ROLE_DEPARTMENTS: Record<UserRole, Department[]> = {
   owner: ['executive', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'],
-  finance: ['finance'],
+  // Finance sees every dashboard (incl. Executive Command); forms stay finance-only (see Sidebar/proxy).
+  finance: ['finance', 'executive', 'commercial', 'marketing', 'operations', 'inventory', 'brand'],
   commercial: ['commercial'],
   marketing: ['marketing', 'brand'],
   operations: ['finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'],

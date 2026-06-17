@@ -43,8 +43,12 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
   // Close the drawer on navigation — so it collapses as soon as a dashboard is opened.
   useEffect(() => { setOpen(false); }, [pathname]);
 
-  // Operations enters only the Operations form; other roles get their own department(s).
-  const formDepts: Department[] = userRole === 'operations' ? ['operations'] : departments.filter((d) => d !== 'executive');
+  // Operations enters only the Operations form; finance only the Finance form (its
+  // dashboard access is wide, but data entry stays scoped). Others get their own dept(s).
+  const formDepts: Department[] =
+    userRole === 'operations' ? ['operations']
+    : userRole === 'finance' ? ['finance']
+    : departments.filter((d) => d !== 'executive');
 
   // Put the user's own department dashboard first (e.g. Operations on top for the ops role).
   const homeDept = (departments as string[]).includes(userRole) ? (userRole as Department) : null;
