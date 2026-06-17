@@ -150,7 +150,7 @@ export default function InventoryFormsPage() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Request Date" name="date" type="date" required />
               <FormField label="Store" name="store" type="select" required options={org.stores} />
-              <FormField label="SKU Code" name="sku" required />
+              <FormField label="SKU Code" name="sku" />
               <FormField label="Product Description" name="description" required />
               <FormField label="Category" name="category" type="select" required options={CATEGORIES} />
               <FormField label="Current Stock" name="currentStock" type="number" required />

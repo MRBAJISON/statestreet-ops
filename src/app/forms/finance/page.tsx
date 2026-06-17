@@ -49,6 +49,11 @@ export default function FinanceFormsPage() {
   const [revStore, setRevStore] = useState('');
   const [revCat, setRevCat] = useState('');
 
+  // Daily closing — its own form (sits under Daily Revenue Entry), submitted once a day.
+  const [closingBusy, setClosingBusy] = useState(false);
+  const [closingMsg, setClosingMsg] = useState('');
+  const [closingSubmitted, setClosingSubmitted] = useState(false);
+
   const annualBudget = finEntries
     .filter((e) => e.formType === 'budget' && String(e.payload.item) === expCat && num(e.payload.year as string) === budgetYear)
     .reduce((s, e) => s + num(e.payload.amount as string), 0);
@@ -67,7 +72,6 @@ export default function FinanceFormsPage() {
     { id: 'cashflow', label: 'Cash Flow Entry' },
     { id: 'debtors', label: 'Debtors / Creditors' },
     { id: 'forecast', label: 'Forecast Update' },
-    { id: 'closing', label: 'Daily Closing' },
   ];
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -84,7 +88,7 @@ export default function FinanceFormsPage() {
       await submitEntry('finance', activeForm, form);
       setMessage('Saved to the live database. The Finance & Executive dashboards reflect it now.');
       form.reset();
-      setExpCat(''); setExpAmount(''); setOverspendReason(''); setPayments({}); setRevStore(''); setRevCat('');
+      setExpCat(''); setExpAmount(''); setOverspendReason(''); setRevStore(''); setRevCat('');
       refreshFin();
     } catch (err) {
       setMessage('Could not save: ' + (err as Error).message);
@@ -93,6 +97,25 @@ export default function FinanceFormsPage() {
     }
     setSubmitted(true);
     setTimeout(() => setSubmitted(false), 4000);
+  }
+
+  async function handleClosing(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    setClosingBusy(true);
+    try {
+      await submitEntry('finance', 'closing', form);
+      setClosingMsg('Daily closing saved. The Finance dashboard sums each payment mode across all stores.');
+      form.reset();
+      setPayments({});
+      refreshFin();
+    } catch (err) {
+      setClosingMsg('Could not save: ' + (err as Error).message);
+    } finally {
+      setClosingBusy(false);
+    }
+    setClosingSubmitted(true);
+    setTimeout(() => setClosingSubmitted(false), 4000);
   }
 
   async function handleExcelUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -266,9 +289,9 @@ export default function FinanceFormsPage() {
               <FormField label="Vendor / Payee" name="vendor" placeholder="Vendor name" />
               <FormField label="Invoice Number" name="invoice" placeholder="INV-XXXX" />
               <FormField label="Payment Method" name="paymentMethod" type="select" options={[
-                { label: 'Bank Transfer', value: 'transfer' },
-                { label: 'Cash', value: 'cash' },
-                { label: 'Mobile Money', value: 'momo' },
+                { label: 'OmniBSIC Bank', value: 'omnibsic' },
+                { label: 'UMB Bank', value: 'umb' },
+                { label: 'MOMO', value: 'momo' },
                 { label: 'Cheque', value: 'cheque' },
               ]} />
               <FormField label="Description" name="description" type="textarea" placeholder="Brief description of expense" />
@@ -383,7 +406,22 @@ export default function FinanceFormsPage() {
           </FormSection>
         )}
 
-        {activeForm === 'closing' && (
+        <div className="flex gap-3 pt-2">
+          <button type="submit" disabled={busy} className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg transition-colors text-sm disabled:opacity-50">
+            {busy ? <><Spinner /> Saving…</> : 'Submit Entry'}
+          </button>
+          <button type="reset" className="bg-[var(--c-hover)] border border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)] px-6 py-2.5 rounded-lg transition-colors text-sm">
+            Clear Form
+          </button>
+        </div>
+      </form>
+
+      {/* Daily Closing — sits under the Daily Revenue Entry (like the Store form), its own save. */}
+      {activeForm === 'revenue' && (
+        <form onSubmit={handleClosing} className="space-y-4 max-w-4xl mt-6">
+          {closingSubmitted && (
+            <div className="bg-green-500/10 border border-green-500/30 text-green-400 p-3 rounded-lg text-sm">{closingMsg}</div>
+          )}
           <FormSection title="Daily Closing" description="A store's end-of-day takings by payment mode + customer counts. One per store per day; the Finance dashboard sums each mode across all stores.">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Date" name="date" type="date" required />
@@ -403,18 +441,14 @@ export default function FinanceFormsPage() {
                 <FormField label="Payments Total (auto)" name="paymentsTotal" type="number" prefix={org.currency} value={paymentsTotal ? String(paymentsTotal) : ''} readOnly />
               </div>
             </div>
+            <div className="flex pt-3">
+              <button type="submit" disabled={closingBusy} className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg transition-colors text-sm disabled:opacity-50">
+                {closingBusy ? <><Spinner /> Saving…</> : 'Save Closing Report'}
+              </button>
+            </div>
           </FormSection>
-        )}
-
-        <div className="flex gap-3 pt-2">
-          <button type="submit" disabled={busy} className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg transition-colors text-sm disabled:opacity-50">
-            {busy ? <><Spinner /> Saving…</> : 'Submit Entry'}
-          </button>
-          <button type="reset" className="bg-[var(--c-hover)] border border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)] px-6 py-2.5 rounded-lg transition-colors text-sm">
-            Clear Form
-          </button>
-        </div>
-      </form>
+        </form>
+      )}
 
       <div className="mt-8 max-w-4xl">
         <h2 className="text-sm font-bold uppercase tracking-wide mb-3">Your Submissions</h2>
