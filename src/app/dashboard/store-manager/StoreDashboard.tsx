@@ -20,18 +20,32 @@ interface CommercialLite {
   sellThroughByCategory: { name: string; value: number }[];
   weeklyReview: { count: number; latest: { achievement: number; weekEnd: string } | null; revenueByCategory: { name: string; value: number }[] };
 }
+interface FinanceLite {
+  revenueMtd: number; transactions: number; footfall: number; itemsSold: number;
+  grossMargin: number; revenueByCategory: { name: string; value: number }[];
+}
 
 export default function StoreDashboard({ assignedStore, managerName }: { assignedStore: string; managerName: string }) {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
   const { data: m, loading } = useMetrics<CommercialLite>('commercial', period, anchor, assignedStore);
+  // Daily sales the store actually enters live in finance/revenue — source the
+  // store's sales numbers and category breakdown from there, filtered to this store.
+  const { data: f } = useMetrics<FinanceLite>('finance', period, anchor, assignedStore);
   const { entries: inv } = useEntries('inventory', 5000);
 
   const transfers = inv.filter((e) => e.formType === 'store-transfer' && (String(e.payload.fromStore) === assignedStore || String(e.payload.toStore) === assignedStore));
   const outgoing = transfers.filter((e) => String(e.payload.fromStore) === assignedStore);
   const incoming = transfers.filter((e) => String(e.payload.toStore) === assignedStore);
   const sumUnits = (rows: typeof transfers) => rows.reduce((s, e) => s + (Number(e.payload.units) || 0), 0);
-  const categorySales = m?.categorySales ?? [];
+
+  // Sales KPIs derived from the store's daily sales (finance/revenue).
+  const storeSales = f?.revenueMtd ?? 0;
+  const tx = f?.transactions ?? 0;
+  const atv = tx ? Math.round(storeSales / tx) : 0;
+  const upt = tx ? Math.round((f?.itemsSold ?? 0) / tx * 10) / 10 : 0;
+  const conv = (f?.footfall ?? 0) ? Math.round(tx / (f?.footfall ?? 1) * 1000) / 10 : 0;
+  const categorySales = f?.revenueByCategory ?? [];
   const sellThroughCat = m?.sellThroughByCategory ?? [];
   const storeName = labelFor(STORE_LABELS, assignedStore);
 
@@ -52,11 +66,11 @@ export default function StoreDashboard({ assignedStore, managerName }: { assigne
 
       <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-          <KPICard label="Store Sales" value={fmtGHS(m?.groupSales ?? 0)} small />
-          <KPICard label="ATV" value={fmtGHS(m?.atv ?? 0)} small />
-          <KPICard label="UPT" value={(m?.upt ?? 0) ? String(m?.upt) : '—'} small />
-          <KPICard label="Conversion" value={pct(m?.convRate ?? 0)} small />
-          <KPICard label="Gross Margin" value={pct(m?.grossMargin ?? 0)} small />
+          <KPICard label="Store Sales" value={fmtGHS(storeSales)} small />
+          <KPICard label="ATV" value={fmtGHS(atv)} small />
+          <KPICard label="UPT" value={upt ? String(upt) : '—'} small />
+          <KPICard label="Conversion" value={pct(conv)} small />
+          <KPICard label="Gross Margin" value={pct(f?.grossMargin ?? 0)} small />
           <KPICard label="Sell Through" value={pct(m?.sellThrough ?? 0)} small />
           <KPICard label="Latest Achievement" value={m?.weeklyReview?.latest?.achievement ? `${m.weeklyReview.latest.achievement}%` : '—'} small />
         </div>
@@ -67,7 +81,7 @@ export default function StoreDashboard({ assignedStore, managerName }: { assigne
           {categorySales.length ? (
             <SimpleBarChart data={categorySales} height={240} color="#c8a951" prefix="GHS " />
           ) : (
-            <EmptyState message="No category sales yet" hint="Log daily sales in your Weekly Review form." height={240} />
+            <EmptyState message="No category sales yet" hint="Log entries on your Daily Sales form." height={240} />
           )}
         </Section>
 
