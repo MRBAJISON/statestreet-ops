@@ -2,22 +2,12 @@
 
 import { useState } from 'react';
 import { useOrg } from '@/components/providers/OrgProvider';
-import { toLabelMap } from '@/lib/org';
+import { categoriesForStore } from '@/lib/org';
 import { postEntry, updateEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 
 export interface DailySale { date: string; category: string; grossRevenue: number; itemsSold: number }
 export interface WeekTarget { weekEnd: string; target: number }
-
-// The 28 SKU categories from the Store Manager Monday Review Worksheet.
-const CATEGORIES = [
-  'Luxury Suits', 'Business Suits', 'Casual Blazers', 'Formal Shirts', 'Casual Shirts',
-  'Premium T-Shirts', 'Polo Shirts', 'Denim Jeans', 'Chinos', 'Formal Trousers',
-  'Sneakers', 'Oxford Shoes', 'Derby Shoes', 'Loafers', 'Sandals',
-  'Leather Belts', 'Premium Belts', 'Ties', 'Pocket Squares', 'Sunglasses',
-  'Leather Bags', 'Wallets & Purses', 'Watches', 'Fragrances', 'Safari Sets',
-  'Knitwear', 'Streetwear Sets', 'Jackets & Outerwear',
-];
 
 type Col = { key: string; label: string; type?: 'number' | 'text'; options?: string[]; auto?: boolean };
 
@@ -78,6 +68,9 @@ const num = (s: string) => Number(s) || 0;
 
 export default function WeeklyReview({ assignedStore = '', managerName = '', dailySales = [], targets = [] }: { assignedStore?: string; managerName?: string; dailySales?: DailySale[]; targets?: WeekTarget[] }) {
   const { org } = useOrg();
+  // The review covers only the store's brand categories (Brand→Stores + Brand→
+  // Categories mappings in Settings); falls back to all categories if unmapped.
+  const catOptions = categoriesForStore(org, assignedStore);
   const [header, setHeader] = useState({ store: assignedStore, manager: managerName, weekEnd: '' });
   // rows[category][colKey] = manually entered value
   const [rows, setRows] = useState<Record<string, Record<string, string>>>({});
@@ -97,15 +90,14 @@ export default function WeeklyReview({ assignedStore = '', managerName = '', dai
     return diff >= 0 && diff < 7;
   };
   const weekDaily = dailySales.filter((d) => inWeek(d.date));
-  // Revenue + units per category (keyed by display label to match the grid rows).
+  // Revenue + units per category, keyed by the category VALUE (exactly as daily
+  // sales store it) so the grid rows match reliably.
   const perCat = new Map<string, { revenue: number; units: number }>();
-  const catLabels = toLabelMap(org.categories);
   for (const d of weekDaily) {
-    const label = catLabels[d.category] ?? d.category;
-    const e = perCat.get(label) ?? { revenue: 0, units: 0 };
+    const e = perCat.get(d.category) ?? { revenue: 0, units: 0 };
     e.revenue += Number(d.grossRevenue) || 0;
     e.units += Number(d.itemsSold) || 0;
-    perCat.set(label, e);
+    perCat.set(d.category, e);
   }
   const actualSales = weekDaily.reduce((s, d) => s + (Number(d.grossRevenue) || 0), 0);
   const weeklyTarget = targets.find((t) => t.weekEnd === header.weekEnd)?.target ?? 0;
@@ -144,17 +136,18 @@ export default function WeeklyReview({ assignedStore = '', managerName = '', dai
     try {
       // Merge manual fields with the computed ones so the dashboards get revenue/rating/etc.
       const categories: Record<string, Record<string, string | number>> = {};
-      for (const cat of CATEGORIES) {
-        const r = rows[cat];
-        const hasDaily = perCat.has(cat);
+      for (const c of catOptions) {
+        const r = rows[c.value];
+        const hasDaily = perCat.has(c.value);
         if (!r && !hasDaily) continue;
-        categories[cat] = {
+        // Saved under the friendly label so dashboards read clean category names.
+        categories[c.label] = {
           ...(r ?? {}),
-          unitsSold: unitsSoldOf(cat),
-          revenue: revenueOf(cat),
-          currentStock: currentStockOf(cat),
-          rating: ratingOf(cat),
-          achievement: rowAchievement(cat),
+          unitsSold: unitsSoldOf(c.value),
+          revenue: revenueOf(c.value),
+          currentStock: currentStockOf(c.value),
+          rating: ratingOf(c.value),
+          achievement: rowAchievement(c.value),
         };
       }
       const payload = {
@@ -291,9 +284,14 @@ export default function WeeklyReview({ assignedStore = '', managerName = '', dai
               </tr>
             </thead>
             <tbody>
-              {CATEGORIES.map((cat) => (
+              {catOptions.length === 0 && (
+                <tr><td colSpan={section.cols.length + 1} className="p-3 text-gray-500">No categories for this store. Map Brand → Stores and Brand → Categories in Settings.</td></tr>
+              )}
+              {catOptions.map((opt) => {
+                const cat = opt.value;
+                return (
                 <tr key={cat} className="border-t border-[var(--c-hover)]">
-                  <td className="p-1.5 sticky left-0 bg-[var(--c-bg)] text-gray-300 whitespace-nowrap">{cat}</td>
+                  <td className="p-1.5 sticky left-0 bg-[var(--c-bg)] text-gray-300 whitespace-nowrap">{opt.label}</td>
                   {section.cols.map((c) => (
                     <td key={c.key} className="p-1">
                       {c.auto ? (
@@ -308,7 +306,7 @@ export default function WeeklyReview({ assignedStore = '', managerName = '', dai
                     </td>
                   ))}
                 </tr>
-              ))}
+              ); })}
             </tbody>
           </table>
         </div>
