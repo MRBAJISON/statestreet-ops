@@ -61,6 +61,8 @@ interface CommercialLive {
     latest: { store: string; weekEnd: string; manager: string; achievement: number; actualSales: number; salesTarget: number } | null;
     ceo: Record<string, string> | null;
   };
+  managerVoices: { store: string; manager: string; weekEnd: string; answers: { q: string; a: string }[] }[];
+  categoryTargets: { name: string; actualRev: number; targetRev: number; actualUnits: number; targetUnits: number; revAch: number; unitAch: number }[];
   leads: { date: string; name: string; leadBuyer: string; occupation: string; number: string; size: string; item: string; source: string; sourceDetail: string; staff: string; store: string }[];
   leadsBySource: { name: string; value: number }[];
   leadsTotal: number;
@@ -100,6 +102,8 @@ export default function CommercialPage() {
   const accountability = m?.accountability ?? [];
   const leads = m?.leads ?? [];
   const leadsBySource = m?.leadsBySource ?? [];
+  const managerVoices = m?.managerVoices ?? [];
+  const categoryTargets = m?.categoryTargets ?? [];
 
   // Brand Performance — every store belongs to a brand, so roll the daily store
   // sales up to brand via the store (Brand → Stores mapping in Settings).
@@ -255,7 +259,7 @@ export default function CommercialPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div>
               {sellThroughCat.length ? (
-                <SimpleDonutChart data={sellThroughCat} height={200} innerRadius={45} outerRadius={65} centerLabel="Categories" centerValue={String(sellThroughCat.length)} />
+                <SimpleDonutChart data={sellThroughCat} height={200} centerLabel="Categories" centerValue={String(sellThroughCat.length)} />
               ) : (
                 <EmptyState message="No sell-through data yet" height={200} />
               )}
@@ -456,6 +460,69 @@ export default function CommercialPage() {
             </div>
           ) : (
             <EmptyState message="No weekly review submissions yet" hint="Submit a Weekly Review on the Commercial form (or have a store manager submit theirs)." height={160} />
+          )}
+        </Section>
+
+        <Section title="Category Target vs Actual" subtitle="From weekly reviews">
+          {categoryTargets.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[var(--c-border)] text-gray-500">
+                    <th className="text-left py-2 pr-3 font-medium">Category</th>
+                    <th className="text-right py-2 px-3 font-medium">Target Rev</th>
+                    <th className="text-right py-2 px-3 font-medium">Actual Rev</th>
+                    <th className="text-right py-2 px-3 font-medium">Rev %</th>
+                    <th className="text-right py-2 px-3 font-medium">Target Units</th>
+                    <th className="text-right py-2 px-3 font-medium">Actual Units</th>
+                    <th className="text-right py-2 font-medium">Unit %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categoryTargets.map((c) => {
+                    const achCls = (a: number) => (!a ? 'text-gray-500' : a >= 100 ? 'text-green-400' : a >= 80 ? 'text-[#c8a951]' : 'text-red-400');
+                    return (
+                      <tr key={c.name} className="border-b border-[var(--c-hover)]">
+                        <td className="py-2 pr-3 whitespace-nowrap">{c.name}</td>
+                        <td className="py-2 px-3 text-right">{c.targetRev ? fmtGHS(c.targetRev) : '—'}</td>
+                        <td className="py-2 px-3 text-right">{c.actualRev ? fmtGHS(c.actualRev) : '—'}</td>
+                        <td className={`py-2 px-3 text-right font-semibold ${achCls(c.revAch)}`}>{c.revAch ? `${c.revAch}%` : '—'}</td>
+                        <td className="py-2 px-3 text-right">{c.targetUnits || '—'}</td>
+                        <td className="py-2 px-3 text-right">{c.actualUnits || '—'}</td>
+                        <td className={`py-2 text-right font-semibold ${achCls(c.unitAch)}`}>{c.unitAch ? `${c.unitAch}%` : '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState message="No category targets yet" hint="Set Revenue/Unit targets per category in Section 3 of the Weekly Review." height={160} />
+          )}
+        </Section>
+
+        <Section title="Manager Voices" subtitle="Latest strategic answers per store">
+          {managerVoices.length ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {managerVoices.map((v) => (
+                <div key={`${v.store}-${v.weekEnd}`} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
+                  <div className="flex items-baseline justify-between mb-2">
+                    <span className="text-sm font-semibold">{v.store}</span>
+                    <span className="text-xs text-gray-500">{v.manager}{v.weekEnd ? ` · ${v.weekEnd}` : ''}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {v.answers.map((ans, i) => (
+                      <div key={i}>
+                        <div className="text-xs text-[#c8a951]">{ans.q}</div>
+                        <div className="text-xs text-gray-300">{ans.a}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState message="No manager input yet" hint="The Manager Questions in Section 1 of the Weekly Review feed this." height={160} />
           )}
         </Section>
 

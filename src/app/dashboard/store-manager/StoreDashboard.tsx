@@ -24,6 +24,7 @@ interface FinanceLite {
   revenueMtd: number; transactions: number; footfall: number; itemsSold: number;
   grossMargin: number; sellThrough: number; revenueByCategory: { name: string; value: number }[];
   sellThroughByCategory: { name: string; value: number }[];
+  customers: { total: number; new: number; returning: number; repeatRate: number };
 }
 
 export default function StoreDashboard({ assignedStore, managerName }: { assignedStore: string; managerName: string }) {
@@ -96,7 +97,20 @@ export default function StoreDashboard({ assignedStore, managerName }: { assigne
           )}
         </Section>
 
-        <Section number={3} title="Stock Transfers" subtitle="My store">
+        <Section number={3} title="Customer Health" subtitle="From daily closing reports">
+          {f?.customers?.total ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <KPICard label="Total Customers" value={f.customers.total.toLocaleString()} small />
+              <KPICard label="New" value={f.customers.new ? f.customers.new.toLocaleString() : '—'} small />
+              <KPICard label="Returning" value={f.customers.returning ? f.customers.returning.toLocaleString() : '—'} small />
+              <KPICard label="Repeat Rate" value={pct(f.customers.repeatRate)} small />
+            </div>
+          ) : (
+            <EmptyState message="No customer counts yet" hint="Submit a Daily Closing Report to track customers." height={120} />
+          )}
+        </Section>
+
+        <Section number={4} title="Stock Transfers" subtitle="My store">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
             <KPICard label="Outgoing (units)" value={sumUnits(outgoing) ? String(sumUnits(outgoing)) : '—'} small />
             <KPICard label="Incoming (units)" value={sumUnits(incoming) ? String(sumUnits(incoming)) : '—'} small />

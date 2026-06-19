@@ -41,6 +41,10 @@ interface InventoryLive {
   };
   supplierPerformance: { name: string; value: number }[];
   replenishments: { sku: string; description: string; currentStock: number; reorderQty: number; urgency: string; store: string }[];
+  deadStockActions: { name: string; count: number; value: number }[];
+  deadStockItems: { description: string; category: string; action: string; justification: string; value: number; store: string }[];
+  receiptQuality: { name: string; value: number }[];
+  receiptIssues: { supplier: string; condition: string; discrepancy: string; date: string; store: string }[];
 }
 
 export default function InventoryPage() {
@@ -59,6 +63,10 @@ export default function InventoryPage() {
   const hasMovement = !!(mv.receivedUnits || mv.transferredUnits || mv.deadStockValue || mv.countedValue);
   const supplierPerformance = m?.supplierPerformance ?? [];
   const replenishments = m?.replenishments ?? [];
+  const deadStockActions = m?.deadStockActions ?? [];
+  const deadStockItems = m?.deadStockItems ?? [];
+  const receiptQuality = m?.receiptQuality ?? [];
+  const receiptIssues = m?.receiptIssues ?? [];
 
   if (loading && !m) return <BrandedLoader fullScreen />;
 
@@ -214,7 +222,95 @@ export default function InventoryPage() {
           </div>
         </Section>
 
-        <Section number={5} title="Stock Transfers">
+        <Section number={5} title="Dead-Stock Actions">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Recommended Action by Value</div>
+              {deadStockActions.length ? (
+                <SimpleBarChart data={deadStockActions} height={200} color="#ef4444" horizontal prefix="GHS " />
+              ) : (
+                <EmptyState message="No dead-stock actions yet" hint="Submit Dead Stock entries in the Inventory form." height={200} />
+              )}
+            </div>
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Top Items</div>
+              {deadStockItems.length ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[var(--c-border)] text-gray-500">
+                        <th className="text-left py-2 pr-3 font-medium">Item</th>
+                        <th className="text-left py-2 px-2 font-medium">Action</th>
+                        <th className="text-right py-2 pl-2 font-medium">Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {deadStockItems.slice(0, 10).map((d, i) => (
+                        <tr key={i} className="border-b border-[var(--c-hover)]">
+                          <td className="py-2 pr-3 truncate max-w-[12rem]">{d.description || '—'}</td>
+                          <td className="py-2 px-2">{d.action || '—'}</td>
+                          <td className="py-2 pl-2 text-right">{fmtGHS(d.value)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <EmptyState message="No dead-stock items yet" hint="Submit Dead Stock entries in the Inventory form." height={200} />
+              )}
+            </div>
+          </div>
+        </Section>
+
+        <Section number={6} title="Goods-Receipt Quality">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Condition Mix</div>
+              {receiptQuality.length ? (
+                <SimpleDonutChart
+                  data={receiptQuality}
+                  height={200}
+                  centerLabel="Receipts"
+                  centerValue={String(receiptQuality.reduce((s, r) => s + r.value, 0))}
+                  colors={['#22c55e', '#f97316', '#ef4444']}
+                />
+              ) : (
+                <EmptyState message="No goods receipts yet" hint="Submit Goods Received in the Inventory form." height={200} />
+              )}
+            </div>
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Flagged Receipts</div>
+              {receiptIssues.length ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[var(--c-border)] text-gray-500">
+                        <th className="text-left py-2 pr-3 font-medium">Supplier</th>
+                        <th className="text-left py-2 px-2 font-medium">Condition</th>
+                        <th className="text-left py-2 px-2 font-medium">Discrepancy</th>
+                        <th className="text-left py-2 pl-2 font-medium">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {receiptIssues.slice(0, 10).map((r, i) => (
+                        <tr key={i} className="border-b border-[var(--c-hover)]">
+                          <td className="py-2 pr-3 truncate max-w-[10rem]">{r.supplier || '—'}</td>
+                          <td className="py-2 px-2">{r.condition || '—'}</td>
+                          <td className="py-2 px-2 truncate max-w-[12rem]">{r.discrepancy || '—'}</td>
+                          <td className="py-2 pl-2 whitespace-nowrap">{r.date || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <EmptyState message="No flagged receipts" hint="Receipts marked damaged or short appear here." height={200} />
+              )}
+            </div>
+          </div>
+        </Section>
+
+        <Section number={7} title="Stock Transfers">
           {transfers.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -243,7 +339,7 @@ export default function InventoryPage() {
           )}
         </Section>
 
-        <Section number={6} title="Recent Entries">
+        <Section number={8} title="Recent Entries">
           <RecentEntries department="inventory" />
         </Section>
       </div>

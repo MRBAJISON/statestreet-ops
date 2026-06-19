@@ -286,7 +286,7 @@ export default function FinancePage() {
         </Section>
 
         {/* Payments collected by mode — summed across all stores' daily closings */}
-        <Section title="Payments Collected" subtitle="by mode · all stores">
+        <Section title="Payments by Mode" subtitle="all stores">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2">
               <div className="text-xs text-gray-400 mb-2">Takings by Payment Mode</div>

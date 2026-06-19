@@ -225,6 +225,15 @@ function financeMetrics(rows: Entry[]) {
     .filter((x) => x.value > 0);
   const paymentsTotal = paymentsByMode.reduce((s, x) => s + x.value, 0);
 
+  // Customer health — totals from the daily closing reports.
+  const custTotal = closing.reduce((s, p) => s + num(p.customers), 0);
+  const custNew = closing.reduce((s, p) => s + num(p.newCustomers), 0);
+  const custReturning = closing.reduce((s, p) => s + num(p.returningCustomers), 0);
+  const custBase = custNew + custReturning;
+  const repeatRate = custBase
+    ? round1((custReturning / custBase) * 100)
+    : custTotal ? round1((custReturning / custTotal) * 100) : 0;
+
   // Daily sales entered by the stores (finance/revenue), summarised per store.
   const dsMap = new Map<string, { gross: number; tx: number; units: number; count: number }>();
   for (const p of payloads(rows, 'revenue')) {
@@ -250,6 +259,7 @@ function financeMetrics(rows: Entry[]) {
     sellThroughByCategory,
     paymentsByMode,
     paymentsTotal,
+    customers: { total: custTotal, new: custNew, returning: custReturning, repeatRate },
     dailySalesByStore,
     revenueMtd,
     cogs: cogsTotal,
@@ -450,6 +460,52 @@ function commercialMetrics(rows: Entry[]) {
     };
   });
 
+  // Manager Voices — the latest strategic answers (CEO questions) per store.
+  const VOICE_QS = [
+    { key: 'q3', q: 'Category Marketing should amplify' },
+    { key: 'q5', q: 'What I will do differently this week' },
+    { key: 'q6', q: 'First three actions if this store were mine' },
+  ];
+  const voiceSeen = new Set<string>();
+  const managerVoices: { store: string; manager: string; weekEnd: string; answers: { q: string; a: string }[] }[] = [];
+  for (const r of reviews) {
+    if (voiceSeen.has(r.store)) continue; // reviews are newest-first → first hit = latest
+    const ceo = (r.ceo as Record<string, string> | null) ?? null;
+    const answers = VOICE_QS
+      .map((q) => ({ q: q.q, a: String(ceo?.[q.key] ?? '').trim() }))
+      .filter((x) => x.a);
+    if (!answers.length) continue;
+    voiceSeen.add(r.store);
+    managerVoices.push({ store: r.store, manager: r.manager, weekEnd: r.weekEnd, answers });
+  }
+
+  // Category target vs actual — revenue & units, aggregated across reviews in scope.
+  const catTgt = new Map<string, { actualRev: number; targetRev: number; actualUnits: number; targetUnits: number }>();
+  for (const r of wrRows) {
+    const cats = ((r.payload as P).categories ?? {}) as Record<string, Record<string, unknown>>;
+    for (const [name, f] of Object.entries(cats)) {
+      const e = catTgt.get(name) ?? { actualRev: 0, targetRev: 0, actualUnits: 0, targetUnits: 0 };
+      e.actualRev += num(f.revenue);
+      e.targetRev += num(f.revenueTarget);
+      e.actualUnits += num(f.actualUnits);
+      e.targetUnits += num(f.salesTargetUnits);
+      catTgt.set(name, e);
+    }
+  }
+  const categoryTargets = [...catTgt]
+    .map(([name, v]) => ({
+      name,
+      actualRev: v.actualRev,
+      targetRev: v.targetRev,
+      actualUnits: v.actualUnits,
+      targetUnits: v.targetUnits,
+      revAch: v.targetRev ? round1((v.actualRev / v.targetRev) * 100) : 0,
+      unitAch: v.targetUnits ? round1((v.actualUnits / v.targetUnits) * 100) : 0,
+    }))
+    .filter((x) => x.targetRev > 0 || x.targetUnits > 0 || x.actualRev > 0)
+    .sort((a, b) => b.targetRev - a.targetRev)
+    .slice(0, 12);
+
   const wrLatest = reviews[0] ?? null;
   const weeklyReview = {
     count: reviews.length,
@@ -584,6 +640,8 @@ function commercialMetrics(rows: Entry[]) {
       status: String(p.status || ''),
     })),
     weeklyReview,
+    managerVoices,
+    categoryTargets,
     leads,
     leadsBySource,
     leadsTotal,
@@ -699,6 +757,37 @@ function operationsMetrics(rows: Entry[]) {
     overdue: maint.filter((p) => /overdue/i.test(String(p.status))).length,
   };
 
+  // Maintenance backlog broken down by category and by assignee (open work + cost).
+  const MAINT_CAT: Record<string, string> = {
+    electrical: 'Electrical', hvac: 'HVAC', plumbing: 'Plumbing', carpentry: 'Carpentry',
+    painting: 'Painting', security: 'Security', it: 'IT / Network', other: 'Other',
+  };
+  const maintCatMap = new Map<string, { count: number; open: number; cost: number; openCost: number }>();
+  for (const p of maint) {
+    const k = MAINT_CAT[String(p.category)] ?? String(p.category || 'Other');
+    const e = maintCatMap.get(k) ?? { count: 0, open: 0, cost: 0, openCost: 0 };
+    e.count += 1;
+    e.cost += num(p.cost);
+    if (!closed(p.status)) { e.open += 1; e.openCost += num(p.cost); }
+    maintCatMap.set(k, e);
+  }
+  const maintenanceByCategory = [...maintCatMap]
+    .map(([name, v]) => ({ name, ...v }))
+    .sort((a, b) => b.open - a.open || b.count - a.count);
+  const maintAsgMap = new Map<string, { count: number; open: number; openCost: number }>();
+  for (const p of maint) {
+    const who = String(p.assignedTo || '').trim();
+    if (!who) continue;
+    const e = maintAsgMap.get(who) ?? { count: 0, open: 0, openCost: 0 };
+    e.count += 1;
+    if (!closed(p.status)) { e.open += 1; e.openCost += num(p.cost); }
+    maintAsgMap.set(who, e);
+  }
+  const maintenanceByAssignee = [...maintAsgMap]
+    .map(([name, v]) => ({ name, ...v }))
+    .sort((a, b) => b.open - a.open || b.count - a.count)
+    .slice(0, 10);
+
   // SOP compliance by area (+ deviations list).
   const SOP_AREA: Record<string, string> = {
     opening: 'Opening', 'sales-floor': 'Sales Floor', cash: 'Cash Handling', service: 'Customer Service',
@@ -781,6 +870,8 @@ function operationsMetrics(rows: Entry[]) {
     peopleHealth,
     staffing,
     maintenance,
+    maintenanceByCategory,
+    maintenanceByAssignee,
     sopByArea,
     sopDeviations,
     correctiveRegister,
@@ -863,6 +954,52 @@ function inventoryMetrics(rows: Entry[]) {
     countedValue: onHandValue,
   };
 
+  // Dead-stock disposition — recommended actions taken (count + value), plus detail.
+  const DS_ACTION: Record<string, string> = {
+    'markdown-20': 'Markdown 20%', 'markdown-40': 'Markdown 40%', 'markdown-60': 'Markdown 60%',
+    outlet: 'Transfer to Outlet', donate: 'Donate', 'write-off': 'Write Off',
+  };
+  const dsActMap = new Map<string, { count: number; value: number }>();
+  for (const p of ds) {
+    const k = DS_ACTION[String(p.action)] ?? String(p.action || 'Unspecified');
+    const e = dsActMap.get(k) ?? { count: 0, value: 0 };
+    e.count += 1; e.value += num(p.stockValue);
+    dsActMap.set(k, e);
+  }
+  const deadStockActions = [...dsActMap]
+    .map(([name, v]) => ({ name, count: v.count, value: v.value }))
+    .sort((a, b) => b.value - a.value);
+  const deadStockItems = ds
+    .map((p) => ({
+      description: String(p.description || p.sku || ''),
+      category: labelFor(CATEGORY_LABELS, p.category),
+      action: DS_ACTION[String(p.action)] ?? String(p.action || ''),
+      justification: String(p.justification || ''),
+      value: num(p.stockValue),
+      store: labelFor(STORE_LABELS, p.store),
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+
+  // Goods-receipt quality gate — condition mix + the receipts that flagged issues.
+  const COND: Record<string, string> = { good: 'Good', partial: 'Partial — damaged', short: 'Short — missing' };
+  const condMap = new Map<string, number>();
+  for (const p of gr) {
+    const k = COND[String(p.condition)] ?? String(p.condition || 'Unspecified');
+    condMap.set(k, (condMap.get(k) ?? 0) + 1);
+  }
+  const receiptQuality = [...condMap].map(([name, value]) => ({ name, value }));
+  const receiptIssues = gr
+    .filter((p) => String(p.discrepancy || '').trim() || /partial|short/.test(String(p.condition)))
+    .map((p) => ({
+      supplier: String(p.supplier || ''),
+      condition: COND[String(p.condition)] ?? String(p.condition || ''),
+      discrepancy: String(p.discrepancy || ''),
+      date: String(p.date || ''),
+      store: labelFor(STORE_LABELS, p.store),
+    }))
+    .slice(0, 10);
+
   return {
     inventoryValue,
     accuracy: sysTotal ? round1(Math.max(0, 100 - (varTotal / sysTotal) * 100)) : 0,
@@ -875,6 +1012,10 @@ function inventoryMetrics(rows: Entry[]) {
     accuracyDistribution,
     valueTrend,
     movement,
+    deadStockActions,
+    deadStockItems,
+    receiptQuality,
+    receiptIssues,
     supplierPerformance: groupSum(gr, 'supplier', 'totalValue').filter((x) => x.name && x.name !== '—'),
     replenishments: rep
       .map((p) => ({
@@ -1112,8 +1253,23 @@ function marketingMetrics(rows: Entry[]) {
     }))
     .slice(0, 10);
 
+  // Lead qualification funnel (total → qualified → converted).
+  const leadFunnel = {
+    total: leads.reduce((s, p) => s + num(p.count), 0),
+    qualified: leads.reduce((s, p) => s + num(p.qualified), 0),
+    converted: leads.reduce((s, p) => s + num(p.converted), 0),
+  };
+  // Content cadence — output volume from the social form.
+  const contentCadence = {
+    posts: social.reduce((s, p) => s + num(p.posts), 0),
+    reels: social.reduce((s, p) => s + num(p.reels), 0),
+    stories: social.reduce((s, p) => s + num(p.stories), 0),
+  };
+
   return {
     leadChannelMix: groupSum(leads, 'channel', 'count'),
+    leadFunnel,
+    contentCadence,
     totalLeads: leads.reduce((s, p) => s + num(p.count), 0),
     converted: leads.reduce((s, p) => s + num(p.converted), 0),
     totalReach: camp.reduce((s, p) => s + num(p.reach), 0),

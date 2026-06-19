@@ -38,6 +38,8 @@ interface OperationsLive {
   cxFeedback: { avgRating: number; avgNps: number; recommendRate: number; count: number };
   peopleHealth: { count: number; attendance: number; punctuality: number; training: number; absences: number; score: number; reasons: { name: string; value: number }[] };
   maintenance: { totalCost: number; openCost: number; overdue: number };
+  maintenanceByCategory: { name: string; count: number; open: number; cost: number; openCost: number }[];
+  maintenanceByAssignee: { name: string; count: number; open: number; openCost: number }[];
   sopByArea: { name: string; value: number }[];
   sopDeviations: { store: string; area: string; deviations: string; corrective: string }[];
   correctiveRegister: { source: string; store: string; text: string; status: string }[];
@@ -62,6 +64,8 @@ export default function OperationsPage() {
   const cx = m?.cxFeedback ?? { avgRating: 0, avgNps: 0, recommendRate: 0, count: 0 };
   const ph = m?.peopleHealth ?? { count: 0, attendance: 0, punctuality: 0, training: 0, absences: 0, score: 0, reasons: [] };
   const maintenance = m?.maintenance ?? { totalCost: 0, openCost: 0, overdue: 0 };
+  const maintenanceByCategory = m?.maintenanceByCategory ?? [];
+  const maintenanceByAssignee = m?.maintenanceByAssignee ?? [];
   const sopByArea = m?.sopByArea ?? [];
   const sopDeviations = m?.sopDeviations ?? [];
   const correctiveRegister = m?.correctiveRegister ?? [];
@@ -253,7 +257,58 @@ export default function OperationsPage() {
           )}
         </Section>
 
-        <Section number={5} title="Customer Experience & VM Detail">
+        <Section number={5} title="Maintenance Backlog" subtitle="By category & assignee">
+          {maintenanceByCategory.length || maintenanceByAssignee.length ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
+                <div className="text-xs text-gray-400 mb-2">Open Work by Category</div>
+                {maintenanceByCategory.length ? (
+                  <SimpleBarChart
+                    data={maintenanceByCategory.map((c) => ({ name: c.name, value: c.open }))}
+                    height={220}
+                    color="#c8a951"
+                    horizontal
+                  />
+                ) : (
+                  <EmptyState message="No maintenance categories yet" height={220} />
+                )}
+              </div>
+              <div>
+                <div className="text-xs text-gray-400 mb-2">Open Workload by Assignee</div>
+                {maintenanceByAssignee.length ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-[var(--c-border)] text-gray-500">
+                          <th className="text-left py-2 pr-3 font-medium">Assignee</th>
+                          <th className="text-right py-2 px-3 font-medium">Open</th>
+                          <th className="text-right py-2 px-3 font-medium">Total</th>
+                          <th className="text-right py-2 pl-3 font-medium">Open Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {maintenanceByAssignee.map((a) => (
+                          <tr key={a.name} className="border-b border-[var(--c-hover)]">
+                            <td className="py-2 pr-3">{a.name}</td>
+                            <td className="py-2 px-3 text-right">{a.open || '—'}</td>
+                            <td className="py-2 px-3 text-right">{a.count || '—'}</td>
+                            <td className="py-2 pl-3 text-right">{fmtGHS(a.openCost)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <EmptyState message="No assignees yet" height={160} />
+                )}
+              </div>
+            </div>
+          ) : (
+            <EmptyState message="No maintenance backlog yet" hint="Log maintenance under Store Standards in the Operations form." height={140} />
+          )}
+        </Section>
+
+        <Section number={6} title="Customer Experience & VM Detail">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
               <div className="text-xs text-gray-400 mb-2">Customer Experience</div>
@@ -287,7 +342,7 @@ export default function OperationsPage() {
           </div>
         </Section>
 
-        <Section number={6} title="People Health" subtitle="HR">
+        <Section number={7} title="People Health" subtitle="HR">
           {ph.count > 0 ? (
             <div className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -315,7 +370,7 @@ export default function OperationsPage() {
           )}
         </Section>
 
-        <Section number={7} title="SOP Compliance" subtitle="By area">
+        <Section number={8} title="SOP Compliance" subtitle="By area">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
               <div className="text-xs text-gray-400 mb-2">Compliance by Area</div>
@@ -347,7 +402,7 @@ export default function OperationsPage() {
           </div>
         </Section>
 
-        <Section number={8} title="Corrective Action Register">
+        <Section number={9} title="Corrective Action Register">
           {correctiveRegister.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -376,7 +431,7 @@ export default function OperationsPage() {
           )}
         </Section>
 
-        <Section number={9} title="Recent Entries">
+        <Section number={10} title="Recent Entries">
           <RecentEntries department="operations" />
         </Section>
       </div>

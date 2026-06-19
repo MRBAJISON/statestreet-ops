@@ -80,7 +80,7 @@ export default function ExecutiveCommandCenter() {
   const retailStoreCount = org.stores.filter((s) => s.value !== 'head-office').length;
   const finQ = useMetrics<{ revenueMtd: number; netProfit: number; grossProfit: number; operatingProfit: number; grossMargin: number; cashNet: number; netMargin: number; roce: number; roi: number; revenueByCategory: { name: string; value: number }[] }>('finance', period, anchor, store);
   const fin = finQ.data;
-  const com = useMetrics<{ groupSales: number; convRate: number; sellThrough: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null; insights: { best: string[]; concern: string[]; risk: string[] } }[] } }>('commercial', period, anchor, store).data;
+  const com = useMetrics<{ groupSales: number; convRate: number; sellThrough: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null; insights: { best: string[]; concern: string[]; risk: string[] } }[] }; managerVoices?: { store: string; manager: string; weekEnd: string; answers: { q: string; a: string }[] }[] }>('commercial', period, anchor, store).data;
   const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[]; priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[]; peopleHealth: { score: number; attendance: number; punctuality: number; training: number; absences: number; count: number }; staffing: { total: number; onDuty: number; absent: number } }>('operations', period, anchor, store).data;
   const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory', period, anchor, store).data;
   const brd = useMetrics<{ healthIndex: number; sentiment: { positive: number }; ceoAttention: { priority: string; issue: string; impact: string; owner: string; status: string }[] }>('brand', period, anchor, store).data;
@@ -119,6 +119,7 @@ export default function ExecutiveCommandCenter() {
   }
   const storePerformance = [...storeMap].map(([store, v]) => ({ store, ...v })).sort((a, b) => b.sales - a.sales);
   const ceoAttention = brd?.ceoAttention ?? [];
+  const managerVoices = (com?.managerVoices ?? []).slice(0, 12);
   const wr = com?.weeklyReview;
   const wrReviews = wr?.reviews ?? [];
   const [wrWeek, setWrWeek] = useState<number | 'all'>('all');
@@ -358,8 +359,36 @@ export default function ExecutiveCommandCenter() {
           )}
         </Section>
 
+        {/* Manager Voices (latest strategic answers per store) */}
+        <Section number={7} title="Manager Voices" subtitle="Latest from store managers">
+          {managerVoices.length ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {managerVoices.map((v, i) => (
+                <div key={`${v.store}-${i}`} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3 flex flex-col">
+                  <div className="text-sm font-semibold text-[var(--c-fg)]">{v.store}</div>
+                  <div className="text-[0.65rem] text-gray-500 mt-0.5">{v.manager || '—'}{v.weekEnd ? ` · week ending ${v.weekEnd}` : ''}</div>
+                  {v.answers.length ? (
+                    <div className="mt-2 space-y-2">
+                      {v.answers.map((x, j) => (
+                        <div key={j}>
+                          <div className="text-[0.65rem] text-[#c8a951]">{x.q}</div>
+                          <div className="text-xs text-gray-200 whitespace-pre-wrap">{x.a || '—'}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-600 mt-2">No answers</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState message="No manager voices yet" hint="Store managers submit these via Commercial → Weekly Review." height={120} />
+          )}
+        </Section>
+
         {/* Action Tracker (cross-department) */}
-        <Section number={7} title="Action Tracker">
+        <Section number={8} title="Action Tracker">
           {actionTracker.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -391,7 +420,7 @@ export default function ExecutiveCommandCenter() {
         </Section>
 
         {/* Store Manager CEO Answers (from selected Weekly Review) */}
-        <Section number={8} title="Store Manager — Key Insights" subtitle={wrHeading}>
+        <Section number={9} title="Store Manager — Key Insights" subtitle={wrHeading}>
           {wr && wr.count > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
               {/* Week history list */}

@@ -29,6 +29,8 @@ interface MarketingLive {
   spend: number;
   roas: number;
   funnel: { reach: number; engagement: number; leads: number; storeVisits: number; revenueInfluenced: number };
+  leadFunnel: { total: number; qualified: number; converted: number };
+  contentCadence: { posts: number; reels: number; stories: number };
   socialByChannel: { platform: string; followers: number; reach: number; impressions: number; engagement: number; clicks: number }[];
   webVisits: number;
   campaignByBrand: { brand: string; revenue: number; spend: number; roas: number }[];
@@ -57,7 +59,18 @@ export default function MarketingPage() {
   const cl = m?.clienteling ?? { contacted: 0, responses: 0, appointments: 0, estRevenue: 0, responseRate: 0 };
   const cx = m?.customerExperience ?? { count: 0, avgNps: 0, recommendRate: 0, byType: [], recent: [] };
   const actions = m?.actions ?? [];
+  const leadFunnel = m?.leadFunnel ?? { total: 0, qualified: 0, converted: 0 };
+  const contentCadence = m?.contentCadence ?? { posts: 0, reels: 0, stories: 0 };
   const hasFunnel = !!(funnel.reach || funnel.engagement || funnel.leads || funnel.storeVisits);
+  const hasLeadFunnel = leadFunnel.total > 0;
+  const hasContentCadence = !!(contentCadence.posts || contentCadence.reels || contentCadence.stories);
+  const qualifiedRate = leadFunnel.total ? Math.round((leadFunnel.qualified / leadFunnel.total) * 100) : 0;
+  const convertRate = leadFunnel.qualified ? Math.round((leadFunnel.converted / leadFunnel.qualified) * 100) : 0;
+  const leadFunnelBars = [
+    { name: 'Total', value: leadFunnel.total },
+    { name: 'Qualified', value: leadFunnel.qualified },
+    { name: 'Converted', value: leadFunnel.converted },
+  ];
   const hasClienteling = !!(cl.contacted || cl.responses || cl.appointments || cl.estRevenue);
 
   // Customer Insights — walk-in captures (commercial/customer-capture), analysed client-side.
@@ -144,7 +157,44 @@ export default function MarketingPage() {
           </div>
         </Section>
 
-        <Section number={2} title="Campaign Performance" subtitle="per campaign">
+        <Section number={2} title="Lead Qualification" subtitle="total leads → qualified → converted">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Lead Qualification Funnel</div>
+              {hasLeadFunnel ? (
+                <div className="space-y-3">
+                  <SimpleBarChart data={leadFunnelBars} height={220} color="#c8a951" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
+                      <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Qualified Rate</div>
+                      <div className="text-lg font-bold text-[#c8a951]">{qualifiedRate}%</div>
+                    </div>
+                    <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
+                      <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">Convert Rate</div>
+                      <div className="text-lg font-bold text-[#c8a951]">{convertRate}%</div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <EmptyState message="No qualified leads yet" hint="Submit Lead Entry in the Marketing form." height={220} />
+              )}
+            </div>
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Content Cadence</div>
+              {hasContentCadence ? (
+                <div className="grid grid-cols-3 gap-3">
+                  <KPICard label="Posts" value={numOrDash(contentCadence.posts)} small />
+                  <KPICard label="Reels" value={numOrDash(contentCadence.reels)} small />
+                  <KPICard label="Stories" value={numOrDash(contentCadence.stories)} small />
+                </div>
+              ) : (
+                <EmptyState message="No content published yet" hint="Submit Content Cadence in the Marketing form." height={220} />
+              )}
+            </div>
+          </div>
+        </Section>
+
+        <Section number={3} title="Campaign Performance" subtitle="per campaign">
           {campaigns.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -195,7 +245,7 @@ export default function MarketingPage() {
           )}
         </Section>
 
-        <Section number={3} title="Social Media by Channel">
+        <Section number={4} title="Social Media by Channel">
           {socialByChannel.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -233,7 +283,7 @@ export default function MarketingPage() {
           )}
         </Section>
 
-        <Section number={4} title="Clienteling">
+        <Section number={5} title="Clienteling">
           {hasClienteling ? (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
@@ -262,7 +312,7 @@ export default function MarketingPage() {
           )}
         </Section>
 
-        <Section number={5} title="Customer Experience">
+        <Section number={6} title="Customer Experience">
           {cx.count ? (
             <div className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -288,7 +338,7 @@ export default function MarketingPage() {
           )}
         </Section>
 
-        <Section number={6} title="Action Tracker">
+        <Section number={7} title="Action Tracker">
           {actions.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -319,7 +369,7 @@ export default function MarketingPage() {
           )}
         </Section>
 
-        <Section number={7} title="Customer Insights" subtitle="walk-in captures from stores">
+        <Section number={8} title="Customer Insights" subtitle="walk-in captures from stores">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             <KPICard label="Captured" value={capTotal ? String(capTotal) : '—'} small />
             <KPICard label="Buyers" value={capBuyers ? String(capBuyers) : '—'} small />
@@ -354,7 +404,7 @@ export default function MarketingPage() {
           </div>
         </Section>
 
-        <Section number={8} title="Recent Entries">
+        <Section number={9} title="Recent Entries">
           <RecentEntries department="marketing" />
         </Section>
       </div>
