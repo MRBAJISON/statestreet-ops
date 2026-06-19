@@ -8,7 +8,7 @@ import { submitEntry, postEntries, useEntries } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { useOrg } from '@/components/providers/OrgProvider';
 import { expenseGroups, categoriesForStore } from '@/lib/org';
-import { PAYMENT_MODES, DISCOVERY_SOURCES, payKey } from '@/lib/config';
+import { PAYMENT_MODES, payKey } from '@/lib/config';
 
 const INFLOW_GROUP = {
   label: 'Inflows',
@@ -522,7 +522,6 @@ export default function FinanceFormsPage() {
               <FormField label="Total Customers" name="customers" type="number" />
               <FormField label="New Customers" name="newCustomers" type="number" />
               <FormField label="Returning Customers" name="returningCustomers" type="number" />
-              <FormField label="How They Found Us" name="discoverySource" type="select" options={DISCOVERY_SOURCES} />
             </div>
             <div className="mt-4">
               <h4 className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Payments by Mode</h4>
