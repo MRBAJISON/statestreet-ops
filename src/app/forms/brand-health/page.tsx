@@ -20,6 +20,7 @@ export default function BrandFormsPage() {
     { id: 'sentiment', label: 'Brand Sentiment' },
     { id: 'competitor', label: 'Competitor Analysis' },
     { id: 'digital', label: 'Digital Reputation' },
+    { id: 'voice', label: 'Customer Voice' },
     { id: 'attention', label: 'CEO Attention Items' },
   ];
 
@@ -142,6 +143,29 @@ export default function BrandFormsPage() {
               <FormField label="Trustpilot Score" name="trustpilot" type="number" step={0.1} min={1} max={5} />
               <FormField label="New Reviews This Week" name="newReviews" type="number" />
               <FormField label="Negative Reviews Requiring Response" name="negReviews" type="number" />
+            </div>
+          </FormSection>
+        )}
+
+        {activeForm === 'voice' && (
+          <FormSection title="Customer Voice" description="Log customer feedback. Complaints feed Risks; compliments & requests feed Opportunities on the Brand dashboard.">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
+              <FormField label="Date" name="date" type="date" required />
+              <FormField label="Brand" name="brand" type="select" options={BRANDS} />
+              <FormField label="Type" name="type" type="select" required options={[
+                { label: 'Frustration', value: 'frustration' }, { label: 'Complaint', value: 'complaint' },
+                { label: 'Negative Feedback', value: 'negative' }, { label: 'Compliment', value: 'compliment' },
+                { label: 'Positive Feedback', value: 'positive' }, { label: 'Feature / Product Request', value: 'request' },
+              ]} />
+              <FormField label="Source" name="source" type="select" options={[
+                { label: 'Social Media', value: 'social' }, { label: 'In-Store', value: 'in-store' },
+                { label: 'Online Reviews', value: 'reviews' }, { label: 'Survey', value: 'survey' },
+                { label: 'Customer Service', value: 'cs' },
+              ]} />
+              <FormField label="Frequency" name="frequency" type="select" options={[
+                { label: 'One-off', value: 'one-off' }, { label: 'Occasional', value: 'occasional' }, { label: 'Frequent', value: 'frequent' },
+              ]} />
+              <FormField label="Detail" name="detail" type="textarea" placeholder="What did the customer say?" required />
             </div>
           </FormSection>
         )}
