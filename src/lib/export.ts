@@ -83,7 +83,7 @@ const formLabel = (t: string) => FORM_TYPE_LABELS[t] ?? prettify(t);
 const num = (v: unknown) => Number(String(v ?? '').replace(/[, ]/g, ''));
 const isNumeric = (v: unknown) => v !== '' && v !== null && v !== undefined && Number.isFinite(num(v));
 
-function entryDate(e: Entry): Date {
+export function entryDate(e: Entry): Date {
   const p = e.payload as P;
   const cand = p.date ?? p.datetime ?? p.weekEnd ?? e.createdAt;
   const d = new Date(String(cand));

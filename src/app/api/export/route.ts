@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import { entries } from '@/lib/db/schema';
 import { desc } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
-import { buildWorkbook, type ExportScope } from '@/lib/export';
+import { buildWorkbook, entryDate, type ExportScope } from '@/lib/export';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,11 +39,28 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'No store assigned to your account' }, { status: 403 });
   }
 
-  const rows = await db.select().from(entries).orderBy(desc(entries.createdAt));
+  // Optional date-range filter (by each entry's business date). Inclusive.
+  const fromStr = req.nextUrl.searchParams.get('from') || '';
+  const toStr = req.nextUrl.searchParams.get('to') || '';
+  const from = fromStr ? new Date(fromStr + 'T00:00:00') : null;
+  const to = toStr ? new Date(toStr + 'T23:59:59') : null;
+
+  let rows = await db.select().from(entries).orderBy(desc(entries.createdAt));
+  if (from || to) {
+    rows = rows.filter((r) => {
+      // Always keep the org-settings row so branding survives; filter operational data.
+      if (r.department === 'admin') return true;
+      const d = entryDate(r);
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
+    });
+  }
   const buffer = await buildWorkbook(scope, rows, { store: session.user.store });
 
+  const range = from || to ? `-${fromStr || 'start'}_to_${toStr || 'now'}` : '';
   const date = new Date().toISOString().slice(0, 10);
-  const filename = `statestreet-${FILE_SLUG[scope]}-${date}.xlsx`;
+  const filename = `statestreet-${FILE_SLUG[scope]}${range || `-${date}`}.xlsx`;
   return new NextResponse(new Uint8Array(buffer), {
     status: 200,
     headers: {

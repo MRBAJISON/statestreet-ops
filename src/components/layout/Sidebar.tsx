@@ -142,10 +142,10 @@ export default function Sidebar({ userName, userRole, departments }: SidebarProp
         {REPORT_LINK[userRole] && (
           <>
             <div className="text-[0.6rem] text-gray-600 uppercase tracking-wider px-3 py-2 mt-4">Entry Report</div>
-            <a href={`/api/export?scope=${REPORT_LINK[userRole].scope}`} className={linkCls(false)}>
+            <Link href="/reports" className={linkCls(pathname === '/reports')}>
               <span>📊</span>
               <span>{REPORT_LINK[userRole].label}</span>
-            </a>
+            </Link>
           </>
         )}
 
