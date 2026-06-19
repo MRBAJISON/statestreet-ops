@@ -428,6 +428,41 @@ export default function CommercialPage() {
           )}
         </Section>
 
+        <Section title="Weekly Review Submissions" subtitle="all stores">
+          {wrReviews.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[var(--c-border)] text-gray-500">
+                    <th className="text-left py-2 pr-3 font-medium">Week Ending</th>
+                    <th className="text-left py-2 pr-3 font-medium">Store</th>
+                    <th className="text-left py-2 pr-3 font-medium">Manager</th>
+                    <th className="text-right py-2 px-3 font-medium">Actual Sales</th>
+                    <th className="text-right py-2 px-3 font-medium">Target</th>
+                    <th className="text-right py-2 px-3 font-medium">Achievement</th>
+                    <th className="text-left py-2 font-medium">Submitted</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...wrReviews].sort((a, b) => (a.weekEnd < b.weekEnd ? 1 : -1)).map((r) => (
+                    <tr key={r.id} className="border-b border-[var(--c-hover)]">
+                      <td className="py-2 pr-3 whitespace-nowrap">{r.weekEnd || '—'}</td>
+                      <td className="py-2 pr-3">{r.store || '—'}</td>
+                      <td className="py-2 pr-3">{r.manager || '—'}</td>
+                      <td className="py-2 px-3 text-right">{r.actualSales ? fmtGHS(r.actualSales) : '—'}</td>
+                      <td className="py-2 px-3 text-right">{r.salesTarget ? fmtGHS(r.salesTarget) : '—'}</td>
+                      <td className="py-2 px-3 text-right font-semibold text-[#c8a951]">{r.achievement ? `${r.achievement}%` : '—'}</td>
+                      <td className="py-2 whitespace-nowrap text-gray-500">{String(r.submittedAt || '').slice(0, 10) || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState message="No weekly review submissions yet" hint="Submit a Weekly Review on the Commercial form (or have a store manager submit theirs)." height={160} />
+          )}
+        </Section>
+
         <Section number={7} title="Sales Achievement Trend" subtitle="Weekly target achievement — forex view">
           {(m?.achievementTrend?.length ?? 0) >= 2 ? (
             <>

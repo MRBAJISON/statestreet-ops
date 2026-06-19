@@ -1,10 +1,11 @@
 ﻿'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
-import { submitEntry } from '@/lib/api';
+import WeeklyReview, { type DailySale, type WeekTarget } from '@/app/forms/store-manager/WeeklyReview';
+import { submitEntry, useEntries } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { useOrg } from '@/components/providers/OrgProvider';
 import { categoriesForBrand, categoriesForStore } from '@/lib/org';
@@ -46,6 +47,25 @@ export default function CommercialFormsPage() {
   const ssConv = numOf(ssFootfall) ? (numOf(ssTxns) / numOf(ssFootfall)) * 100 : 0;
   const cpAsp = numOf(cpUnits) ? numOf(cpSales) / numOf(cpUnits) : 0;
 
+  // Weekly Review (reuses the store worksheet) needs every store's daily sales
+  // and weekly targets so it can scope to the store the user picks.
+  const { entries: finEntries } = useEntries('finance', 5000);
+  const { entries: comEntries } = useEntries('commercial', 5000);
+  const dailySalesAll: DailySale[] = useMemo(
+    () => finEntries.filter((e) => e.formType === 'revenue').map((e) => ({
+      date: String(e.payload.date || ''), category: String(e.payload.category || ''),
+      grossRevenue: Number(e.payload.grossRevenue) || 0, itemsSold: Number(e.payload.itemsSold) || 0,
+      store: String(e.payload.store || ''),
+    })),
+    [finEntries]
+  );
+  const targetsAll: WeekTarget[] = useMemo(
+    () => comEntries.filter((e) => e.formType === 'weekly-target').map((e) => ({
+      weekEnd: String(e.payload.weekEnd || ''), target: Number(e.payload.target) || 0, store: String(e.payload.store || ''),
+    })),
+    [comEntries]
+  );
+
   function resetAutoCalc() {
     setSsTotalSales('');
     setSsTxns('');
@@ -68,6 +88,7 @@ export default function CommercialFormsPage() {
     { id: 'sku-entry', label: 'SKU Performance' },
     { id: 'new-arrivals', label: 'New Arrivals' },
     { id: 'accountability', label: 'Accountability Update' },
+    { id: 'weekly-review', label: 'Weekly Review' },
   ];
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -128,6 +149,14 @@ export default function CommercialFormsPage() {
         </div>
       )}
 
+      {activeForm === 'weekly-review' && (
+        <div className="max-w-4xl">
+          <p className="text-xs text-gray-500 mb-4">Pick a store, set the Week Ending, then complete the four sections. Units &amp; Revenue auto-fill from that store&apos;s daily sales; only the store&apos;s brand categories are shown.</p>
+          <WeeklyReview dailySales={dailySalesAll} targets={targetsAll} />
+        </div>
+      )}
+
+      {activeForm !== 'weekly-review' && (
       <form onSubmit={handleSubmit} className="space-y-4 max-w-4xl">
         {activeForm === 'store-sales' && (
           <FormSection title="Daily Store Sales" description="Record daily sales metrics per store">
@@ -232,6 +261,7 @@ export default function CommercialFormsPage() {
           )}
         </div>
       </form>
+      )}
 
       {activeForm === 'store-sales' && showClosing && (
         <form onSubmit={handleClosing} className="space-y-4 max-w-4xl mt-6">

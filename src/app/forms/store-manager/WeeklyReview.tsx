@@ -6,8 +6,8 @@ import { categoriesForStore } from '@/lib/org';
 import { postEntry, updateEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 
-export interface DailySale { date: string; category: string; grossRevenue: number; itemsSold: number }
-export interface WeekTarget { weekEnd: string; target: number }
+export interface DailySale { date: string; category: string; grossRevenue: number; itemsSold: number; store?: string }
+export interface WeekTarget { weekEnd: string; target: number; store?: string }
 
 type Col = { key: string; label: string; type?: 'number' | 'text'; options?: string[]; auto?: boolean };
 
@@ -68,10 +68,10 @@ const num = (s: string) => Number(s) || 0;
 
 export default function WeeklyReview({ assignedStore = '', managerName = '', dailySales = [], targets = [] }: { assignedStore?: string; managerName?: string; dailySales?: DailySale[]; targets?: WeekTarget[] }) {
   const { org } = useOrg();
-  // The review covers only the store's brand categories (Brand→Stores + Brand→
-  // Categories mappings in Settings); falls back to all categories if unmapped.
-  const catOptions = categoriesForStore(org, assignedStore);
   const [header, setHeader] = useState({ store: assignedStore, manager: managerName, weekEnd: '' });
+  // The review covers only the selected store's brand categories (Brand→Stores +
+  // Brand→Categories mappings in Settings); falls back to all if unmapped.
+  const catOptions = categoriesForStore(org, header.store);
   // rows[category][colKey] = manually entered value
   const [rows, setRows] = useState<Record<string, Record<string, string>>>({});
   const [ceo, setCeo] = useState<Record<string, string>>({});
@@ -89,7 +89,9 @@ export default function WeeklyReview({ assignedStore = '', managerName = '', dai
     const diff = (end.getTime() - d.getTime()) / 86_400_000;
     return diff >= 0 && diff < 7;
   };
-  const weekDaily = dailySales.filter((d) => inWeek(d.date));
+  // Only this store's daily sales for the chosen week (store is fixed for a
+  // store manager, picked from the header for commercial).
+  const weekDaily = header.store ? dailySales.filter((d) => inWeek(d.date) && (d.store ?? header.store) === header.store) : [];
   // Revenue + units per category, keyed by the category VALUE (exactly as daily
   // sales store it) so the grid rows match reliably.
   const perCat = new Map<string, { revenue: number; units: number }>();
@@ -100,7 +102,7 @@ export default function WeeklyReview({ assignedStore = '', managerName = '', dai
     perCat.set(d.category, e);
   }
   const actualSales = weekDaily.reduce((s, d) => s + (Number(d.grossRevenue) || 0), 0);
-  const weeklyTarget = targets.find((t) => t.weekEnd === header.weekEnd)?.target ?? 0;
+  const weeklyTarget = targets.find((t) => t.weekEnd === header.weekEnd && (t.store ?? header.store) === header.store)?.target ?? 0;
   const headerAchievement = weeklyTarget > 0 ? Math.round((actualSales / weeklyTarget) * 1000) / 10 : 0;
 
   const setCell = (cat: string, key: string, val: string) =>

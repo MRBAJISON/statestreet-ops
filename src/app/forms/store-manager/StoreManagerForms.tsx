@@ -39,13 +39,14 @@ export default function StoreManagerForms({ managerName, assignedStore }: { mana
       category: String(e.payload.category || ''),
       grossRevenue: Number(e.payload.grossRevenue) || 0,
       itemsSold: Number(e.payload.itemsSold) || 0,
+      store: String(e.payload.store || ''),
     })),
     [myDaily]
   );
   const targets: WeekTarget[] = useMemo(
     () => comEntries
       .filter((e) => e.formType === 'weekly-target' && String(e.payload.store) === assignedStore)
-      .map((e) => ({ weekEnd: String(e.payload.weekEnd || ''), target: Number(e.payload.target) || 0 })),
+      .map((e) => ({ weekEnd: String(e.payload.weekEnd || ''), target: Number(e.payload.target) || 0, store: assignedStore })),
     [comEntries, assignedStore]
   );
 
