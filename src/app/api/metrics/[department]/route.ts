@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { entries } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import { computeMetrics, filterByPeriod, filterByStore, type Period } from '@/lib/metrics';
 import { getSession } from '@/lib/auth';
 
@@ -22,7 +22,12 @@ export async function GET(
       : 'mtd';
     const date = sp.get('date') || undefined;
     const store = sp.get('store') || '';
-    const rows = await db.select().from(entries).where(eq(entries.department, department));
+    // Commercial sales views are driven by the stores' Daily Sales, which are
+    // stored as finance/revenue — load those alongside the commercial rows.
+    const where = department === 'commercial'
+      ? or(eq(entries.department, 'commercial'), and(eq(entries.department, 'finance'), eq(entries.formType, 'revenue')))
+      : eq(entries.department, department);
+    const rows = await db.select().from(entries).where(where);
     const filtered = filterByStore(filterByPeriod(rows, period, date), store);
     return NextResponse.json(computeMetrics(department, filtered));
   } catch (e) {

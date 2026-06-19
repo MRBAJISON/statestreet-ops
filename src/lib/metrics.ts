@@ -449,9 +449,23 @@ function commercialMetrics(rows: Entry[]) {
     ceo: wrLatest?.ceo ?? null,
   };
 
-  const groupSales = ss.reduce((s, p) => s + num(p.totalSales), 0);
-  const tx = ss.reduce((s, p) => s + num(p.transactions), 0);
-  const units = ss.reduce((s, p) => s + num(p.unitsSold), 0);
+  // Store-level sales come from two streams: the commercial team's Daily Store
+  // Sales (store-sales) AND the stores' own Daily Sales (finance/revenue, which
+  // the metrics route also loads for this endpoint). Merge both so the dashboard
+  // reflects what the stores actually enter. (Same sale isn't entered in both
+  // streams in practice, so this doesn't double-count.)
+  const rev = payloads(rows, 'revenue');
+  const groupSales = ss.reduce((s, p) => s + num(p.totalSales), 0) + rev.reduce((s, p) => s + num(p.grossRevenue), 0);
+  const tx = ss.reduce((s, p) => s + num(p.transactions), 0) + rev.reduce((s, p) => s + num(p.transactions), 0);
+  const units = ss.reduce((s, p) => s + num(p.unitsSold), 0) + rev.reduce((s, p) => s + num(p.itemsSold), 0);
+  const footfall = ss.reduce((s, p) => s + num(p.footfall), 0) + rev.reduce((s, p) => s + num(p.footfall), 0);
+  const mergeGroups = (...arrs: { name: string; value: number }[][]) => {
+    const m = new Map<string, number>();
+    for (const arr of arrs) for (const x of arr) m.set(x.name, (m.get(x.name) ?? 0) + x.value);
+    return [...m].map(([name, value]) => ({ name, value }));
+  };
+  const salesByStoreRaw = mergeGroups(groupSum(ss, 'store', 'totalSales'), groupSum(rev, 'store', 'grossRevenue'));
+  const categorySalesRaw = mergeGroups(groupSum(cp, 'category', 'sales'), groupSum(rev, 'category', 'grossRevenue'));
 
   // SKU performance
   const skus = sku.map((p) => ({
@@ -517,11 +531,11 @@ function commercialMetrics(rows: Entry[]) {
     groupSales,
     atv: tx ? Math.round(groupSales / tx) : Math.round(avg(ss.map((p) => num(p.atv)))),
     upt: tx ? round1(units / tx) : 0,
-    convRate: round1(avg(ss.map((p) => num(p.convRate)).filter((n) => n > 0))),
+    convRate: footfall ? round1((tx / footfall) * 100) : round1(avg(ss.map((p) => num(p.convRate)).filter((n) => n > 0))),
     grossMargin: round1(avg(cp.map((p) => num(p.gm)).filter((n) => n > 0))),
     sellThrough: round1(avg(cp.map((p) => num(p.sellThrough)).filter((n) => n > 0))),
     activeSku: new Set(sku.map((p) => String(p.sku)).filter(Boolean)).size,
-    categorySales: groupSum(cp, 'category', 'sales').map((x) => ({
+    categorySales: categorySalesRaw.map((x) => ({
       name: labelFor(CATEGORY_LABELS, x.name),
       value: x.value,
     })),
@@ -530,7 +544,7 @@ function commercialMetrics(rows: Entry[]) {
       value: x.value,
     })),
     achievementTrend,
-    salesByStore: groupSum(ss, 'store', 'totalSales').map((x) => ({
+    salesByStore: salesByStoreRaw.map((x) => ({
       name: labelFor(STORE_LABELS, x.name),
       value: x.value,
     })),
@@ -1039,8 +1053,8 @@ function marketingMetrics(rows: Entry[]) {
     responseRate: contacted ? round1((responses / contacted) * 100) : 0,
   };
 
-  // Customer Experience — merges the new survey/CX form with legacy customer-intel.
-  const cxRows = [...payloads(rows, 'customer-experience'), ...payloads(rows, 'customer-intel')];
+  // Customer Experience — from the CX form + public survey (both customer-experience).
+  const cxRows = payloads(rows, 'customer-experience');
   const cxNps = cxRows.map((p) => num(p.nps)).filter((n) => n !== 0);
   const cxTypes = new Map<string, number>();
   for (const p of cxRows) {
