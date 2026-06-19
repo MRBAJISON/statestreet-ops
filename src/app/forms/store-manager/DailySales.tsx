@@ -92,14 +92,14 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-1">
           <FormField label="Date" name="date" type="date" required />
           <FormField label="Category" name="category" type="select" required value={category} onChange={(e) => setCategory(e.target.value)} options={categoriesForStore(org, assignedStore)} />
-          <FormField label="Opening Stock" name="openingStock" type="number" />
+          <FormField label="Opening Stock" name="openingStock" type="number" required />
           <FormField label="Gross Revenue" name="grossRevenue" type="number" prefix="GHS" required step={0.01} value={gross} onChange={(e) => setGross(e.target.value)} />
-          <FormField label="Cost of Goods (COGS)" name="cogs" type="number" prefix="GHS" step={0.01} />
+          <FormField label="Cost of Goods (COGS)" name="cogs" type="number" prefix="GHS" step={0.01} required />
           <FormField label="Discounts Given" name="discounts" type="number" prefix="GHS" step={0.01} value={discounts} onChange={(e) => setDiscounts(e.target.value)} />
           <FormField label="Net Revenue (auto)" name="netRevenue" type="number" prefix="GHS" value={netRevenue ? String(netRevenue) : ''} readOnly />
           <FormField label="Transactions" name="transactions" type="number" />
           <FormField label="Footfall" name="footfall" type="number" />
-          <FormField label="Items Sold" name="itemsSold" type="number" />
+          <FormField label="Items Sold" name="itemsSold" type="number" required />
         </div>
 
         <div className="flex gap-3 mt-3 flex-wrap">
