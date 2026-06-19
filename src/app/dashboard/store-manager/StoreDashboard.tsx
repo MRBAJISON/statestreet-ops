@@ -22,7 +22,8 @@ interface CommercialLite {
 }
 interface FinanceLite {
   revenueMtd: number; transactions: number; footfall: number; itemsSold: number;
-  grossMargin: number; revenueByCategory: { name: string; value: number }[];
+  grossMargin: number; sellThrough: number; revenueByCategory: { name: string; value: number }[];
+  sellThroughByCategory: { name: string; value: number }[];
 }
 
 export default function StoreDashboard({ assignedStore, managerName }: { assignedStore: string; managerName: string }) {
@@ -46,7 +47,9 @@ export default function StoreDashboard({ assignedStore, managerName }: { assigne
   const upt = tx ? Math.round((f?.itemsSold ?? 0) / tx * 10) / 10 : 0;
   const conv = (f?.footfall ?? 0) ? Math.round(tx / (f?.footfall ?? 1) * 1000) / 10 : 0;
   const categorySales = f?.revenueByCategory ?? [];
-  const sellThroughCat = m?.sellThroughByCategory ?? [];
+  // Sell-through is now derived from the store's own Daily Sales (opening stock
+  // vs items sold), so it reflects what the manager actually enters.
+  const sellThroughCat = f?.sellThroughByCategory ?? [];
   const storeName = labelFor(STORE_LABELS, assignedStore);
 
   if (loading && !m) return <BrandedLoader fullScreen />;
@@ -71,7 +74,7 @@ export default function StoreDashboard({ assignedStore, managerName }: { assigne
           <KPICard label="UPT" value={upt ? String(upt) : '—'} small />
           <KPICard label="Conversion" value={pct(conv)} small />
           <KPICard label="Gross Margin" value={pct(f?.grossMargin ?? 0)} small />
-          <KPICard label="Sell Through" value={pct(m?.sellThrough ?? 0)} small />
+          <KPICard label="Sell Through" value={pct(f?.sellThrough ?? 0)} small />
           <KPICard label="Latest Achievement" value={m?.weeklyReview?.latest?.achievement ? `${m.weeklyReview.latest.achievement}%` : '—'} small />
         </div>
       </div>
@@ -87,7 +90,7 @@ export default function StoreDashboard({ assignedStore, managerName }: { assigne
 
         <Section number={2} title="Sell-Through by Category">
           {sellThroughCat.length ? (
-            <SimpleDonutChart data={sellThroughCat} height={220} innerRadius={50} outerRadius={70} centerLabel="Categories" centerValue={String(sellThroughCat.length)} />
+            <SimpleDonutChart data={sellThroughCat} height={220} centerLabel="Categories" centerValue={String(sellThroughCat.length)} />
           ) : (
             <EmptyState message="No sell-through data yet" height={220} />
           )}

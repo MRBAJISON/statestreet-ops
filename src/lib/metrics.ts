@@ -89,6 +89,9 @@ function financeMetrics(rows: Entry[]) {
   const labels = Array.from({ length: 31 }, (_, i) => String(i + 1));
   const daily = new Array(31).fill(0);
   const catMap = new Map<string, number>();
+  // Sell-through per category, derived from the stores' Daily Sales:
+  // units sold vs opening stock. Accumulated here, computed in the return.
+  const stMap = new Map<string, { sold: number; opening: number }>();
   let revenueMtd = 0;
   let cogsTotal = 0;
   let transactions = 0;
@@ -105,6 +108,13 @@ function financeMetrics(rows: Entry[]) {
     const catKey = String(p.category ?? p.brand ?? '');
     const cat = CATEGORY_LABELS[catKey] ?? (catKey || 'Others');
     catMap.set(cat, (catMap.get(cat) ?? 0) + gross);
+    const opening = num(p.openingStock);
+    const sold = num(p.itemsSold);
+    if (opening > 0 || sold > 0) {
+      const st = stMap.get(cat) ?? { sold: 0, opening: 0 };
+      st.sold += sold; st.opening += opening;
+      stMap.set(cat, st);
+    }
     const d = p.date ? new Date(String(p.date)) : null;
     const day = d && !isNaN(d.getTime()) ? d.getDate() : 0;
     if (day >= 1 && day <= 31) daily[day - 1] += gross;
@@ -225,7 +235,19 @@ function financeMetrics(rows: Entry[]) {
   }
   const dailySalesByStore = [...dsMap].map(([name, v]) => ({ name, ...v })).sort((a, b) => b.gross - a.gross);
 
+  // Sell-through % per category = units sold / opening stock (capped at 100%,
+  // since restocks within the period can push raw sold past a single opening
+  // snapshot). Only categories with opening stock recorded are included.
+  const sellThroughByCategory = [...stMap]
+    .filter(([, v]) => v.opening > 0)
+    .map(([name, v]) => ({ name, value: round1(Math.min(100, (v.sold / v.opening) * 100)) }))
+    .sort((a, b) => b.value - a.value);
+  const stTotals = [...stMap.values()].reduce((s, v) => ({ sold: s.sold + v.sold, opening: s.opening + v.opening }), { sold: 0, opening: 0 });
+  const sellThrough = stTotals.opening > 0 ? round1(Math.min(100, (stTotals.sold / stTotals.opening) * 100)) : 0;
+
   return {
+    sellThrough,
+    sellThroughByCategory,
     paymentsByMode,
     paymentsTotal,
     dailySalesByStore,
