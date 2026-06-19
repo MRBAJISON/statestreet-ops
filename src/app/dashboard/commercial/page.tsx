@@ -12,7 +12,7 @@ import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, type Period } from '@/lib/api';
 import { TARGETS, ragStatus } from '@/lib/targets';
 import { useOrg } from '@/components/providers/OrgProvider';
-import { toLabelMap } from '@/lib/org';
+import { toLabelMap, brandOfStore } from '@/lib/org';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -101,20 +101,16 @@ export default function CommercialPage() {
   const leads = m?.leads ?? [];
   const leadsBySource = m?.leadsBySource ?? [];
 
-  // Brand Performance — roll the category sales mix up to brand using the
-  // Brand → Categories mapping from Settings (client-side; no metrics change).
-  const catLabelToValue = new Map(org.categories.map((c) => [c.label, c.value]));
-  const catValueToBrand: Record<string, string> = {};
-  for (const [brandVal, cats] of Object.entries(org.brandCategories ?? {})) {
-    for (const c of cats) catValueToBrand[c] = brandVal;
-  }
+  // Brand Performance — every store belongs to a brand, so roll the daily store
+  // sales up to brand via the store (Brand → Stores mapping in Settings).
+  const storeLabelToValue = new Map(org.stores.map((s) => [s.label, s.value]));
   const brandLabels = toLabelMap(org.brands);
   const brandAgg = new Map<string, number>();
-  for (const cs of categorySales) {
-    const val = catLabelToValue.get(cs.name) ?? cs.name;
-    const bv = catValueToBrand[val];
+  for (const ss of salesByStore) {
+    const storeVal = storeLabelToValue.get(ss.name) ?? ss.name;
+    const bv = brandOfStore(org, storeVal);
     const name = bv ? (brandLabels[bv] ?? bv) : 'Unassigned';
-    brandAgg.set(name, (brandAgg.get(name) ?? 0) + cs.value);
+    brandAgg.set(name, (brandAgg.get(name) ?? 0) + ss.value);
   }
   const brandPerformance = [...brandAgg].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
   const brandTotal = brandPerformance.reduce((s, b) => s + b.value, 0);
