@@ -34,10 +34,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 }
 
-// Delete an entry.
+// Delete an entry. Store managers may edit their entries but not delete them.
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    if (!(await getSession())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (session.user.role === 'store-manager') {
+      return NextResponse.json({ error: 'Store managers cannot delete entries — edit only.' }, { status: 403 });
+    }
     const { id } = await params;
     const numId = parseId(id);
     if (!numId) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });

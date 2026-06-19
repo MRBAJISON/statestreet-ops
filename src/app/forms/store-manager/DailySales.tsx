@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
-import { postEntry, deleteEntry, type EntryRow } from '@/lib/api';
+import { postEntry, type EntryRow } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
-import { labelFor, PAYMENT_MODES, DISCOVERY_SOURCES, payKey } from '@/lib/config';
+import { labelFor, PAYMENT_MODES, payKey } from '@/lib/config';
 import { useOrg } from '@/components/providers/OrgProvider';
 import { toLabelMap, categoriesForStore } from '@/lib/org';
 
@@ -80,10 +80,6 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
     setTimeout(() => setClosingMsg(null), 4000);
   }
 
-  async function remove(id: number) {
-    try { await deleteEntry(id); onSaved(); } catch { /* ignore */ }
-  }
-
   const recentSorted = [...recent].sort((a, b) => (String(a.payload.date) < String(b.payload.date) ? 1 : -1)).slice(0, 8);
 
   return (
@@ -128,8 +124,7 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
                   <th className="text-left py-2 pr-3 font-medium">Date</th>
                   <th className="text-left py-2 pr-3 font-medium">Category</th>
                   <th className="text-right py-2 px-3 font-medium">Gross</th>
-                  <th className="text-right py-2 px-3 font-medium">Items</th>
-                  <th className="text-right py-2 font-medium">Action</th>
+                  <th className="text-right py-2 font-medium">Items</th>
                 </tr>
               </thead>
               <tbody>
@@ -138,10 +133,7 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
                     <td className="py-2 pr-3 whitespace-nowrap">{String(e.payload.date || '—')}</td>
                     <td className="py-2 pr-3">{labelFor(categoryLabels, e.payload.category)}</td>
                     <td className="py-2 px-3 text-right">{fmtGHS(Number(e.payload.grossRevenue) || 0)}</td>
-                    <td className="py-2 px-3 text-right">{String(e.payload.itemsSold || '—')}</td>
-                    <td className="py-2 text-right">
-                      <button onClick={() => remove(e.id)} className="text-gray-400 hover:text-red-400">Delete</button>
-                    </td>
+                    <td className="py-2 text-right">{String(e.payload.itemsSold || '—')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -162,7 +154,6 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
           <FormField label="Total Customers" name="customers" type="number" />
           <FormField label="New Customers" name="newCustomers" type="number" />
           <FormField label="Returning Customers" name="returningCustomers" type="number" />
-          <FormField label="How They Found Us" name="discoverySource" type="select" options={DISCOVERY_SOURCES} />
         </div>
 
         <div className="mt-5">

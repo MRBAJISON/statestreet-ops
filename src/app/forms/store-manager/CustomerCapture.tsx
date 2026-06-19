@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
-import { postEntry, deleteEntry, type EntryRow } from '@/lib/api';
+import { postEntry, type EntryRow } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 
 // Customer database / walk-in capture (saved as commercial/customer-capture).
@@ -57,10 +57,6 @@ export default function CustomerCapture({ assignedStore, managerName, recent, on
     setTimeout(() => setMsg(null), 4000);
   }
 
-  async function remove(id: number) {
-    try { await deleteEntry(id); onSaved(); } catch { /* ignore */ }
-  }
-
   const recentSorted = [...recent].sort((a, b) => (String(a.payload.date) < String(b.payload.date) ? 1 : -1)).slice(0, 8);
 
   return (
@@ -100,8 +96,7 @@ export default function CustomerCapture({ assignedStore, managerName, recent, on
                   <th className="text-left py-2 pr-3 font-medium">Name</th>
                   <th className="text-left py-2 pr-3 font-medium">Type</th>
                   <th className="text-left py-2 pr-3 font-medium">Phone</th>
-                  <th className="text-left py-2 pr-3 font-medium">Source</th>
-                  <th className="text-right py-2 font-medium">Action</th>
+                  <th className="text-left py-2 font-medium">Source</th>
                 </tr>
               </thead>
               <tbody>
@@ -112,9 +107,6 @@ export default function CustomerCapture({ assignedStore, managerName, recent, on
                     <td className="py-2 pr-3 capitalize">{String(e.payload.leadBuyer || '—')}</td>
                     <td className="py-2 pr-3">{String(e.payload.number || '—')}</td>
                     <td className="py-2 pr-3">{SOURCE_LABELS[String(e.payload.source)] ?? String(e.payload.source || '—')}{e.payload.sourceDetail ? ` · ${e.payload.sourceDetail}` : ''}</td>
-                    <td className="py-2 text-right">
-                      <button onClick={() => remove(e.id)} className="text-gray-400 hover:text-red-400">Delete</button>
-                    </td>
                   </tr>
                 ))}
               </tbody>

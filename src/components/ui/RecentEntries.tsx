@@ -30,8 +30,9 @@ function timeAgo(iso: string): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-// Live feed of the latest submissions for a department, with edit + delete via modals.
-export default function RecentEntries({ department }: { department: string }) {
+// Live feed of the latest submissions for a department, with edit + delete via
+// modals. canDelete=false hides delete (store managers may edit but not delete).
+export default function RecentEntries({ department, canDelete = true }: { department: string; canDelete?: boolean }) {
   const { entries, loading, refresh } = useEntries(department, 8);
   const [editing, setEditing] = useState<EntryRow | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -118,7 +119,7 @@ export default function RecentEntries({ department }: { department: string }) {
             <div className="fixed inset-0 z-40" onClick={() => setMenu(null)} aria-hidden="true" />
             <div className="fixed z-50 w-32 bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg shadow-xl py-1 text-left" style={{ top: menu.top, right: menu.right }}>
               <button onClick={() => { openEdit(e); setMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-[var(--c-hover)] hover:text-[#c8a951]">Edit</button>
-              <button onClick={() => { setDeleting(e); setMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-[var(--c-hover)] hover:text-red-400">Delete</button>
+              {canDelete && <button onClick={() => { setDeleting(e); setMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-[var(--c-hover)] hover:text-red-400">Delete</button>}
             </div>
           </>
         );

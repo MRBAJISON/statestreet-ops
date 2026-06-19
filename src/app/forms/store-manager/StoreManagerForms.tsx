@@ -87,7 +87,7 @@ export default function StoreManagerForms({ managerName, assignedStore }: { mana
 
         <div>
           <h2 className="text-sm font-bold uppercase tracking-wide mb-3">Your Submissions</h2>
-          <RecentEntries department="commercial" />
+          <RecentEntries department="commercial" canDelete={false} />
         </div>
       </div>
     </div>

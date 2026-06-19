@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
-import { postEntry, deleteEntry, type EntryRow } from '@/lib/api';
+import { postEntry, type EntryRow } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { STORE_LABELS, labelFor } from '@/lib/config';
 import MultiSelectDropdown from '@/components/forms/MultiSelectDropdown';
@@ -44,10 +44,6 @@ export default function StockTransfer({ assignedStore, managerName, recent, onSa
     }
     setSubmitting(false);
     setTimeout(() => setMsg(null), 4000);
-  }
-
-  async function remove(id: number) {
-    try { await deleteEntry(id); onSaved(); } catch { /* ignore */ }
   }
 
   const recentSorted = [...recent].sort((a, b) => (String(a.payload.date) < String(b.payload.date) ? 1 : -1)).slice(0, 8);
@@ -98,8 +94,7 @@ export default function StockTransfer({ assignedStore, managerName, recent, onSa
                   <th className="text-left py-2 pr-3 font-medium">Date</th>
                   <th className="text-left py-2 pr-3 font-medium">To</th>
                   <th className="text-left py-2 pr-3 font-medium">Item</th>
-                  <th className="text-right py-2 px-3 font-medium">Units</th>
-                  <th className="text-right py-2 font-medium">Action</th>
+                  <th className="text-right py-2 font-medium">Units</th>
                 </tr>
               </thead>
               <tbody>
@@ -108,10 +103,7 @@ export default function StockTransfer({ assignedStore, managerName, recent, onSa
                     <td className="py-2 pr-3 whitespace-nowrap">{String(e.payload.date || '—')}</td>
                     <td className="py-2 pr-3">{labelFor(STORE_LABELS, e.payload.toStore)}</td>
                     <td className="py-2 pr-3">{String(e.payload.sku || e.payload.description || '—')}</td>
-                    <td className="py-2 px-3 text-right">{String(e.payload.units || '—')}</td>
-                    <td className="py-2 text-right">
-                      <button onClick={() => remove(e.id)} className="text-gray-400 hover:text-red-400">Delete</button>
-                    </td>
+                    <td className="py-2 text-right">{String(e.payload.units || '—')}</td>
                   </tr>
                 ))}
               </tbody>
