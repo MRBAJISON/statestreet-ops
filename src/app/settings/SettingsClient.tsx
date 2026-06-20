@@ -125,6 +125,17 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
   const router = useRouter();
   const { org, refresh: refreshOrg } = useOrg();
 
+  // Page split into tabs so each form opens on its own instead of one long scroll.
+  const TABS = [
+    { id: 'profile', label: 'Profile', show: !isOwner },
+    { id: 'password', label: 'Password', show: !isOwner },
+    { id: 'organization', label: 'Organization', show: canEditOrg },
+    { id: 'appearance', label: 'Appearance', show: true },
+  ].filter((t) => t.show);
+  const [tab, setTab] = useState(TABS[0]?.id ?? 'appearance');
+  // Organization is itself large, so it gets its own sub-tabs (one shared Save).
+  const [orgTab, setOrgTab] = useState<'general' | 'catalog' | 'mappings'>('general');
+
   // Profile
   const [name, setName] = useState(user.name);
   const [savingName, setSavingName] = useState(false);
@@ -231,8 +242,19 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
         <p className="text-sm text-gray-500 mt-1">Manage your profile, password and appearance.</p>
       </div>
 
+      {TABS.length > 1 && (
+        <div className="flex gap-2 flex-wrap justify-center">
+          {TABS.map((t) => (
+            <button key={t.id} type="button" onClick={() => setTab(t.id)}
+              className={`px-4 py-2 rounded-lg text-sm transition-colors ${tab === t.id ? 'bg-[#c8a951] text-black font-semibold' : 'bg-[var(--c-card)] border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Profile (hidden for owner) */}
-      {!isOwner && (
+      {!isOwner && tab === 'profile' && (
       <section className={cardCls}>
         <h2 className={h2Cls}>Profile</h2>
         <Msg m={nameMsg} />
@@ -263,7 +285,7 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
       )}
 
       {/* Password (hidden for owner) — collapsed until the user chooses to change it */}
-      {!isOwner && (
+      {!isOwner && tab === 'password' && (
       <section className={cardCls}>
         <h2 className={h2Cls}>Change Password</h2>
         {!showPw ? (
@@ -297,11 +319,21 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
       )}
 
       {/* Organization (owner + commercial + operations) */}
-      {canEditOrg && (
+      {canEditOrg && tab === 'organization' && (
         <section className={cardCls}>
           <h2 className={h2Cls}>Organization</h2>
+          <div className="flex gap-2 flex-wrap justify-center mb-4">
+            {([{ id: 'general', label: 'General' }, { id: 'catalog', label: 'Catalog' }, { id: 'mappings', label: 'Mappings' }] as const).map((t) => (
+              <button key={t.id} type="button" onClick={() => setOrgTab(t.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${orgTab === t.id ? 'bg-[#c8a951] text-black font-semibold' : 'bg-[var(--c-card2)] border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
           <Msg m={orgMsg} />
           <form onSubmit={saveOrg} className="space-y-4 max-w-md mx-auto">
+            {orgTab === 'general' && (
+            <div className="space-y-4">
             <div className="flex flex-col items-center gap-2">
               {orgDraft.logo ? (
                 <img src={orgDraft.logo} alt="Logo" className="w-16 h-16 rounded object-contain border border-[var(--c-border)] bg-[var(--c-card2)]" />
@@ -347,16 +379,22 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
                 <input type="number" min={1} className={inputCls} value={orgDraft.security.sessionDays} onChange={(e) => setOrgDraft((d) => ({ ...d, security: { ...d.security, sessionDays: Number(e.target.value) || 7 } }))} />
               </div>
             </div>
-            <div className="pt-2 border-t border-[var(--c-border)] space-y-4">
+            </div>
+            )}
+            {orgTab === 'catalog' && (
+            <div className="space-y-4">
               <ListEditor title="Stores / Locations" items={orgDraft.stores} onChange={(stores) => setOrgDraft((d) => ({ ...d, stores }))} />
               <ListEditor title="Brands" items={orgDraft.brands} onChange={(brands) => setOrgDraft((d) => ({ ...d, brands }))} />
               <ListEditor title="Product Categories" items={orgDraft.categories} onChange={(categories) => setOrgDraft((d) => ({ ...d, categories }))} />
               <ExpenseEditor items={orgDraft.expenseItems} onChange={(expenseItems) => setOrgDraft((d) => ({ ...d, expenseItems }))} />
             </div>
-            <div className="pt-2 border-t border-[var(--c-border)] space-y-4">
+            )}
+            {orgTab === 'mappings' && (
+            <div className="space-y-4">
               <MappingEditor title="Brand → Categories" hint="Tap to assign categories to each brand. Sales forms show only a brand's categories once mapped." brands={orgDraft.brands} items={orgDraft.categories} value={orgDraft.brandCategories} onChange={(brandCategories) => setOrgDraft((d) => ({ ...d, brandCategories }))} />
               <MappingEditor title="Brand → Stores" hint="Group stores under a brand. Stock transfers are allowed only between stores of the same brand (Head Office reaches all)." brands={orgDraft.brands} items={orgDraft.stores} value={orgDraft.brandStores} onChange={(brandStores) => setOrgDraft((d) => ({ ...d, brandStores }))} />
             </div>
+            )}
             <div className="flex justify-center pt-1">
               <button type="submit" disabled={savingOrg} className={btnCls}>{savingOrg ? <><Spinner /> Saving…</> : 'Save Organization'}</button>
             </div>
@@ -365,6 +403,7 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
       )}
 
       {/* Appearance */}
+      {tab === 'appearance' && (
       <section className={cardCls}>
         <h2 className={h2Cls}>Appearance</h2>
         <div className="max-w-sm mx-auto">
@@ -375,6 +414,7 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
           </select>
         </div>
       </section>
+      )}
       </div>
     </div>
   );
