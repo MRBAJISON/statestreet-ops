@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { entries } from '@/lib/db/schema';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { isAudited, recordAudit } from '@/lib/audit';
 import { getSession } from '@/lib/auth';
 
@@ -51,7 +51,8 @@ export async function POST(req: NextRequest) {
 // List raw entries, optionally filtered by ?department= &formType=
 export async function GET(req: NextRequest) {
   try {
-    if (!(await getSession())) {
+    const session = await getSession();
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const sp = req.nextUrl.searchParams;
@@ -60,6 +61,15 @@ export async function GET(req: NextRequest) {
     const conds = [];
     if (department) conds.push(eq(entries.department, department));
     if (formType) conds.push(eq(entries.formType, formType));
+    // A store manager only ever sees their own store's submissions (the store
+    // lives in the payload under store / fromStore / toStore). Other roles
+    // oversee all stores, so they are unaffected.
+    if (session.user.role === 'store-manager' && session.user.store) {
+      const s = session.user.store;
+      conds.push(
+        sql`(${entries.payload} ->> 'store' = ${s} OR ${entries.payload} ->> 'fromStore' = ${s} OR ${entries.payload} ->> 'toStore' = ${s})`
+      );
+    }
     const rows = await db
       .select()
       .from(entries)
