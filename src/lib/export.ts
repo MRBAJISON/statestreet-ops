@@ -14,7 +14,7 @@ const SCOPE_LABEL: Record<ExportScope, string> = {
 };
 
 // Target types are configuration, not captured operational data — leave them out.
-const EXCLUDED_TYPES = new Set(['weekly-target', 'exec-target', 'exec-target-annual']);
+const EXCLUDED_TYPES = new Set(['weekly-target', 'exec-target', 'exec-target-annual', 'import-log']);
 
 const DEPT_SHEETS: { name: string; dept: string }[] = [
   { name: 'Finance', dept: 'finance' },

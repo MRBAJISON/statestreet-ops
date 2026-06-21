@@ -4,6 +4,7 @@ import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
+import ImportPanel from './ImportPanel';
 import { submitEntry, postEntries, useEntries } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { useOrg } from '@/components/providers/OrgProvider';
@@ -152,6 +153,7 @@ export default function FinanceFormsPage() {
     { id: 'cashflow', label: 'Cash Flow Entry' },
     { id: 'debtors', label: 'Debtors / Creditors' },
     { id: 'forecast', label: 'Forecast Update' },
+    { id: 'import', label: 'Import (Excel)' },
   ];
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -348,6 +350,9 @@ export default function FinanceFormsPage() {
         </div>
       )}
 
+      {activeForm === 'import' ? (
+        <ImportPanel />
+      ) : (
       <form onSubmit={handleSubmit} className="space-y-4 max-w-4xl">
         {activeForm === 'revenue' && (
           <FormSection title="Daily Revenue Entry" description="Record daily revenue figures by store and category">
@@ -508,6 +513,7 @@ export default function FinanceFormsPage() {
           )}
         </div>
       </form>
+      )}
 
       {/* Daily Closing — opens under the Daily Revenue Entry (like the Store form), its own save. */}
       {activeForm === 'revenue' && showClosing && (
