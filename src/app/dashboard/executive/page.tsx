@@ -11,6 +11,7 @@ import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, useEntries, type Period } from '@/lib/api';
 import { rateRatio } from '@/lib/config';
 import { useOrg } from '@/components/providers/OrgProvider';
+import { toLabelMap, brandOfStore } from '@/lib/org';
 import { TARGETS } from '@/lib/targets';
 import BrandedLoader from '@/components/ui/BrandedLoader';
 
@@ -118,6 +119,19 @@ export default function ExecutiveCommandCenter() {
     storeMap.set(s.store, cur);
   }
   const storePerformance = [...storeMap].map(([store, v]) => ({ store, ...v })).sort((a, b) => b.sales - a.sales);
+
+  // Brand Performance — roll store sales up to brand via the Brand → Stores mapping.
+  const storeLabelToValue = new Map(org.stores.map((s) => [s.label, s.value]));
+  const brandLabels = toLabelMap(org.brands);
+  const brandAgg = new Map<string, number>();
+  for (const s of salesByStore) {
+    const storeVal = storeLabelToValue.get(s.name) ?? s.name;
+    const bv = brandOfStore(org, storeVal);
+    const name = bv ? brandLabels[bv] ?? bv : 'Unassigned';
+    brandAgg.set(name, (brandAgg.get(name) ?? 0) + s.value);
+  }
+  const brandPerformance = [...brandAgg].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+
   const ceoAttention = brd?.ceoAttention ?? [];
   const managerVoices = (com?.managerVoices ?? []).slice(0, 12);
   const wr = com?.weeklyReview;
@@ -286,6 +300,15 @@ export default function ExecutiveCommandCenter() {
               )}
             </div>
           </div>
+        </Section>
+
+        {/* Brand performance */}
+        <Section title="Brand Performance" subtitle="Sales rolled up by brand">
+          {brandPerformance.length ? (
+            <SimpleBarChart data={brandPerformance} height={240} color="#3b82f6" horizontal prefix="GHS " />
+          ) : (
+            <EmptyState message="No brand sales yet" hint="Set Brand → Stores in Settings so store sales roll up to a brand." height={200} />
+          )}
         </Section>
 
         {/* Department snapshot */}

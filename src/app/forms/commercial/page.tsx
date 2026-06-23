@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
@@ -14,6 +14,17 @@ import { PAYMENT_MODES, payKey } from '@/lib/config';
 const numOf = (s: string) => Number(s) || 0;
 const fmt2 = (x: number) => (x ? x.toFixed(2) : '');
 const fmt1 = (x: number) => (x ? x.toFixed(1) : '');
+const fmtGHS = (n: number) => `GHS ${Math.round(n).toLocaleString()}`;
+
+// True when `dateStr` falls in the Mon–Sun week ending on `weekEnd`.
+const inWeek = (dateStr: string, weekEnd: string) => {
+  if (!weekEnd) return false;
+  const end = new Date(weekEnd);
+  const d = new Date(dateStr);
+  if (isNaN(end.getTime()) || isNaN(d.getTime())) return false;
+  const diff = (end.getTime() - d.getTime()) / 86_400_000;
+  return diff >= 0 && diff < 7;
+};
 
 export default function CommercialFormsPage() {
   const { org } = useOrg();
@@ -34,6 +45,11 @@ export default function CommercialFormsPage() {
   const [brand, setBrand] = useState('');
   const [category, setCategory] = useState('');
   const [cpStore, setCpStore] = useState('');
+  const [cpWeekEnd, setCpWeekEnd] = useState('');
+  // Weekly Sales (renamed store-sales): confirm-and-augment over the stores' Daily Sales.
+  const [ssStore, setSsStore] = useState('');
+  const [ssWeekEnd, setSsWeekEnd] = useState('');
+  const [ssUnits, setSsUnits] = useState('');
 
   // Daily Closing — opens on demand under Daily Store Sales (saved as finance/closing).
   const [showClosing, setShowClosing] = useState(false);
@@ -66,6 +82,50 @@ export default function CommercialFormsPage() {
     [comEntries]
   );
 
+  // Category Performance auto-fill: the picked store + week + category's sales & units
+  // come from the stores' Daily Sales (the single source of truth).
+  const cpAuto = useMemo(() => {
+    let sales = 0, units = 0;
+    for (const d of dailySalesAll) {
+      if (cpStore && d.store !== cpStore) continue;
+      if (category && d.category !== category) continue;
+      if (!inWeek(d.date, cpWeekEnd)) continue;
+      sales += d.grossRevenue; units += d.itemsSold;
+    }
+    return { sales, units };
+  }, [dailySalesAll, cpStore, category, cpWeekEnd]);
+
+  // Weekly Sales auto-fill: the picked store + week's totals come from Daily Sales.
+  const ssAuto = useMemo(() => {
+    let sales = 0, units = 0, transactions = 0, footfall = 0;
+    for (const e of finEntries) {
+      if (e.formType !== 'revenue') continue;
+      const p = e.payload;
+      if (ssStore && String(p.store || '') !== ssStore) continue;
+      if (!inWeek(String(p.date || ''), ssWeekEnd)) continue;
+      sales += Number(p.grossRevenue) || 0; units += Number(p.itemsSold) || 0;
+      transactions += Number(p.transactions) || 0; footfall += Number(p.footfall) || 0;
+    }
+    return { sales, units, transactions, footfall };
+  }, [finEntries, ssStore, ssWeekEnd]);
+
+  // Prefill the editable fields when the selection changes (Commercial then confirms/edits).
+  useEffect(() => {
+    if (activeForm !== 'category-perf' || !cpStore || !cpWeekEnd || !category) return;
+    setCpSales(cpAuto.sales ? String(cpAuto.sales) : '');
+    setCpUnits(cpAuto.units ? String(cpAuto.units) : '');
+  }, [cpAuto, activeForm, cpStore, cpWeekEnd, category]);
+  useEffect(() => {
+    if (activeForm !== 'store-sales' || !ssStore || !ssWeekEnd) return;
+    setSsTotalSales(ssAuto.sales ? String(ssAuto.sales) : '');
+    setSsTxns(ssAuto.transactions ? String(ssAuto.transactions) : '');
+    setSsFootfall(ssAuto.footfall ? String(ssAuto.footfall) : '');
+    setSsUnits(ssAuto.units ? String(ssAuto.units) : '');
+  }, [ssAuto, activeForm, ssStore, ssWeekEnd]);
+
+  const cpSalesMismatch = cpSales !== '' && Math.round(numOf(cpSales)) !== Math.round(cpAuto.sales);
+  const ssSalesMismatch = ssTotalSales !== '' && Math.round(numOf(ssTotalSales)) !== Math.round(ssAuto.sales);
+
   function resetAutoCalc() {
     setSsTotalSales('');
     setSsTxns('');
@@ -75,6 +135,10 @@ export default function CommercialFormsPage() {
     setBrand('');
     setCategory('');
     setCpStore('');
+    setCpWeekEnd('');
+    setSsStore('');
+    setSsWeekEnd('');
+    setSsUnits('');
   }
 
   function switchForm(id: string) {
@@ -83,7 +147,7 @@ export default function CommercialFormsPage() {
   }
 
   const forms = [
-    { id: 'store-sales', label: 'Daily Store Sales' },
+    { id: 'store-sales', label: 'Weekly Sales' },
     { id: 'category-perf', label: 'Category Performance' },
     { id: 'sku-entry', label: 'SKU Performance' },
     { id: 'new-arrivals', label: 'New Arrivals' },
@@ -159,36 +223,42 @@ export default function CommercialFormsPage() {
       {activeForm !== 'weekly-review' && (
       <form onSubmit={handleSubmit} className="space-y-4 max-w-4xl">
         {activeForm === 'store-sales' && (
-          <FormSection title="Daily Store Sales" description="Record daily sales metrics per store">
+          <FormSection title="Weekly Sales" description="Pick a store and week — the sales, transactions, footfall and units auto-fill from the stores' Daily Sales. Confirm, or edit only to correct.">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
-              <FormField label="Date" name="date" type="date" required />
-              <FormField label="Store" name="store" type="select" required options={org.stores} />
+              <FormField label="Week Ending" name="weekEnd" type="date" required value={ssWeekEnd} onChange={(e) => setSsWeekEnd(e.target.value)} />
+              <FormField label="Store" name="store" type="select" required value={ssStore} onChange={(e) => setSsStore(e.target.value)} options={org.stores} />
               <FormField label="Opening Stock" name="openingStock" type="number" />
               <FormField label="Total Sales" name="totalSales" type="number" prefix="GHS" required step={0.01} value={ssTotalSales} onChange={(e) => setSsTotalSales(e.target.value)} />
               <FormField label="Number of Transactions" name="transactions" type="number" required value={ssTxns} onChange={(e) => setSsTxns(e.target.value)} />
               <FormField label="Footfall" name="footfall" type="number" required value={ssFootfall} onChange={(e) => setSsFootfall(e.target.value)} />
-              <FormField label="Items Sold (Units)" name="unitsSold" type="number" required />
+              <FormField label="Items Sold (Units)" name="unitsSold" type="number" required value={ssUnits} onChange={(e) => setSsUnits(e.target.value)} />
               <FormField label="Returns Value" name="returns" type="number" prefix="GHS" step={0.01} />
               <FormField label="Conversion Rate % (auto)" name="convRate" type="number" suffix="%" value={fmt1(ssConv)} readOnly />
               <FormField label="Avg Transaction Value (auto)" name="atv" type="number" prefix="GHS" value={fmt2(ssAtv)} readOnly />
             </div>
-            <p className="text-xs text-gray-500 mt-3">Customers and payment-mode takings are captured once a day on the store’s <span className="text-gray-400">Daily Closing Report</span> (Store Manager form) or on the Finance form.</p>
+            {ssSalesMismatch && (
+              <p className="text-xs text-yellow-400 mt-2">⚠ Total Sales doesn’t match the stores’ Daily Sales for this week ({fmtGHS(ssAuto.sales)}).</p>
+            )}
+            <p className="text-xs text-gray-500 mt-3">Customers and payment-mode takings are captured on the store’s <span className="text-gray-400">Daily Closing Report</span> (Store Manager form) or on the Finance form.</p>
           </FormSection>
         )}
 
         {activeForm === 'category-perf' && (
-          <FormSection title="Category Performance" description="Weekly category sales breakdown">
+          <FormSection title="Category Performance" description="Pick a store, week and category — Sales & Units auto-fill from the stores' Daily Sales. Enter Sell-Through, Gross Margin and Markdown.">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
-              <FormField label="Week Ending" name="weekEnd" type="date" required />
+              <FormField label="Week Ending" name="weekEnd" type="date" required value={cpWeekEnd} onChange={(e) => setCpWeekEnd(e.target.value)} />
               <FormField label="Store" name="store" type="select" required value={cpStore} onChange={(e) => { setCpStore(e.target.value); setCategory(''); }} options={org.stores} />
               <FormField label="Category" name="category" type="select" required value={category} onChange={(e) => setCategory(e.target.value)} options={categoriesForStore(org, cpStore)} />
-              <FormField label="Sales Value" name="sales" type="number" prefix="GHS" required step={0.01} value={cpSales} onChange={(e) => setCpSales(e.target.value)} />
-              <FormField label="Units Sold" name="units" type="number" required value={cpUnits} onChange={(e) => setCpUnits(e.target.value)} />
+              <FormField label="Sales Value (auto)" name="sales" type="number" prefix="GHS" required step={0.01} value={cpSales} onChange={(e) => setCpSales(e.target.value)} />
+              <FormField label="Units Sold (auto)" name="units" type="number" required value={cpUnits} onChange={(e) => setCpUnits(e.target.value)} />
               <FormField label="Gross Margin %" name="gm" type="number" suffix="%" step={0.1} />
               <FormField label="Sell Through %" name="sellThrough" type="number" suffix="%" step={0.1} />
               <FormField label="Avg Selling Price (auto)" name="asp" type="number" prefix="GHS" value={fmt2(cpAsp)} readOnly />
               <FormField label="Markdown %" name="markdown" type="number" suffix="%" step={0.1} />
             </div>
+            {cpSalesMismatch && (
+              <p className="text-xs text-yellow-400 mt-2">⚠ Sales Value doesn’t match the stores’ Daily Sales for this category/week ({fmtGHS(cpAuto.sales)}).</p>
+            )}
           </FormSection>
         )}
 

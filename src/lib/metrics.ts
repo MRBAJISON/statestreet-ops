@@ -327,7 +327,6 @@ function financeMetrics(rows: Entry[]) {
 
 /* ---------------------------- COMMERCIAL --------------------------- */
 function commercialMetrics(rows: Entry[]) {
-  const ss = payloads(rows, 'store-sales');
   const cp = payloads(rows, 'category-perf');
   const sku = payloads(rows, 'sku-entry');
 
@@ -527,23 +526,17 @@ function commercialMetrics(rows: Entry[]) {
     ceo: wrLatest?.ceo ?? null,
   };
 
-  // Store-level sales come from two streams: the commercial team's Daily Store
-  // Sales (store-sales) AND the stores' own Daily Sales (finance/revenue, which
-  // the metrics route also loads for this endpoint). Merge both so the dashboard
-  // reflects what the stores actually enter. (Same sale isn't entered in both
-  // streams in practice, so this doesn't double-count.)
+  // Sales totals are sourced ONLY from the stores' Daily Sales (finance/revenue,
+  // which the metrics route also loads for this endpoint) — the single source of
+  // truth. The commercial store-sales and category-perf forms are confirm/augment
+  // layers and no longer add to these totals, so nothing is double-counted.
   const rev = payloads(rows, 'revenue');
-  const groupSales = ss.reduce((s, p) => s + num(p.totalSales), 0) + rev.reduce((s, p) => s + num(p.grossRevenue), 0);
-  const tx = ss.reduce((s, p) => s + num(p.transactions), 0) + rev.reduce((s, p) => s + num(p.transactions), 0);
-  const units = ss.reduce((s, p) => s + num(p.unitsSold), 0) + rev.reduce((s, p) => s + num(p.itemsSold), 0);
-  const footfall = ss.reduce((s, p) => s + num(p.footfall), 0) + rev.reduce((s, p) => s + num(p.footfall), 0);
-  const mergeGroups = (...arrs: { name: string; value: number }[][]) => {
-    const m = new Map<string, number>();
-    for (const arr of arrs) for (const x of arr) m.set(x.name, (m.get(x.name) ?? 0) + x.value);
-    return [...m].map(([name, value]) => ({ name, value }));
-  };
-  const salesByStoreRaw = mergeGroups(groupSum(ss, 'store', 'totalSales'), groupSum(rev, 'store', 'grossRevenue'));
-  const categorySalesRaw = mergeGroups(groupSum(cp, 'category', 'sales'), groupSum(rev, 'category', 'grossRevenue'));
+  const groupSales = rev.reduce((s, p) => s + num(p.grossRevenue), 0);
+  const tx = rev.reduce((s, p) => s + num(p.transactions), 0);
+  const units = rev.reduce((s, p) => s + num(p.itemsSold), 0);
+  const footfall = rev.reduce((s, p) => s + num(p.footfall), 0);
+  const salesByStoreRaw = groupSum(rev, 'store', 'grossRevenue');
+  const categorySalesRaw = groupSum(rev, 'category', 'grossRevenue');
 
   // SKU performance
   const skus = sku.map((p) => ({
@@ -607,9 +600,9 @@ function commercialMetrics(rows: Entry[]) {
 
   return {
     groupSales,
-    atv: tx ? Math.round(groupSales / tx) : Math.round(avg(ss.map((p) => num(p.atv)))),
+    atv: tx ? Math.round(groupSales / tx) : 0,
     upt: tx ? round1(units / tx) : 0,
-    convRate: footfall ? round1((tx / footfall) * 100) : round1(avg(ss.map((p) => num(p.convRate)).filter((n) => n > 0))),
+    convRate: footfall ? round1((tx / footfall) * 100) : 0,
     grossMargin: round1(avg(cp.map((p) => num(p.gm)).filter((n) => n > 0))),
     sellThrough: round1(avg(cp.map((p) => num(p.sellThrough)).filter((n) => n > 0))),
     activeSku: new Set(sku.map((p) => String(p.sku)).filter(Boolean)).size,

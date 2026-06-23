@@ -5,10 +5,11 @@ import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
 import ImportPanel from './ImportPanel';
+import FinanceRevenueReview from './FinanceRevenueReview';
 import { submitEntry, postEntries, useEntries } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { useOrg } from '@/components/providers/OrgProvider';
-import { expenseGroups, categoriesForStore } from '@/lib/org';
+import { expenseGroups } from '@/lib/org';
 import { PAYMENT_MODES, payKey } from '@/lib/config';
 
 const INFLOW_GROUP = {
@@ -126,8 +127,6 @@ export default function FinanceFormsPage() {
   const paymentsTotal = Math.round(PAYMENT_MODES.reduce((s, m) => s + num(payments[m.value] ?? ''), 0) * 100) / 100;
 
   // Daily revenue: the selected store's brand drives the category list.
-  const [revStore, setRevStore] = useState('');
-  const [revCat, setRevCat] = useState('');
 
   // Daily closing — opens on demand under Daily Revenue Entry (its own save).
   const [showClosing, setShowClosing] = useState(false);
@@ -170,7 +169,7 @@ export default function FinanceFormsPage() {
       await submitEntry('finance', activeForm, form);
       setMessage('Saved to the live database. The Finance & Executive dashboards reflect it now.');
       form.reset();
-      setExpCat(''); setExpAmount(''); setOverspendReason(''); setRevStore(''); setRevCat('');
+      setExpCat(''); setExpAmount(''); setOverspendReason('');
       refreshFin();
     } catch (err) {
       setMessage('Could not save: ' + (err as Error).message);
@@ -352,24 +351,16 @@ export default function FinanceFormsPage() {
 
       {activeForm === 'import' ? (
         <ImportPanel />
+      ) : activeForm === 'revenue' ? (
+        <div className="space-y-4 max-w-4xl">
+          <FinanceRevenueReview />
+          <button type="button" onClick={() => setShowClosing((s) => !s)}
+            className={`px-6 py-2.5 rounded-lg text-sm border transition-colors ${showClosing ? 'bg-[var(--c-hover)] border-[#c8a951] text-[var(--c-fg)]' : 'border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
+            {showClosing ? '✕ Close Daily Closing' : '+ Daily Closing'}
+          </button>
+        </div>
       ) : (
       <form onSubmit={handleSubmit} className="space-y-4 max-w-4xl">
-        {activeForm === 'revenue' && (
-          <FormSection title="Daily Revenue Entry" description="Record daily revenue figures by store and category">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
-              <FormField label="Date" name="date" type="date" required />
-              <FormField label="Store" name="store" type="select" required value={revStore} onChange={(e) => { setRevStore(e.target.value); setRevCat(''); }} options={org.stores} />
-              <FormField label="Category" name="category" type="select" required value={revCat} onChange={(e) => setRevCat(e.target.value)} options={categoriesForStore(org, revStore)} />
-              <FormField label="Gross Revenue" name="grossRevenue" type="number" prefix="GHS" required step={0.01} />
-              <FormField label="Cost of Goods (COGS)" name="cogs" type="number" prefix="GHS" step={0.01} />
-              <FormField label="Discounts Given" name="discounts" type="number" prefix="GHS" step={0.01} />
-              <FormField label="Net Revenue" name="netRevenue" type="number" prefix="GHS" step={0.01} />
-              <FormField label="Number of Transactions" name="transactions" type="number" required />
-              <FormField label="Footfall / Traffic" name="footfall" type="number" />
-              <FormField label="Items Sold" name="itemsSold" type="number" />
-            </div>
-          </FormSection>
-        )}
 
         {activeForm === 'expenses' && (
           <FormSection title="Expense Recording" description="Record operational expenses">
@@ -505,12 +496,6 @@ export default function FinanceFormsPage() {
           <button type="reset" className="bg-[var(--c-hover)] border border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)] px-6 py-2.5 rounded-lg transition-colors text-sm">
             Clear Form
           </button>
-          {activeForm === 'revenue' && (
-            <button type="button" onClick={() => setShowClosing((s) => !s)}
-              className={`px-6 py-2.5 rounded-lg text-sm border transition-colors ${showClosing ? 'bg-[var(--c-hover)] border-[#c8a951] text-[var(--c-fg)]' : 'border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
-              {showClosing ? '✕ Close Daily Closing' : '+ Daily Closing'}
-            </button>
-          )}
         </div>
       </form>
       )}
