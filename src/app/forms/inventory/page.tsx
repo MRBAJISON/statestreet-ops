@@ -97,7 +97,6 @@ export default function InventoryFormsPage() {
               <FormField label="Total Value" name="totalValue" type="number" prefix="GHS" required step={0.01} />
               <FormField label="Receiving Store" name="store" type="select" required options={[
                 { label: 'Main Warehouse', value: 'warehouse' },
-                ...org.stores,
               ]} />
               <FormField label="Condition" name="condition" type="select" options={[
                 { label: 'Good - All items OK', value: 'good' },

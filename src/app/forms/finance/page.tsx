@@ -10,7 +10,6 @@ import { submitEntry, postEntries, useEntries } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { useOrg } from '@/components/providers/OrgProvider';
 import { expenseGroups } from '@/lib/org';
-import { PAYMENT_MODES, payKey } from '@/lib/config';
 
 const INFLOW_GROUP = {
   label: 'Inflows',
@@ -122,18 +121,6 @@ export default function FinanceFormsPage() {
   const [overspendReason, setOverspendReason] = useState('');
   const budgetYear = new Date().getFullYear();
 
-  // Daily closing — payment-mode takings (auto-totalled).
-  const [payments, setPayments] = useState<Record<string, string>>({});
-  const paymentsTotal = Math.round(PAYMENT_MODES.reduce((s, m) => s + num(payments[m.value] ?? ''), 0) * 100) / 100;
-
-  // Daily revenue: the selected store's brand drives the category list.
-
-  // Daily closing — opens on demand under Daily Revenue Entry (its own save).
-  const [showClosing, setShowClosing] = useState(false);
-  const [closingBusy, setClosingBusy] = useState(false);
-  const [closingMsg, setClosingMsg] = useState('');
-  const [closingSubmitted, setClosingSubmitted] = useState(false);
-
   const annualBudget = finEntries
     .filter((e) => e.formType === 'budget' && String(e.payload.item) === expCat && num(e.payload.year as string) === budgetYear)
     .reduce((s, e) => s + num(e.payload.amount as string), 0);
@@ -178,25 +165,6 @@ export default function FinanceFormsPage() {
     }
     setSubmitted(true);
     setTimeout(() => setSubmitted(false), 4000);
-  }
-
-  async function handleClosing(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = e.currentTarget;
-    setClosingBusy(true);
-    try {
-      await submitEntry('finance', 'closing', form);
-      setClosingMsg('Daily closing saved. The Finance dashboard sums each payment mode across all stores.');
-      form.reset();
-      setPayments({});
-      refreshFin();
-    } catch (err) {
-      setClosingMsg('Could not save: ' + (err as Error).message);
-    } finally {
-      setClosingBusy(false);
-    }
-    setClosingSubmitted(true);
-    setTimeout(() => setClosingSubmitted(false), 4000);
   }
 
   async function handleExcelUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -352,13 +320,7 @@ export default function FinanceFormsPage() {
       {activeForm === 'import' ? (
         <ImportPanel />
       ) : activeForm === 'revenue' ? (
-        <div className="space-y-4 max-w-4xl">
-          <FinanceRevenueReview />
-          <button type="button" onClick={() => setShowClosing((s) => !s)}
-            className={`px-6 py-2.5 rounded-lg text-sm border transition-colors ${showClosing ? 'bg-[var(--c-hover)] border-[#c8a951] text-[var(--c-fg)]' : 'border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
-            {showClosing ? '✕ Close Daily Closing' : '+ Daily Closing'}
-          </button>
-        </div>
+        <FinanceRevenueReview />
       ) : (
       <form onSubmit={handleSubmit} className="space-y-4 max-w-4xl">
 
@@ -498,39 +460,6 @@ export default function FinanceFormsPage() {
           </button>
         </div>
       </form>
-      )}
-
-      {/* Daily Closing — opens under the Daily Revenue Entry (like the Store form), its own save. */}
-      {activeForm === 'revenue' && showClosing && (
-        <form onSubmit={handleClosing} className="space-y-4 max-w-4xl mt-6">
-          {closingSubmitted && (
-            <div className="bg-green-500/10 border border-green-500/30 text-green-400 p-3 rounded-lg text-sm">{closingMsg}</div>
-          )}
-          <FormSection title="Daily Closing" description="A store's end-of-day takings by payment mode + customer counts. One per store per day; the Finance dashboard sums each mode across all stores.">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
-              <FormField label="Date" name="date" type="date" required />
-              <FormField label="Store" name="store" type="select" required options={org.stores} />
-              <FormField label="Total Customers" name="customers" type="number" />
-              <FormField label="New Customers" name="newCustomers" type="number" />
-              <FormField label="Returning Customers" name="returningCustomers" type="number" />
-            </div>
-            <div className="mt-4">
-              <h4 className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Payments by Mode</h4>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {PAYMENT_MODES.map((mode) => (
-                  <FormField key={mode.value} label={mode.label} name={payKey(mode.value)} type="number" prefix={org.currency} step={0.01}
-                    value={payments[mode.value] ?? ''} onChange={(e) => setPayments((p) => ({ ...p, [mode.value]: e.target.value }))} />
-                ))}
-                <FormField label="Payments Total (auto)" name="paymentsTotal" type="number" prefix={org.currency} value={paymentsTotal ? String(paymentsTotal) : ''} readOnly />
-              </div>
-            </div>
-            <div className="flex pt-3">
-              <button type="submit" disabled={closingBusy} className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg transition-colors text-sm disabled:opacity-50">
-                {closingBusy ? <><Spinner /> Saving…</> : 'Save Closing Report'}
-              </button>
-            </div>
-          </FormSection>
-        </form>
       )}
 
       <div className="mt-8 max-w-4xl">
