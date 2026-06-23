@@ -22,10 +22,15 @@ export async function GET(
       : 'mtd';
     const date = sp.get('date') || undefined;
     const store = sp.get('store') || '';
-    // Commercial sales views are driven by the stores' Daily Sales, which are
-    // stored as finance/revenue — load those alongside the commercial rows.
+    // Commercial sales views are driven by the stores' Daily Sales (finance/revenue);
+    // its New Arrivals & Deployment come from inventory goods-receipt + store-transfer.
+    // Load all of those alongside the commercial rows.
     const where = department === 'commercial'
-      ? or(eq(entries.department, 'commercial'), and(eq(entries.department, 'finance'), eq(entries.formType, 'revenue')))
+      ? or(
+          eq(entries.department, 'commercial'),
+          and(eq(entries.department, 'finance'), eq(entries.formType, 'revenue')),
+          and(eq(entries.department, 'inventory'), or(eq(entries.formType, 'goods-receipt'), eq(entries.formType, 'store-transfer'))),
+        )
       : eq(entries.department, department);
     const rows = await db.select().from(entries).where(where);
     const filtered = filterByStore(filterByPeriod(rows, period, date), store);

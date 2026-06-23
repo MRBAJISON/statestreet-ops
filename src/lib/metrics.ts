@@ -330,7 +330,10 @@ function commercialMetrics(rows: Entry[]) {
   const cp = payloads(rows, 'category-perf');
   const sku = payloads(rows, 'sku-entry');
 
-  const na = payloads(rows, 'new-arrivals');
+  // Incoming stock now comes from the inventory Goods Received form (single source),
+  // not a separate commercial New Arrivals form. Deployment to stores is the transfers.
+  const na = payloads(rows, 'goods-receipt');
+  const transfers = payloads(rows, 'store-transfer');
   const acc = payloads(rows, 'accountability');
 
   // Store Manager Weekly Review aggregation
@@ -559,22 +562,27 @@ function commercialMetrics(rows: Entry[]) {
     .sort((a, b) => b.daysInStock - a.daysInStock)
     .slice(0, 6);
 
-  // New arrivals
+  // New arrivals — from Goods Received (units → qty, totalValue → stockValue).
   const newArrivals = na
     .map((p) => ({
       date: String(p.date ?? ''),
       brand: labelFor(BRAND_LABELS, p.brand),
       category: labelFor(CATEGORY_LABELS, p.category),
-      qty: num(p.qty),
-      stockValue: num(p.stockValue),
+      qty: num(p.units),
+      stockValue: num(p.totalValue),
       store: labelFor(STORE_LABELS, p.store),
       supplier: String(p.supplier ?? ''),
     }))
     .slice(0, 10);
-  const deploymentByStore = groupSum(na, 'store', 'qty').map((x) => ({
-    name: labelFor(STORE_LABELS, x.name),
-    value: x.value,
-  }));
+  // Deployment to each store = units transferred in (warehouse → store). Transfer
+  // qty is `qty` on the inventory form and `units` on the store-manager form.
+  const depMap = new Map<string, number>();
+  for (const p of transfers) {
+    const k = String(p.toStore ?? '');
+    if (!k) continue;
+    depMap.set(k, (depMap.get(k) ?? 0) + (num(p.qty) || num(p.units)));
+  }
+  const deploymentByStore = [...depMap].map(([name, value]) => ({ name: labelFor(STORE_LABELS, name), value }));
 
   // Customer database / walk-in captures (commercial/customer-capture).
   const SOURCE_LABELS_LOCAL: Record<string, string> = {

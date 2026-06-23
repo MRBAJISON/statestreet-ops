@@ -8,7 +8,7 @@ import WeeklyReview, { type DailySale, type WeekTarget } from '@/app/forms/store
 import { submitEntry, useEntries } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { useOrg } from '@/components/providers/OrgProvider';
-import { categoriesForBrand, categoriesForStore } from '@/lib/org';
+import { categoriesForBrand, brandOfStore } from '@/lib/org';
 import { PAYMENT_MODES, payKey } from '@/lib/config';
 
 const numOf = (s: string) => Number(s) || 0;
@@ -44,8 +44,10 @@ export default function CommercialFormsPage() {
   // Performance filters by the selected Store's brand. `category` is shared.
   const [brand, setBrand] = useState('');
   const [category, setCategory] = useState('');
-  const [cpStore, setCpStore] = useState('');
+  const [cpBrand, setCpBrand] = useState('');
   const [cpWeekEnd, setCpWeekEnd] = useState('');
+  const [cpGm, setCpGm] = useState('');
+  const [cpSellThrough, setCpSellThrough] = useState('');
   // Weekly Sales (renamed store-sales): confirm-and-augment over the stores' Daily Sales.
   const [ssStore, setSsStore] = useState('');
   const [ssWeekEnd, setSsWeekEnd] = useState('');
@@ -82,18 +84,24 @@ export default function CommercialFormsPage() {
     [comEntries]
   );
 
-  // Category Performance auto-fill: the picked store + week + category's sales & units
-  // come from the stores' Daily Sales (the single source of truth).
+  // Category Performance auto-fill: for the picked BRAND + week + category, sum the
+  // Daily Sales of every store in that brand. Sales, units, GM% and sell-through% all
+  // derive from the stores' Daily Sales (the single source of truth).
   const cpAuto = useMemo(() => {
-    let sales = 0, units = 0;
-    for (const d of dailySalesAll) {
-      if (cpStore && d.store !== cpStore) continue;
-      if (category && d.category !== category) continue;
-      if (!inWeek(d.date, cpWeekEnd)) continue;
-      sales += d.grossRevenue; units += d.itemsSold;
+    let sales = 0, units = 0, cogs = 0, opening = 0;
+    for (const e of finEntries) {
+      if (e.formType !== 'revenue') continue;
+      const p = e.payload;
+      if (cpBrand && brandOfStore(org, String(p.store || '')) !== cpBrand) continue;
+      if (category && String(p.category || '') !== category) continue;
+      if (!inWeek(String(p.date || ''), cpWeekEnd)) continue;
+      sales += Number(p.grossRevenue) || 0; units += Number(p.itemsSold) || 0;
+      cogs += Number(p.cogs) || 0; opening += Number(p.openingStock) || 0;
     }
-    return { sales, units };
-  }, [dailySalesAll, cpStore, category, cpWeekEnd]);
+    const gm = sales ? Math.round(((sales - cogs) / sales) * 1000) / 10 : 0;
+    const sellThrough = opening ? Math.min(100, Math.round((units / opening) * 1000) / 10) : 0;
+    return { sales, units, gm, sellThrough };
+  }, [finEntries, org, cpBrand, category, cpWeekEnd]);
 
   // Weekly Sales auto-fill: the picked store + week's totals come from Daily Sales.
   const ssAuto = useMemo(() => {
@@ -111,10 +119,12 @@ export default function CommercialFormsPage() {
 
   // Prefill the editable fields when the selection changes (Commercial then confirms/edits).
   useEffect(() => {
-    if (activeForm !== 'category-perf' || !cpStore || !cpWeekEnd || !category) return;
+    if (activeForm !== 'category-perf' || !cpBrand || !cpWeekEnd || !category) return;
     setCpSales(cpAuto.sales ? String(cpAuto.sales) : '');
     setCpUnits(cpAuto.units ? String(cpAuto.units) : '');
-  }, [cpAuto, activeForm, cpStore, cpWeekEnd, category]);
+    setCpGm(cpAuto.gm ? String(cpAuto.gm) : '');
+    setCpSellThrough(cpAuto.sellThrough ? String(cpAuto.sellThrough) : '');
+  }, [cpAuto, activeForm, cpBrand, cpWeekEnd, category]);
   useEffect(() => {
     if (activeForm !== 'store-sales' || !ssStore || !ssWeekEnd) return;
     setSsTotalSales(ssAuto.sales ? String(ssAuto.sales) : '');
@@ -132,9 +142,11 @@ export default function CommercialFormsPage() {
     setSsFootfall('');
     setCpSales('');
     setCpUnits('');
+    setCpGm('');
+    setCpSellThrough('');
     setBrand('');
     setCategory('');
-    setCpStore('');
+    setCpBrand('');
     setCpWeekEnd('');
     setSsStore('');
     setSsWeekEnd('');
@@ -150,7 +162,6 @@ export default function CommercialFormsPage() {
     { id: 'store-sales', label: 'Weekly Sales' },
     { id: 'category-perf', label: 'Category Performance' },
     { id: 'sku-entry', label: 'SKU Performance' },
-    { id: 'new-arrivals', label: 'New Arrivals' },
     { id: 'accountability', label: 'Accountability Update' },
     { id: 'weekly-review', label: 'Weekly Review' },
   ];
@@ -244,15 +255,15 @@ export default function CommercialFormsPage() {
         )}
 
         {activeForm === 'category-perf' && (
-          <FormSection title="Category Performance" description="Pick a store, week and category — Sales & Units auto-fill from the stores' Daily Sales. Enter Sell-Through, Gross Margin and Markdown.">
+          <FormSection title="Category Performance" description="Pick a brand, week and category — Sales, Units, Sell-Through% and Gross Margin% auto-fill from the brand's stores' Daily Sales. Only Markdown is entered.">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Week Ending" name="weekEnd" type="date" required value={cpWeekEnd} onChange={(e) => setCpWeekEnd(e.target.value)} />
-              <FormField label="Store" name="store" type="select" required value={cpStore} onChange={(e) => { setCpStore(e.target.value); setCategory(''); }} options={org.stores} />
-              <FormField label="Category" name="category" type="select" required value={category} onChange={(e) => setCategory(e.target.value)} options={categoriesForStore(org, cpStore)} />
+              <FormField label="Brand" name="brand" type="select" required value={cpBrand} onChange={(e) => { setCpBrand(e.target.value); setCategory(''); }} options={org.brands} />
+              <FormField label="Category" name="category" type="select" required value={category} onChange={(e) => setCategory(e.target.value)} options={categoriesForBrand(org, cpBrand)} />
               <FormField label="Sales Value (auto)" name="sales" type="number" prefix="GHS" required step={0.01} value={cpSales} onChange={(e) => setCpSales(e.target.value)} />
               <FormField label="Units Sold (auto)" name="units" type="number" required value={cpUnits} onChange={(e) => setCpUnits(e.target.value)} />
-              <FormField label="Gross Margin %" name="gm" type="number" suffix="%" step={0.1} />
-              <FormField label="Sell Through %" name="sellThrough" type="number" suffix="%" step={0.1} />
+              <FormField label="Gross Margin % (auto)" name="gm" type="number" suffix="%" step={0.1} value={cpGm} onChange={(e) => setCpGm(e.target.value)} />
+              <FormField label="Sell Through % (auto)" name="sellThrough" type="number" suffix="%" step={0.1} value={cpSellThrough} onChange={(e) => setCpSellThrough(e.target.value)} />
               <FormField label="Avg Selling Price (auto)" name="asp" type="number" prefix="GHS" value={fmt2(cpAsp)} readOnly />
               <FormField label="Markdown %" name="markdown" type="number" suffix="%" step={0.1} />
             </div>
@@ -277,22 +288,6 @@ export default function CommercialFormsPage() {
                 { label: 'Active', value: 'active' }, { label: 'Slow Moving', value: 'slow' },
                 { label: 'Dead Stock', value: 'dead' }, { label: 'Out of Stock', value: 'oos' },
               ]} />
-            </div>
-          </FormSection>
-        )}
-
-        {activeForm === 'new-arrivals' && (
-          <FormSection title="New Arrivals Registration" description="Register new stock arrivals">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
-              <FormField label="Arrival Date" name="date" type="date" required />
-              <FormField label="Brand" name="brand" type="select" required value={brand} onChange={(e) => { setBrand(e.target.value); setCategory(''); }} options={org.brands} />
-              <FormField label="Category" name="category" type="select" required value={category} onChange={(e) => setCategory(e.target.value)} options={categoriesForBrand(org, brand)} />
-              <FormField label="Total Quantity" name="qty" type="number" required />
-              <FormField label="Stock Value" name="stockValue" type="number" prefix="GHS" required step={0.01} />
-              <FormField label="Store Deployed To" name="store" type="select" options={org.stores} />
-              <FormField label="Supplier" name="supplier" />
-              <FormField label="PO Number" name="poNumber" placeholder="PO-XXXX" />
-              <FormField label="Notes" name="notes" type="textarea" placeholder="Style notes, size breakdown, etc." />
             </div>
           </FormSection>
         )}
