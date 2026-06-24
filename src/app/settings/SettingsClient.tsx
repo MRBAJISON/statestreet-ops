@@ -220,8 +220,10 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
           brands: orgDraft.brands.filter((s) => s.label.trim()),
           categories: orgDraft.categories.filter((s) => s.label.trim()),
           expenseItems: orgDraft.expenseItems.filter((s) => s.label.trim()),
+          subCategories: orgDraft.subCategories.filter((s) => s.label.trim()),
           brandCategories: orgDraft.brandCategories,
           brandStores: orgDraft.brandStores,
+          categorySubcategories: orgDraft.categorySubcategories,
         }),
       });
       const data = await res.json();
@@ -386,6 +388,7 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
               <ListEditor title="Stores / Locations" items={orgDraft.stores} onChange={(stores) => setOrgDraft((d) => ({ ...d, stores }))} />
               <ListEditor title="Brands" items={orgDraft.brands} onChange={(brands) => setOrgDraft((d) => ({ ...d, brands }))} />
               <ListEditor title="Product Categories" items={orgDraft.categories} onChange={(categories) => setOrgDraft((d) => ({ ...d, categories }))} />
+              <ListEditor title="Sub-categories" items={orgDraft.subCategories} onChange={(subCategories) => setOrgDraft((d) => ({ ...d, subCategories }))} />
               <ExpenseEditor items={orgDraft.expenseItems} onChange={(expenseItems) => setOrgDraft((d) => ({ ...d, expenseItems }))} />
             </div>
             )}
@@ -393,6 +396,7 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
             <div className="space-y-4">
               <MappingEditor title="Brand → Categories" hint="Tap to assign categories to each brand. Sales forms show only a brand's categories once mapped." brands={orgDraft.brands} items={orgDraft.categories} value={orgDraft.brandCategories} onChange={(brandCategories) => setOrgDraft((d) => ({ ...d, brandCategories }))} />
               <MappingEditor title="Brand → Stores" hint="Group stores under a brand. Stock transfers are allowed only between stores of the same brand (Head Office reaches all)." brands={orgDraft.brands} items={orgDraft.stores} value={orgDraft.brandStores} onChange={(brandStores) => setOrgDraft((d) => ({ ...d, brandStores }))} />
+              <MappingEditor title="Category → Sub-categories" hint="Tap to assign sub-categories to each category. Goods Received lets you pick a category's sub-categories once mapped." brands={orgDraft.categories} items={orgDraft.subCategories} value={orgDraft.categorySubcategories} onChange={(categorySubcategories) => setOrgDraft((d) => ({ ...d, categorySubcategories }))} />
             </div>
             )}
             <div className="flex justify-center pt-1">

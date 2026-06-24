@@ -59,6 +59,22 @@ export default function FinanceRevenueReview() {
     setBusy(false);
   }
 
+  // Mark the shown entries finance-reviewed — this is what releases them to the
+  // executive dashboard. Persists reviewed:true on each (un-reviewed) row.
+  async function confirmReviewed() {
+    const toMark = rows.filter((e) => !e.payload.reviewed);
+    if (!toMark.length) { setReviewed(true); return; }
+    setBusy(true); setMsg(null);
+    try {
+      for (const e of toMark) await updateEntry(e.id, { ...e.payload, reviewed: true });
+      refresh();
+      setReviewed(true);
+      setMsg({ ok: true, text: `Marked ${toMark.length} ${toMark.length === 1 ? 'entry' : 'entries'} reviewed — now visible on the Executive dashboard.` });
+    } catch (err) { setMsg({ ok: false, text: 'Could not confirm: ' + (err as Error).message }); }
+    setBusy(false);
+  }
+  const allReviewed = rows.length > 0 && rows.every((e) => e.payload.reviewed);
+
   const sel = 'bg-[var(--c-card2)] border border-[var(--c-border)] rounded px-3 py-2 text-sm text-[var(--c-fg)] focus:outline-none focus:border-[#c8a951]';
   const th = 'text-right py-2 px-2 font-medium whitespace-nowrap';
   const td = 'py-2 px-2 text-right whitespace-nowrap';
@@ -168,9 +184,10 @@ export default function FinanceRevenueReview() {
 
           {rows.length > 0 && (
             <div className="mt-4 flex items-center gap-3">
-              <button type="button" onClick={() => setReviewed(true)}
-                className="border border-[var(--c-border2)] hover:border-[#c8a951] text-[var(--c-fg)] px-5 py-2 rounded-lg text-sm">Confirm reviewed</button>
-              {reviewed && <span className="text-xs text-green-400">✓ Reviewed — figures confirmed.</span>}
+              <button type="button" onClick={confirmReviewed} disabled={busy || allReviewed}
+                className="border border-[var(--c-border2)] hover:border-[#c8a951] text-[var(--c-fg)] px-5 py-2 rounded-lg text-sm disabled:opacity-50">
+                {busy ? <><Spinner /> Confirming…</> : allReviewed ? 'All reviewed ✓' : 'Confirm reviewed'}</button>
+              {(reviewed || allReviewed) && <span className="text-xs text-green-400">✓ Released to the Executive dashboard.</span>}
             </div>
           )}
         </div>

@@ -93,7 +93,8 @@ export function useMetrics<T = Record<string, unknown>>(
   department: string,
   period: Period = 'mtd',
   date = '',
-  store = ''
+  store = '',
+  reviewed = false
 ) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +103,7 @@ export function useMetrics<T = Record<string, unknown>>(
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const q = `period=${period}${date ? `&date=${date}` : ''}${store ? `&store=${encodeURIComponent(store)}` : ''}`;
+      const q = `period=${period}${date ? `&date=${date}` : ''}${store ? `&store=${encodeURIComponent(store)}` : ''}${reviewed ? '&reviewed=1' : ''}`;
       const res = await fetch(`/api/metrics/${department}?${q}`, { cache: 'no-store' });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to load');
@@ -113,7 +114,7 @@ export function useMetrics<T = Record<string, unknown>>(
     } finally {
       setLoading(false);
     }
-  }, [department, period, date, store]);
+  }, [department, period, date, store, reviewed]);
 
   useEffect(() => {
     refresh();

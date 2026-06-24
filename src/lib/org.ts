@@ -15,9 +15,11 @@ export interface OrgSettings {
   brands: Option[];
   categories: Option[];
   expenseItems: ExpenseItem[];
+  subCategories: Option[];
   // Relationships (owner/commercial/operations-editable in Settings):
   brandCategories: Record<string, string[]>; // brandValue -> [categoryValue,...]
   brandStores: Record<string, string[]>;     // brandValue -> [storeValue,...]
+  categorySubcategories: Record<string, string[]>; // categoryValue -> [subCategoryValue,...]
 }
 
 export const DEFAULT_ORG: OrgSettings = {
@@ -31,8 +33,10 @@ export const DEFAULT_ORG: OrgSettings = {
   brands: BRANDS,
   categories: PRODUCT_CATEGORIES,
   expenseItems: EXPENSE_ITEMS,
+  subCategories: [],
   brandCategories: {},
   brandStores: {},
+  categorySubcategories: {},
 };
 
 // Merge a stored (possibly partial) record over the defaults.
@@ -52,8 +56,10 @@ export function mergeOrg(raw: Partial<OrgSettings> | null | undefined): OrgSetti
     brands: r.brands?.length ? r.brands : DEFAULT_ORG.brands,
     categories: r.categories?.length ? r.categories : DEFAULT_ORG.categories,
     expenseItems: r.expenseItems?.length ? r.expenseItems : DEFAULT_ORG.expenseItems,
+    subCategories: r.subCategories ?? [],
     brandCategories: r.brandCategories ?? {},
     brandStores: r.brandStores ?? {},
+    categorySubcategories: r.categorySubcategories ?? {},
   };
 }
 
@@ -79,6 +85,15 @@ export function categoriesForBrand(org: OrgSettings, brandValue: string): Option
   if (!brandValue || !allowed?.length) return org.categories;
   const set = new Set(allowed);
   return org.categories.filter((c) => set.has(c.value));
+}
+
+// Sub-categories mapped to a category (in the org's sub-category order). Empty if
+// the category has no mapping yet.
+export function subCategoriesForCategory(org: OrgSettings, categoryValue: string): Option[] {
+  const allowed = org.categorySubcategories?.[categoryValue];
+  if (!categoryValue || !allowed?.length) return [];
+  const set = new Set(allowed);
+  return (org.subCategories ?? []).filter((s) => set.has(s.value));
 }
 
 // Categories available at a store = the categories of the store's brand. Falls

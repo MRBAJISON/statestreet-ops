@@ -79,9 +79,9 @@ export default function ExecutiveCommandCenter() {
   const [store, setStore] = useState('');
   const { org } = useOrg();
   const retailStoreCount = org.stores.filter((s) => s.value !== 'head-office').length;
-  const finQ = useMetrics<{ revenueMtd: number; netProfit: number; grossProfit: number; operatingProfit: number; grossMargin: number; cashNet: number; netMargin: number; roce: number; roi: number; revenueByCategory: { name: string; value: number }[] }>('finance', period, anchor, store);
+  const finQ = useMetrics<{ revenueMtd: number; netProfit: number; grossProfit: number; operatingProfit: number; grossMargin: number; cashNet: number; netMargin: number; roce: number; roi: number; revenueByCategory: { name: string; value: number }[]; reviewedPct: number; reviewedCount: number; revenueCount: number }>('finance', period, anchor, store, true);
   const fin = finQ.data;
-  const com = useMetrics<{ groupSales: number; convRate: number; sellThrough: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null; insights: { best: string[]; concern: string[]; risk: string[] } }[] }; managerVoices?: { store: string; manager: string; weekEnd: string; answers: { q: string; a: string }[] }[] }>('commercial', period, anchor, store).data;
+  const com = useMetrics<{ groupSales: number; convRate: number; sellThrough: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null; insights: { best: string[]; concern: string[]; risk: string[] } }[] }; managerVoices?: { store: string; manager: string; weekEnd: string; answers: { q: string; a: string }[] }[] }>('commercial', period, anchor, store, true).data;
   const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[]; priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[]; peopleHealth: { score: number; attendance: number; punctuality: number; training: number; absences: number; count: number }; staffing: { total: number; onDuty: number; absent: number } }>('operations', period, anchor, store).data;
   const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory', period, anchor, store).data;
   const brd = useMetrics<{ healthIndex: number; sentiment: { positive: number }; ceoAttention: { priority: string; issue: string; impact: string; owner: string; status: string }[] }>('brand', period, anchor, store).data;
@@ -191,6 +191,13 @@ export default function ExecutiveCommandCenter() {
       <div className="px-6 pt-4 flex justify-end">
         <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={org.stores} onStoreChange={setStore} />
       </div>
+      {fin && (fin.revenueCount ?? 0) > 0 && (
+        <div className="px-6 pt-2">
+          <div className={`text-xs rounded-lg border px-3 py-2 ${fin.reviewedPct >= 100 ? 'border-green-500/30 bg-green-500/10 text-green-400' : 'border-[#c8a951]/30 bg-[#c8a951]/10 text-[#c8a951]'}`}>
+            Sales figures are <span className="font-semibold">finance-reviewed only</span> — {fin.reviewedPct}% of this period reviewed ({fin.reviewedCount} of {fin.revenueCount} daily-sales entries). Unreviewed entries appear once Finance confirms them in the reconcile.
+          </div>
+        </div>
+      )}
       <div className="px-6 py-3">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           <KpiProgress icon="💰" label="Group Revenue (MTD)" value={fin?.revenueMtd ?? 0} target={T.revenueMtd} />

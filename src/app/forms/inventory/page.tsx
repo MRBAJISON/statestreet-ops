@@ -8,6 +8,7 @@ import RecentEntries from '@/components/ui/RecentEntries';
 import { submitEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { useOrg } from '@/components/providers/OrgProvider';
+import { subCategoriesForCategory } from '@/lib/org';
 
 export default function InventoryFormsPage() {
   const { org } = useOrg();
@@ -18,6 +19,9 @@ export default function InventoryFormsPage() {
   const [message, setMessage] = useState('');
   // Stock-transfer can span multiple categories.
   const [transferCats, setTransferCats] = useState<string[]>([]);
+  // Goods Received: pick a category, then multi-select its sub-categories.
+  const [grCategory, setGrCategory] = useState('');
+  const [grSubCats, setGrSubCats] = useState<string[]>([]);
 
   const forms = [
     { id: 'stock-count', label: 'Stock Count' },
@@ -36,6 +40,7 @@ export default function InventoryFormsPage() {
       setMessage('Saved to the live database. The dashboard reflects it now.');
       form.reset();
       setTransferCats([]);
+      setGrCategory(''); setGrSubCats([]);
     } catch (err) {
       setMessage('Could not save: ' + (err as Error).message);
     } finally {
@@ -92,7 +97,9 @@ export default function InventoryFormsPage() {
               <FormField label="PO Number" name="poNumber" placeholder="PO-XXXX" />
               <FormField label="Supplier" name="supplier" />
               <FormField label="Brand" name="brand" placeholder="Type the brand" />
-              <FormField label="Category" name="category" type="select" required options={CATEGORIES} />
+              <FormField label="Category" name="category" type="select" required value={grCategory} onChange={(e) => { setGrCategory(e.target.value); setGrSubCats([]); }} options={CATEGORIES} />
+              <MultiSelectDropdown label="Sub-categories" options={subCategoriesForCategory(org, grCategory)} value={grSubCats} onChange={setGrSubCats} placeholder={grCategory ? 'Select…' : 'Pick a category first'} />
+              <input type="hidden" name="subCategories" value={grSubCats.join(', ')} />
               <FormField label="Total Units Received" name="units" type="number" required />
               <FormField label="Total Value" name="totalValue" type="number" prefix="GHS" required step={0.01} />
               <FormField label="Receiving Store" name="store" type="select" required options={[
