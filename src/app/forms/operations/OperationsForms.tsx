@@ -264,6 +264,7 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
               <FormField label="Training Completion %" name="training" type="number" suffix="%" min={0} max={100} />
               <FormField label="Absence Reason" name="reason" type="select" options={[
                 { label: 'Sick', value: 'sick' }, { label: 'Approved Leave', value: 'leave' },
+                { label: 'Off / Day Off', value: 'off' },
                 { label: 'No-show', value: 'no-show' }, { label: 'Other', value: 'other' },
               ]} />
               <FormField label="Notes" name="notes" type="textarea" placeholder="Context on attendance / training" />

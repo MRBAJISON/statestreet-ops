@@ -97,8 +97,6 @@ export default function CommercialPage() {
   const topSelling = m?.topSelling ?? [];
   const lowMoving = m?.lowMoving ?? [];
   const deadStock = m?.deadStock ?? [];
-  const newArrivals = m?.newArrivals ?? [];
-  const deploymentByStore = m?.deploymentByStore ?? [];
   const accountability = m?.accountability ?? [];
   const leads = m?.leads ?? [];
   const leadsBySource = m?.leadsBySource ?? [];
@@ -289,53 +287,7 @@ export default function CommercialPage() {
           </div>
         </Section>
 
-        <Section number={4} title="New Arrivals & Deployment">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2">
-              <div className="text-xs text-gray-400 mb-2">Recent New Arrivals</div>
-              {newArrivals.length ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-[var(--c-border)] text-gray-500">
-                        <th className="text-left py-2 pr-3 font-medium">Date</th>
-                        <th className="text-left py-2 pr-3 font-medium">Brand</th>
-                        <th className="text-left py-2 pr-3 font-medium">Category</th>
-                        <th className="text-right py-2 px-2 font-medium">Qty</th>
-                        <th className="text-right py-2 px-2 font-medium">Value</th>
-                        <th className="text-left py-2 pl-2 font-medium">Store</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {newArrivals.map((a, i) => (
-                        <tr key={i} className="border-b border-[var(--c-hover)]">
-                          <td className="py-2 pr-3 whitespace-nowrap">{a.date || '—'}</td>
-                          <td className="py-2 pr-3">{a.brand}</td>
-                          <td className="py-2 pr-3">{a.category}</td>
-                          <td className="py-2 px-2 text-right">{a.qty || '—'}</td>
-                          <td className="py-2 px-2 text-right">{a.stockValue ? fmtGHS(a.stockValue) : '—'}</td>
-                          <td className="py-2 pl-2">{a.store}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <EmptyState message="No new arrivals logged" hint="Submit New Arrivals in the Commercial form." height={160} />
-              )}
-            </div>
-            <div>
-              <div className="text-xs text-gray-400 mb-2">Deployment by Store (units)</div>
-              {deploymentByStore.length ? (
-                <SimpleBarChart data={deploymentByStore} height={200} color="#c8a951" horizontal />
-              ) : (
-                <EmptyState message="No deployment yet" height={200} />
-              )}
-            </div>
-          </div>
-        </Section>
-
-        <Section number={5} title="Accountability">
+        <Section number={4} title="Accountability">
           {accountability.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -368,7 +320,7 @@ export default function CommercialPage() {
           )}
         </Section>
 
-        <Section number={6} title="Store Manager Weekly Review" subtitle={wrView ? wrView.heading : undefined}>
+        <Section number={5} title="Store Manager Weekly Review" subtitle={wrView ? wrView.heading : undefined}>
           {wr && wr.count > 0 && wrView ? (
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
               {/* Week history list */}
@@ -526,7 +478,7 @@ export default function CommercialPage() {
           )}
         </Section>
 
-        <Section number={7} title="Sales Achievement Trend" subtitle="Weekly target achievement — forex view">
+        <Section number={6} title="Sales Achievement Trend" subtitle="Weekly target achievement — forex view">
           {(m?.achievementTrend?.length ?? 0) >= 2 ? (
             <>
               <div className="text-xs text-gray-500 mb-3">
@@ -541,7 +493,7 @@ export default function CommercialPage() {
           )}
         </Section>
 
-        <Section number={8} title="Customer Database" subtitle="Walk-in captures">
+        <Section number={7} title="Customer Database" subtitle="Walk-in captures">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
             <KPICard label="Captured" value={(m?.leadsTotal ?? 0) ? String(m?.leadsTotal) : '—'} small />
             <KPICard label="Buyers" value={(m?.buyersCount ?? 0) ? String(m?.buyersCount) : '—'} small />
@@ -596,7 +548,7 @@ export default function CommercialPage() {
           </div>
         </Section>
 
-        <Section number={9} title="Recent Entries">
+        <Section number={8} title="Recent Entries">
           <RecentEntries department="commercial" />
         </Section>
       </div>

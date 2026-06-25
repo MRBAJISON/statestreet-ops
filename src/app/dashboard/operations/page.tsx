@@ -69,7 +69,7 @@ export default function OperationsPage() {
   const sopByArea = m?.sopByArea ?? [];
   const sopDeviations = m?.sopDeviations ?? [];
   const correctiveRegister = m?.correctiveRegister ?? [];
-  const reasonLabel = (v: string) => ({ sick: 'Sick', leave: 'Approved Leave', 'no-show': 'No-show', other: 'Other' }[v] ?? v);
+  const reasonLabel = (v: string) => ({ sick: 'Sick', leave: 'Approved Leave', off: 'Off / Day Off', 'no-show': 'No-show', other: 'Other' }[v] ?? v);
 
   if (loading && !m) return <BrandedLoader fullScreen />;
 

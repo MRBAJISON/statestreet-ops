@@ -129,14 +129,10 @@ function financeMetrics(rows: Entry[]) {
     .filter((p) => String(p.type) === 'creditor')
     .reduce((s, p) => s + num(p.amount), 0);
 
-  // Cash flow (cashflow form)
-  const cf = payloads(rows, 'cashflow');
-  const cashInflow = cf
-    .filter((p) => String(p.type) === 'inflow')
-    .reduce((s, p) => s + num(p.amount), 0);
-  const cashOutflow = cf
-    .filter((p) => String(p.type) === 'outflow')
-    .reduce((s, p) => s + num(p.amount), 0);
+  // Cash flow — inflows are the stores' daily revenue, outflows are expenses
+  // (single source of truth; the manual cashflow form no longer feeds these).
+  const cashInflow = revenueMtd;
+  const cashOutflow = payloads(rows, 'expenses').reduce((s, p) => s + num(p.amount), 0);
 
   // Expenses (expenses form) — actual + budget per category.
   // 'tax' and 'interest' are below-the-line items, excluded from operating expenses.
@@ -197,16 +193,18 @@ function financeMetrics(rows: Entry[]) {
   const roce = capitalEmployed > 0 ? round1((operatingProfit / capitalEmployed) * 100) : 0;
   const roi = investment > 0 ? round1((netProfit / investment) * 100) : 0;
 
-  // Weekly cash-flow trend (net per ISO week) + position/runway
+  // Weekly cash-flow trend (net per ISO week): revenue in, expenses out.
   const weekMap = new Map<string, number>();
-  for (const p of cf) {
-    const dt = p.date ? new Date(String(p.date)) : null;
-    if (!dt || isNaN(dt.getTime())) continue;
+  const addWeek = (dateStr: unknown, amt: number) => {
+    const dt = dateStr ? new Date(String(dateStr)) : null;
+    if (!dt || isNaN(dt.getTime())) return;
     const onejan = new Date(dt.getFullYear(), 0, 1);
     const week = Math.ceil((((dt.getTime() - onejan.getTime()) / 86400000) + onejan.getDay() + 1) / 7);
     const key = `${dt.getFullYear()}-W${String(week).padStart(2, '0')}`;
-    weekMap.set(key, (weekMap.get(key) ?? 0) + (String(p.type) === 'inflow' ? num(p.amount) : -num(p.amount)));
-  }
+    weekMap.set(key, (weekMap.get(key) ?? 0) + amt);
+  };
+  for (const p of payloads(rows, 'revenue')) addWeek(p.date, num(p.grossRevenue));
+  for (const p of payloads(rows, 'expenses')) addWeek(p.date, -num(p.amount));
   const cashTrend = [...weekMap.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, value], i) => ({ name: `W${i + 1}`, value }));
