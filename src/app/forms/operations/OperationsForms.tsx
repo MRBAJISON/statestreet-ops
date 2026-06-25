@@ -4,6 +4,7 @@ import { useState } from 'react';
 import FormField from '@/components/forms/FormField';
 import FormSection from '@/components/forms/FormSection';
 import RecentEntries from '@/components/ui/RecentEntries';
+import OpenItemsManager from './OpenItemsManager';
 import { submitEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { useOrg } from '@/components/providers/OrgProvider';
@@ -275,6 +276,8 @@ export default function OperationsForms({ managerName = '' }: { managerName?: st
           <button type="reset" className="bg-[var(--c-hover)] border border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)] px-6 py-2.5 rounded-lg transition-colors text-sm">Clear Form</button>
         </div>
       </form>
+
+      <OpenItemsManager />
 
       <div className="mt-8 max-w-4xl">
         <h2 className="text-sm font-bold uppercase tracking-wide mb-3">Your Submissions</h2>

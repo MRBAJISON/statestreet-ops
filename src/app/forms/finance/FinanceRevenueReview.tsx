@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useEntries, updateEntry, postEntry } from '@/lib/api';
+import { useEntries, updateEntry, postEntry, type EntryRow } from '@/lib/api';
 import { useOrg } from '@/components/providers/OrgProvider';
 import { categoriesForStore } from '@/lib/org';
 import { Spinner } from '@/components/ui/BrandedLoader';
@@ -9,19 +9,21 @@ import { Spinner } from '@/components/ui/BrandedLoader';
 const fmtGHS = (n: number) => `GHS ${Math.round(n).toLocaleString()}`;
 const num = (v: unknown) => Number(String(v ?? '').replace(/[,\s]/g, '')) || 0;
 
+// Editable numeric fields the store manager captured.
+const FIELDS = ['grossRevenue', 'cogs', 'discounts', 'itemsSold', 'transactions', 'footfall', 'openingStock'] as const;
+
 // Finance reviews/reconciles what the stores submitted (finance/revenue) instead of
-// re-keying it: pick a store, see every entry that store made with almost all the
-// fields the manager filled, edit a figure to correct a gap (updates the store's own
-// entry, with a flag), or add a category the store missed.
+// re-keying it: pick a store, see every entry that store made, and edit ANY figure to
+// correct a gap — it updates the store's own entry, so every dashboard (incl. the
+// Executive) reflects the corrected number.
 export default function FinanceRevenueReview() {
   const { org } = useOrg();
   const { entries, refresh } = useEntries('finance', 5000);
   const [store, setStore] = useState('');
   const [date, setDate] = useState('');
-  const [edits, setEdits] = useState<Record<number, string>>({});
+  const [edits, setEdits] = useState<Record<number, Record<string, string>>>({});
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [reviewed, setReviewed] = useState(false);
   const [addCat, setAddCat] = useState('');
   const [addAmt, setAddAmt] = useState('');
 
@@ -31,19 +33,25 @@ export default function FinanceRevenueReview() {
       .sort((a, b) => (String(a.payload.date) < String(b.payload.date) ? 1 : -1)),
     [entries, store, date]
   );
-  const total = rows.reduce((s, e) => s + num(e.payload.grossRevenue), 0);
   const catLabel = (v: string) => org.categories.find((c) => c.value === v)?.label ?? v;
-  const valOf = (id: number, orig: number) => edits[id] ?? String(orig);
   const presentCats = new Set(rows.map((e) => String(e.payload.category || '')));
   const missingCats = categoriesForStore(org, store).filter((c) => !presentCats.has(c.value));
 
-  async function saveRow(id: number, payload: Record<string, unknown>) {
+  // Current value of a field = the in-progress edit if any, else what the store entered.
+  const cur = (e: EntryRow, f: string) => { const ov = edits[e.id]?.[f]; return ov !== undefined ? num(ov) : num(e.payload[f]); };
+  const setEdit = (id: number, f: string, val: string) => setEdits((d) => ({ ...d, [id]: { ...(d[id] ?? {}), [f]: val } }));
+  const rowChanged = (e: EntryRow) => FIELDS.some((f) => edits[e.id]?.[f] !== undefined && Math.round(num(edits[e.id][f])) !== Math.round(num(e.payload[f])));
+  const total = rows.reduce((s, e) => s + cur(e, 'grossRevenue'), 0);
+
+  async function saveRow(e: EntryRow) {
     setBusy(true); setMsg(null);
     try {
-      await updateEntry(id, { ...payload, grossRevenue: num(edits[id]) });
-      setEdits((d) => { const n = { ...d }; delete n[id]; return n; });
+      const patch: Record<string, unknown> = { ...e.payload };
+      for (const f of FIELDS) { const ov = edits[e.id]?.[f]; if (ov !== undefined) patch[f] = num(ov); }
+      await updateEntry(e.id, patch);
+      setEdits((d) => { const n = { ...d }; delete n[e.id]; return n; });
       refresh();
-      setMsg({ ok: true, text: 'Updated the store’s figure.' });
+      setMsg({ ok: true, text: 'Updated the store’s entry — dashboards now reflect it.' });
     } catch (err) { setMsg({ ok: false, text: 'Could not update: ' + (err as Error).message }); }
     setBusy(false);
   }
@@ -59,40 +67,31 @@ export default function FinanceRevenueReview() {
     setBusy(false);
   }
 
-  // Mark the shown entries finance-reviewed — this is what releases them to the
-  // executive dashboard. Persists reviewed:true on each (un-reviewed) row.
-  async function confirmReviewed() {
-    const toMark = rows.filter((e) => !e.payload.reviewed);
-    if (!toMark.length) { setReviewed(true); return; }
-    setBusy(true); setMsg(null);
-    try {
-      for (const e of toMark) await updateEntry(e.id, { ...e.payload, reviewed: true });
-      refresh();
-      setReviewed(true);
-      setMsg({ ok: true, text: `Marked ${toMark.length} ${toMark.length === 1 ? 'entry' : 'entries'} reviewed — now visible on the Executive dashboard.` });
-    } catch (err) { setMsg({ ok: false, text: 'Could not confirm: ' + (err as Error).message }); }
-    setBusy(false);
-  }
-  const allReviewed = rows.length > 0 && rows.every((e) => e.payload.reviewed);
-
   const sel = 'bg-[var(--c-card2)] border border-[var(--c-border)] rounded px-3 py-2 text-sm text-[var(--c-fg)] focus:outline-none focus:border-[#c8a951]';
   const th = 'text-right py-2 px-2 font-medium whitespace-nowrap';
-  const td = 'py-2 px-2 text-right whitespace-nowrap';
+  const inp = 'w-20 bg-[var(--c-hover)] border border-[var(--c-border)] rounded px-1.5 py-1 text-xs text-right text-[var(--c-fg)]';
+
+  // An editable numeric cell.
+  const cell = (e: EntryRow, f: string) => {
+    const raw = edits[e.id]?.[f];
+    const v = raw !== undefined ? raw : (num(e.payload[f]) ? String(num(e.payload[f])) : '');
+    return <input type="number" value={v} onChange={(ev) => setEdit(e.id, f, ev.target.value)} className={inp} />;
+  };
 
   return (
-    <div className="space-y-4 max-w-5xl">
+    <div className="space-y-4 max-w-6xl">
       <div className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-4">
         <div className="text-sm font-semibold mb-1">Daily Revenue — Review &amp; Reconcile</div>
-        <div className="text-xs text-gray-500 mb-3">Pick a store to see everything it submitted. Edit a figure only to correct a gap — it updates the store’s own entry. Use the date filter to focus on one day.</div>
+        <div className="text-xs text-gray-500 mb-3">Pick a store to see everything it submitted. You can edit any figure to correct it — saving updates the store’s own entry, and every dashboard (including the Executive) reflects the change. Use the date filter to focus on one day.</div>
         <div className="flex gap-3 flex-wrap">
           <label className="text-xs text-gray-400">Store
-            <select value={store} onChange={(e) => { setStore(e.target.value); setReviewed(false); }} className={`${sel} w-full mt-1`}>
+            <select value={store} onChange={(e) => setStore(e.target.value)} className={`${sel} w-full mt-1`}>
               <option value="">Select…</option>
               {org.stores.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </label>
           <label className="text-xs text-gray-400">Date <span className="text-gray-600">(optional)</span>
-            <input type="date" value={date} onChange={(e) => { setDate(e.target.value); setReviewed(false); }} className={`${sel} w-full mt-1`} />
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${sel} w-full mt-1`} />
           </label>
         </div>
         {msg && <div className={`mt-3 text-xs p-2 rounded-lg border ${msg.ok ? 'border-green-500/30 bg-green-500/10 text-green-400' : 'border-red-500/30 bg-red-500/10 text-red-400'}`}>{msg.text}</div>}
@@ -107,7 +106,7 @@ export default function FinanceRevenueReview() {
                   <tr className="text-gray-500 border-b border-[var(--c-border)]">
                     <th className="text-left py-2 pr-2 font-medium">Date</th>
                     <th className="text-left py-2 px-2 font-medium">Category</th>
-                    <th className={th}>Gross Rev (edit)</th>
+                    <th className={th}>Gross Rev</th>
                     <th className={th}>COGS</th>
                     <th className={th}>Discounts</th>
                     <th className={th}>Net</th>
@@ -116,38 +115,29 @@ export default function FinanceRevenueReview() {
                     <th className={th}>Txns</th>
                     <th className={th}>Footfall</th>
                     <th className={th}>Opening Stock</th>
+                    <th className={th}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((e) => {
-                    const p = e.payload;
-                    const orig = num(p.grossRevenue);
-                    const v = valOf(e.id, orig);
-                    const changed = Math.round(num(v)) !== Math.round(orig);
-                    const units = num(p.itemsSold);
-                    const net = p.netRevenue != null && p.netRevenue !== '' ? num(p.netRevenue) : orig - num(p.discounts);
+                    const net = cur(e, 'grossRevenue') - cur(e, 'discounts');
+                    const up = cur(e, 'itemsSold') ? cur(e, 'grossRevenue') / cur(e, 'itemsSold') : 0;
                     return (
                       <tr key={e.id} className="border-b border-[var(--c-hover)]">
-                        <td className="py-2 pr-2 whitespace-nowrap">{String(p.date || '—')}</td>
-                        <td className="py-2 px-2">{catLabel(String(p.category || ''))}</td>
-                        <td className={td}>
-                          <input type="number" value={v} onChange={(ev) => setEdits((d) => ({ ...d, [e.id]: ev.target.value }))}
-                            className="w-24 bg-[var(--c-hover)] border border-[var(--c-border)] rounded px-2 py-1 text-xs text-right text-[var(--c-fg)]" />
-                          {changed && (
-                            <div className="mt-0.5 whitespace-nowrap">
-                              <span className="text-[0.6rem] text-yellow-400">⚠ was {fmtGHS(orig)}</span>{' '}
-                              <button type="button" onClick={() => saveRow(e.id, p)} disabled={busy} className="text-[0.6rem] text-[#c8a951] hover:underline disabled:opacity-50">Save</button>
-                            </div>
-                          )}
+                        <td className="py-2 pr-2 whitespace-nowrap">{String(e.payload.date || '—')}</td>
+                        <td className="py-2 px-2 whitespace-nowrap">{catLabel(String(e.payload.category || ''))}</td>
+                        <td className="py-1 px-2 text-right">{cell(e, 'grossRevenue')}</td>
+                        <td className="py-1 px-2 text-right">{cell(e, 'cogs')}</td>
+                        <td className="py-1 px-2 text-right">{cell(e, 'discounts')}</td>
+                        <td className="py-2 px-2 text-right text-gray-400 whitespace-nowrap">{fmtGHS(net)}</td>
+                        <td className="py-1 px-2 text-right">{cell(e, 'itemsSold')}</td>
+                        <td className="py-2 px-2 text-right text-gray-400 whitespace-nowrap">{up ? fmtGHS(up) : '—'}</td>
+                        <td className="py-1 px-2 text-right">{cell(e, 'transactions')}</td>
+                        <td className="py-1 px-2 text-right">{cell(e, 'footfall')}</td>
+                        <td className="py-1 px-2 text-right">{cell(e, 'openingStock')}</td>
+                        <td className="py-1 px-2 text-right">
+                          {rowChanged(e) && <button type="button" onClick={() => saveRow(e)} disabled={busy} className="text-[0.7rem] text-[#c8a951] hover:underline disabled:opacity-50">Save</button>}
                         </td>
-                        <td className={`${td} text-gray-400`}>{num(p.cogs) ? fmtGHS(num(p.cogs)) : '—'}</td>
-                        <td className={`${td} text-gray-400`}>{num(p.discounts) ? fmtGHS(num(p.discounts)) : '—'}</td>
-                        <td className={`${td} text-gray-400`}>{fmtGHS(net)}</td>
-                        <td className={`${td} text-gray-400`}>{units || '—'}</td>
-                        <td className={`${td} text-gray-400`}>{units ? fmtGHS(orig / units) : '—'}</td>
-                        <td className={`${td} text-gray-400`}>{num(p.transactions) || '—'}</td>
-                        <td className={`${td} text-gray-400`}>{num(p.footfall) || '—'}</td>
-                        <td className={`${td} text-gray-400`}>{num(p.openingStock) || '—'}</td>
                       </tr>
                     );
                   })}
@@ -155,8 +145,8 @@ export default function FinanceRevenueReview() {
                 <tfoot>
                   <tr className="border-t border-[var(--c-border)]">
                     <td className="py-2 pr-2 font-semibold" colSpan={2}>TOTAL ({rows.length} {rows.length === 1 ? 'entry' : 'entries'})</td>
-                    <td className="py-2 px-2 text-right font-semibold text-[#c8a951]">{fmtGHS(total)}</td>
-                    <td colSpan={8}></td>
+                    <td className="py-2 px-2 text-right font-semibold text-[#c8a951] whitespace-nowrap">{fmtGHS(total)}</td>
+                    <td colSpan={9}></td>
                   </tr>
                 </tfoot>
               </table>
@@ -179,15 +169,6 @@ export default function FinanceRevenueReview() {
               <button type="button" onClick={addFallback} disabled={busy || !addCat || !num(addAmt)} className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-4 py-2 rounded-lg text-sm disabled:opacity-50">
                 {busy ? <><Spinner /> …</> : 'Add'}
               </button>
-            </div>
-          )}
-
-          {rows.length > 0 && (
-            <div className="mt-4 flex items-center gap-3">
-              <button type="button" onClick={confirmReviewed} disabled={busy || allReviewed}
-                className="border border-[var(--c-border2)] hover:border-[#c8a951] text-[var(--c-fg)] px-5 py-2 rounded-lg text-sm disabled:opacity-50">
-                {busy ? <><Spinner /> Confirming…</> : allReviewed ? 'All reviewed ✓' : 'Confirm reviewed'}</button>
-              {(reviewed || allReviewed) && <span className="text-xs text-green-400">✓ Released to the Executive dashboard.</span>}
             </div>
           )}
         </div>

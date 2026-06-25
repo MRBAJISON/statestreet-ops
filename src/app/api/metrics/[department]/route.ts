@@ -22,9 +22,6 @@ export async function GET(
       : 'mtd';
     const date = sp.get('date') || undefined;
     const store = sp.get('store') || '';
-    // Executive gate: when set, sales figures come ONLY from finance-reviewed daily
-    // sales. Other dashboards omit this and see everything live.
-    const reviewedOnly = sp.get('reviewed') === '1';
     // Commercial sales views are driven by the stores' Daily Sales (finance/revenue);
     // its New Arrivals & Deployment come from inventory goods-receipt + store-transfer.
     // Load all of those alongside the commercial rows.
@@ -37,18 +34,7 @@ export async function GET(
       : eq(entries.department, department);
     const rows = await db.select().from(entries).where(where);
     const filtered = filterByStore(filterByPeriod(rows, period, date), store);
-    // Share of daily sales that Finance has reviewed (computed before any gating,
-    // so the executive indicator reflects true progress).
-    const revRows = filtered.filter((r) => r.formType === 'revenue');
-    const reviewedCount = revRows.filter((r) => (r.payload as Record<string, unknown>).reviewed).length;
-    const reviewedPct = revRows.length ? Math.round((reviewedCount / revRows.length) * 100) : 0;
-    // Gate: drop unreviewed daily-sales rows so the executive's sales figures are
-    // finance-confirmed only. Non-revenue rows (commercial insights etc.) pass through.
-    const scoped = reviewedOnly
-      ? filtered.filter((r) => r.formType !== 'revenue' || (r.payload as Record<string, unknown>).reviewed)
-      : filtered;
-    const metrics = computeMetrics(department, scoped);
-    return NextResponse.json({ ...metrics, reviewedPct, reviewedCount, revenueCount: revRows.length });
+    return NextResponse.json(computeMetrics(department, filtered));
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
