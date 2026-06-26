@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { useOrg } from '@/components/providers/OrgProvider';
+import CategoryRecoder from './CategoryRecoder';
 
 interface UserInfo { name: string; email: string; role: string; store: string }
 
@@ -407,6 +408,9 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
           </form>
         </section>
       )}
+
+      {/* Owner-only data cleanup tool */}
+      {isOwner && tab === 'organization' && <CategoryRecoder />}
 
       {/* Appearance */}
       {tab === 'appearance' && (
