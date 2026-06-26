@@ -147,10 +147,9 @@ export const labelFor = (map: Record<string, string>, value: unknown): string =>
   const key = String(value ?? '');
   if (map[key]) return map[key];
   if (!key) return '—';
-  // Graceful fallback for org-added codes not in the static map: prettify the slug.
-  return /[a-z0-9]+(?:[-_][a-z0-9]+)+/i.test(key)
-    ? key.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-    : key;
+  // Graceful fallback for org-added codes not in the static map: prettify the slug
+  // (replace separators, capitalise each word — never lowercases, so acronyms keep).
+  return key.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
 // Financial-ratio performance bands → label + RAG tone.

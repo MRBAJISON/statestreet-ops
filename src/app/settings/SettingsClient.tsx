@@ -30,7 +30,9 @@ type Opt = { label: string; value: string };
 
 // Editable label/value list (Stores, Brands, Categories). Value auto-derives from the label.
 function ListEditor({ title, items, onChange }: { title: string; items: Opt[]; onChange: (next: Opt[]) => void }) {
-  const set = (i: number, label: string) => onChange(items.map((it, k) => (k === i ? { label, value: it.value || slugify(label) } : it)));
+  // Code tracks the full name as you type (don't freeze on the first letter, or
+  // "Dresses" would end up coded "d"). Editing an existing name re-derives its code.
+  const set = (i: number, label: string) => onChange(items.map((it, k) => (k === i ? { label, value: slugify(label) } : it)));
   const remove = (i: number) => onChange(items.filter((_, k) => k !== i));
   const add = () => onChange([...items, { label: '', value: '' }]);
   return (
@@ -54,7 +56,7 @@ function ListEditor({ title, items, onChange }: { title: string; items: Opt[]; o
 
 type ExpOpt = { label: string; value: string; group: 'operating' | 'capital' | 'below-line' };
 function ExpenseEditor({ items, onChange }: { items: ExpOpt[]; onChange: (next: ExpOpt[]) => void }) {
-  const set = (i: number, patch: Partial<ExpOpt>) => onChange(items.map((it, k) => (k === i ? { ...it, ...patch, value: (patch.label !== undefined ? (it.value || slugify(patch.label)) : it.value) } : it)));
+  const set = (i: number, patch: Partial<ExpOpt>) => onChange(items.map((it, k) => (k === i ? { ...it, ...patch, value: (patch.label !== undefined ? slugify(patch.label) : it.value) } : it)));
   const remove = (i: number) => onChange(items.filter((_, k) => k !== i));
   const add = () => onChange([...items, { label: '', value: '', group: 'operating' }]);
   return (
