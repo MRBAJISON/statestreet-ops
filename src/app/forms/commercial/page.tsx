@@ -47,7 +47,10 @@ export default function CommercialFormsPage() {
   const [cpBrand, setCpBrand] = useState('');
   const [cpWeekEnd, setCpWeekEnd] = useState('');
   const [cpGm, setCpGm] = useState('');
-  const [cpSellThrough, setCpSellThrough] = useState('');
+  // SKU Performance: units + stock drive an auto sell-through for that item.
+  const [skuUnits, setSkuUnits] = useState('');
+  const [skuStock, setSkuStock] = useState('');
+  const skuSellThrough = (numOf(skuUnits) + numOf(skuStock)) ? Math.round((numOf(skuUnits) / (numOf(skuUnits) + numOf(skuStock))) * 1000) / 10 : 0;
   // Weekly Sales (renamed store-sales): confirm-and-augment over the stores' Daily Sales.
   const [ssStore, setSsStore] = useState('');
   const [ssWeekEnd, setSsWeekEnd] = useState('');
@@ -85,10 +88,10 @@ export default function CommercialFormsPage() {
   );
 
   // Category Performance auto-fill: for the picked BRAND + week + category, sum the
-  // Daily Sales of every store in that brand. Sales, units, GM% and sell-through% all
-  // derive from the stores' Daily Sales (the single source of truth).
+  // Daily Sales of every store in that brand. Sales, units and GM% derive from the
+  // stores' Daily Sales (the single source of truth). Sell-through lives on SKU now.
   const cpAuto = useMemo(() => {
-    let sales = 0, units = 0, cogs = 0, opening = 0;
+    let sales = 0, units = 0, cogs = 0;
     for (const e of finEntries) {
       if (e.formType !== 'revenue') continue;
       const p = e.payload;
@@ -96,11 +99,10 @@ export default function CommercialFormsPage() {
       if (category && String(p.category || '') !== category) continue;
       if (!inWeek(String(p.date || ''), cpWeekEnd)) continue;
       sales += Number(p.grossRevenue) || 0; units += Number(p.itemsSold) || 0;
-      cogs += Number(p.cogs) || 0; opening += Number(p.openingStock) || 0;
+      cogs += Number(p.cogs) || 0;
     }
     const gm = sales ? Math.round(((sales - cogs) / sales) * 1000) / 10 : 0;
-    const sellThrough = opening ? Math.min(100, Math.round((units / opening) * 1000) / 10) : 0;
-    return { sales, units, gm, sellThrough };
+    return { sales, units, gm };
   }, [finEntries, org, cpBrand, category, cpWeekEnd]);
 
   // Weekly Sales auto-fill: the picked store + week's totals come from Daily Sales.
@@ -123,7 +125,6 @@ export default function CommercialFormsPage() {
     setCpSales(cpAuto.sales ? String(cpAuto.sales) : '');
     setCpUnits(cpAuto.units ? String(cpAuto.units) : '');
     setCpGm(cpAuto.gm ? String(cpAuto.gm) : '');
-    setCpSellThrough(cpAuto.sellThrough ? String(cpAuto.sellThrough) : '');
   }, [cpAuto, activeForm, cpBrand, cpWeekEnd, category]);
   useEffect(() => {
     if (activeForm !== 'store-sales' || !ssStore || !ssWeekEnd) return;
@@ -143,7 +144,8 @@ export default function CommercialFormsPage() {
     setCpSales('');
     setCpUnits('');
     setCpGm('');
-    setCpSellThrough('');
+    setSkuUnits('');
+    setSkuStock('');
     setBrand('');
     setCategory('');
     setCpBrand('');
@@ -161,7 +163,7 @@ export default function CommercialFormsPage() {
   const forms = [
     { id: 'store-sales', label: 'Weekly Sales' },
     { id: 'category-perf', label: 'Category Performance' },
-    { id: 'sku-entry', label: 'SKU Performance' },
+    { id: 'sku-entry', label: 'SKU & Commercial Insight' },
     { id: 'accountability', label: 'Accountability Update' },
     { id: 'weekly-review', label: 'Weekly Review' },
   ];
@@ -255,7 +257,7 @@ export default function CommercialFormsPage() {
         )}
 
         {activeForm === 'category-perf' && (
-          <FormSection title="Category Performance" description="Pick a brand, week and category — Sales, Units, Sell-Through% and Gross Margin% auto-fill from the brand's stores' Daily Sales. Only Markdown is entered.">
+          <FormSection title="Category Performance" description="Pick a brand, week and category — Sales, Units and Gross Margin% auto-fill from the brand's stores' Daily Sales. Only Markdown is entered.">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="Week Ending" name="weekEnd" type="date" required value={cpWeekEnd} onChange={(e) => setCpWeekEnd(e.target.value)} />
               <FormField label="Brand" name="brand" type="select" required value={cpBrand} onChange={(e) => { setCpBrand(e.target.value); setCategory(''); }} options={org.brands} />
@@ -263,7 +265,6 @@ export default function CommercialFormsPage() {
               <FormField label="Sales Value (auto)" name="sales" type="number" prefix="GHS" required step={0.01} value={cpSales} onChange={(e) => setCpSales(e.target.value)} />
               <FormField label="Units Sold (auto)" name="units" type="number" required value={cpUnits} onChange={(e) => setCpUnits(e.target.value)} />
               <FormField label="Gross Margin % (auto)" name="gm" type="number" suffix="%" step={0.1} value={cpGm} onChange={(e) => setCpGm(e.target.value)} />
-              <FormField label="Sell Through % (auto)" name="sellThrough" type="number" suffix="%" step={0.1} value={cpSellThrough} onChange={(e) => setCpSellThrough(e.target.value)} />
               <FormField label="Avg Selling Price (auto)" name="asp" type="number" prefix="GHS" value={fmt2(cpAsp)} readOnly />
               <FormField label="Markdown %" name="markdown" type="number" suffix="%" step={0.1} />
             </div>
@@ -274,20 +275,31 @@ export default function CommercialFormsPage() {
         )}
 
         {activeForm === 'sku-entry' && (
-          <FormSection title="SKU Performance Entry" description="Record individual SKU performance">
+          <FormSection title="SKU & Commercial Insight" description="Record an item's performance — Sell-Through auto-calculates from units sold vs current stock — and capture how it's running commercially.">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="SKU Code" name="sku" required placeholder="e.g. ARB-101-BLK-42" />
               <FormField label="Product Name" name="name" required />
               <FormField label="Brand" name="brand" type="select" value={brand} onChange={(e) => { setBrand(e.target.value); setCategory(''); }} options={org.brands} />
               <FormField label="Category" name="category" type="select" required value={category} onChange={(e) => setCategory(e.target.value)} options={categoriesForBrand(org, brand)} />
-              <FormField label="Units Sold (MTD)" name="unitsSold" type="number" />
+              <FormField label="Units Sold (MTD)" name="unitsSold" type="number" value={skuUnits} onChange={(e) => setSkuUnits(e.target.value)} />
+              <FormField label="Current Stock" name="stock" type="number" value={skuStock} onChange={(e) => setSkuStock(e.target.value)} />
+              <FormField label="Sell Through % (auto)" name="sellThrough" type="number" suffix="%" value={fmt1(skuSellThrough)} readOnly />
               <FormField label="Sales Value (MTD)" name="salesValue" type="number" prefix="GHS" step={0.01} />
-              <FormField label="Current Stock" name="stock" type="number" />
               <FormField label="Days in Stock" name="daysInStock" type="number" />
               <FormField label="Status" name="status" type="select" options={[
                 { label: 'Active', value: 'active' }, { label: 'Slow Moving', value: 'slow' },
                 { label: 'Dead Stock', value: 'dead' }, { label: 'Out of Stock', value: 'oos' },
               ]} />
+            </div>
+            <div className="mt-4 pt-3 border-t border-[var(--c-border)]">
+              <h4 className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-3">Commercial Insight</h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <FormField label="Commercial Performance" name="performance" type="select" options={[
+                  { label: 'Strong', value: 'strong' }, { label: 'Steady', value: 'steady' }, { label: 'Underperforming', value: 'underperforming' },
+                ]} />
+                <FormField label="Promo / Campaign" name="promo" placeholder="e.g. Eid promo, bundle deal" />
+                <FormField label="Insight" name="insight" type="textarea" placeholder="How is this item running commercially? Demand, pricing, what's driving it." />
+              </div>
             </div>
           </FormSection>
         )}

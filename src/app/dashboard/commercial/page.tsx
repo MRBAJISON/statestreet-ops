@@ -48,6 +48,7 @@ interface CommercialLive {
   topSelling: SkuRow[];
   lowMoving: SkuRow[];
   deadStock: SkuRow[];
+  skuInsights: { name: string; category: string; sellThrough: number; performance: string; promo: string; insight: string }[];
   newArrivals: { date: string; brand: string; category: string; qty: number; stockValue: number; store: string; supplier: string }[];
   deploymentByStore: { name: string; value: number }[];
   accountability: { member: string; role: string; kpi: string; target: string; actual: string; status: string }[];
@@ -94,6 +95,7 @@ export default function CommercialPage() {
   const categorySales = m?.categorySales ?? [];
   const sellThroughCat = m?.sellThroughByCategory ?? [];
   const salesByStore = m?.salesByStore ?? [];
+  const skuInsights = m?.skuInsights ?? [];
   const topSelling = m?.topSelling ?? [];
   const lowMoving = m?.lowMoving ?? [];
   const deadStock = m?.deadStock ?? [];
@@ -284,6 +286,43 @@ export default function CommercialPage() {
             {skuTable('Top Selling', topSelling, 'Submit SKU Performance in the Commercial form.')}
             {skuTable('Low Moving (60–180d)', lowMoving, 'SKUs aging 60–180 days appear here.')}
             {skuTable('Dead Stock (180d+)', deadStock, 'SKUs over 180 days or flagged dead appear here.')}
+          </div>
+
+          <div className="mt-4">
+            <div className="text-xs text-gray-400 mb-2">Commercial Insight on Items</div>
+            {skuInsights.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-[var(--c-border)] text-gray-500">
+                      <th className="text-left py-2 pr-3 font-medium">Item</th>
+                      <th className="text-left py-2 pr-3 font-medium">Category</th>
+                      <th className="text-right py-2 px-3 font-medium">Sell-Through</th>
+                      <th className="text-left py-2 pr-3 font-medium">Performance</th>
+                      <th className="text-left py-2 pr-3 font-medium">Promo</th>
+                      <th className="text-left py-2 font-medium">Insight</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {skuInsights.map((s, i) => {
+                      const tone = s.performance === 'strong' ? 'text-green-400' : s.performance === 'underperforming' ? 'text-red-400' : 'text-[#c8a951]';
+                      return (
+                        <tr key={i} className="border-b border-[var(--c-hover)]">
+                          <td className="py-2 pr-3">{s.name}</td>
+                          <td className="py-2 pr-3 text-gray-400">{s.category}</td>
+                          <td className="py-2 px-3 text-right">{s.sellThrough ? `${s.sellThrough}%` : '—'}</td>
+                          <td className={`py-2 pr-3 capitalize ${tone}`}>{s.performance || '—'}</td>
+                          <td className="py-2 pr-3 text-gray-400">{s.promo || '—'}</td>
+                          <td className="py-2 text-gray-300 max-w-[20rem] truncate" title={s.insight}>{s.insight || '—'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState message="No commercial insights yet" hint="Add Commercial Insight on the SKU form." height={120} />
+            )}
           </div>
         </Section>
 

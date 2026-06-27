@@ -547,9 +547,18 @@ function commercialMetrics(rows: Entry[]) {
     salesValue: num(p.salesValue),
     unitsSold: num(p.unitsSold),
     stock: num(p.stock),
+    sellThrough: num(p.sellThrough),
     daysInStock: num(p.daysInStock),
     status: String(p.status ?? ''),
+    performance: String(p.performance ?? ''),
+    promo: String(p.promo ?? ''),
+    insight: String(p.insight ?? ''),
   }));
+  // Items with a commercial note — for reporting how they're running commercially.
+  const skuInsights = skus
+    .filter((s) => s.insight.trim() || s.performance)
+    .map((s) => ({ name: s.name || s.sku, category: s.category, sellThrough: s.sellThrough, performance: s.performance, promo: s.promo, insight: s.insight }))
+    .slice(0, 12);
   const topSelling = [...skus].sort((a, b) => b.salesValue - a.salesValue).slice(0, 6);
   const lowMoving = [...skus]
     .filter((s) => s.daysInStock >= 60 && s.daysInStock < 180)
@@ -628,6 +637,7 @@ function commercialMetrics(rows: Entry[]) {
     topSelling,
     lowMoving,
     deadStock,
+    skuInsights,
     newArrivals,
     deploymentByStore,
     accountability: acc.map((p) => ({
@@ -899,7 +909,9 @@ function inventoryMetrics(rows: Entry[]) {
   const ds = payloads(rows, 'dead-stock');
   const rep = payloads(rows, 'replenishment');
 
-  const onHandValue = sc.reduce((s, p) => s + num(p.physicalQty) * num(p.unitValue), 0);
+  // Stock count now records the store's total Stock Value directly (falls back to
+  // physical × unit value for older per-SKU counts).
+  const onHandValue = sc.reduce((s, p) => s + (num(p.stockValue) || num(p.physicalQty) * num(p.unitValue)), 0);
   const receivedValue = gr.reduce((s, p) => s + num(p.totalValue), 0);
   const inventoryValue = onHandValue || receivedValue;
   const sysTotal = sc.reduce((s, p) => s + num(p.systemQty), 0);
@@ -947,7 +959,7 @@ function inventoryMetrics(rows: Entry[]) {
     receivedUnits: gr.reduce((s, p) => s + num(p.units), 0),
     receivedValue,
     transferredUnits: tr.reduce((s, p) => s + num(p.qty), 0),
-    transferredValue: tr.reduce((s, p) => s + num(p.qty) * num(p.unitValue), 0),
+    transferredValue: tr.reduce((s, p) => s + (num(p.totalValue) || num(p.qty) * num(p.unitValue)), 0),
     deadStockValue: deadValue,
     replenishmentRequests: rep.length,
     countedValue: onHandValue,
