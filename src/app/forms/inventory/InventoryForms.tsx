@@ -17,21 +17,24 @@ export default function InventoryForms({ managerName = '' }: { managerName?: str
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  // Stock-transfer can span multiple categories.
+  // Stock-transfer can span multiple categories + their sub-categories.
   const [transferCats, setTransferCats] = useState<string[]>([]);
+  const [transferSubCats, setTransferSubCats] = useState<string[]>([]);
   // Goods Received: multi-select categories, then multi-select their sub-categories.
   const [grCategories, setGrCategories] = useState<string[]>([]);
   const [grSubCats, setGrSubCats] = useState<string[]>([]);
 
   // Sub-categories available = the pooled sub-categories of every selected category.
-  const grSubOptions = (() => {
+  const pooledSubs = (cats: string[]) => {
     const seen = new Set<string>();
     const out: { label: string; value: string }[] = [];
-    for (const c of grCategories) for (const s of subCategoriesForCategory(org, c)) {
+    for (const c of cats) for (const s of subCategoriesForCategory(org, c)) {
       if (!seen.has(s.value)) { seen.add(s.value); out.push(s); }
     }
     return out;
-  })();
+  };
+  const grSubOptions = pooledSubs(grCategories);
+  const transferSubOptions = pooledSubs(transferCats);
 
   // A person field that pre-fills (read-only) with the logged-in manager's name.
   const personField = (label: string, name: string, required = false) =>
@@ -55,7 +58,7 @@ export default function InventoryForms({ managerName = '' }: { managerName?: str
       await submitEntry('inventory', activeForm, form);
       setMessage('Saved to the live database. The dashboard reflects it now.');
       form.reset();
-      setTransferCats([]);
+      setTransferCats([]); setTransferSubCats([]);
       setGrCategories([]); setGrSubCats([]);
     } catch (err) {
       setMessage('Could not save: ' + (err as Error).message);
@@ -137,6 +140,7 @@ export default function InventoryForms({ managerName = '' }: { managerName?: str
               <FormField label="To Store" name="toStore" type="select" required options={org.stores} />
               <FormField label="SKU Code" name="sku" placeholder="e.g. ARB-101-BLK-42" />
               <MultiSelectDropdown label="Categories" options={CATEGORIES} value={transferCats} onChange={setTransferCats} />
+              <MultiSelectDropdown label="Sub-categories" options={transferSubOptions} value={transferSubCats} onChange={setTransferSubCats} placeholder={transferCats.length ? 'Select…' : 'Pick categories first'} />
               <FormField label="Product Description" name="description" required />
               <FormField label="Quantity" name="qty" type="number" required />
               <FormField label="Total Value" name="totalValue" type="number" prefix="GHS" step={0.01} />
@@ -147,6 +151,7 @@ export default function InventoryForms({ managerName = '' }: { managerName?: str
               <FormField label="Authorized By" name="authorizedBy" required />
             </div>
             <input type="hidden" name="categories" value={transferCats.join(', ')} />
+            <input type="hidden" name="subCategories" value={transferSubCats.join(', ')} />
           </FormSection>
         )}
 

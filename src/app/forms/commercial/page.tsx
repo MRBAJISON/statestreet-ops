@@ -163,7 +163,7 @@ export default function CommercialFormsPage() {
   const forms = [
     { id: 'store-sales', label: 'Weekly Sales' },
     { id: 'category-perf', label: 'Category Performance' },
-    { id: 'sku-entry', label: 'SKU & Commercial Insight' },
+    { id: 'sku-entry', label: 'New SKU Performance' },
     { id: 'accountability', label: 'Accountability Update' },
     { id: 'weekly-review', label: 'Weekly Review' },
   ];
@@ -275,7 +275,7 @@ export default function CommercialFormsPage() {
         )}
 
         {activeForm === 'sku-entry' && (
-          <FormSection title="SKU & Commercial Insight" description="Record an item's performance — Sell-Through auto-calculates from units sold vs current stock — and capture how it's running commercially.">
+          <FormSection title="New SKU Performance" description="Record an item's performance — Sell-Through auto-calculates from units sold vs current stock — and capture how it's running commercially.">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
               <FormField label="SKU Code" name="sku" required placeholder="e.g. ARB-101-BLK-42" />
               <FormField label="Product Name" name="name" required />
