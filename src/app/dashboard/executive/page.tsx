@@ -5,6 +5,7 @@ import DashboardHeader from '@/components/layout/DashboardHeader';
 import KPICard from '@/components/ui/KPICard';
 import Section from '@/components/ui/Section';
 import EmptyState from '@/components/ui/EmptyState';
+import { ShowMoreRows, ShowMoreGrid } from '@/components/ui/ShowMore';
 import { SimpleDonutChart, SimpleBarChart } from '@/components/charts/Charts';
 import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
@@ -210,24 +211,30 @@ export default function ExecutiveCommandCenter() {
         <Section number={1} title="Group Performance" subtitle="Live">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div>
-              <div className="text-xs text-gray-400 mb-2">Revenue by Category</div>
+              <div className="text-sm text-gray-400 mb-2">Group Revenue by Category</div>
               {revenueByCategory.length ? (
-                <SimpleDonutChart
-                  data={revenueByCategory}
-                  height={220}
-                  innerRadius={55}
-                  outerRadius={80}
-                  centerLabel="Revenue"
-                  centerValue={fmtGHS(fin?.revenueMtd ?? 0)}
-                />
+                <>
+                  <SimpleDonutChart data={revenueByCategory} height={200} innerRadius={45} outerRadius={65} centerLabel="Total" centerValue={fmtGHS(fin?.revenueMtd ?? 0)} />
+                  <ShowMoreGrid items={revenueByCategory} limit={7} wrapClass="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
+                    {(b, i) => (
+                      <div key={b.name} className="flex items-center gap-1.5 text-xs">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: ['#c8a951', '#22c55e', '#3b82f6', '#ef4444', '#eab308', '#8b5cf6'][i % 6] }} />
+                        <span className="text-gray-400 truncate">{b.name}</span>
+                        <span className="text-[var(--c-fg)] ml-auto">{fmtGHS(b.value)}</span>
+                      </div>
+                    )}
+                  </ShowMoreGrid>
+                </>
               ) : (
-                <EmptyState message="No revenue yet" hint="Add revenue entries in the Finance form." height={220} />
+                <EmptyState message="No revenue yet" hint="Add revenue entries in the Finance form." height={200} />
               )}
             </div>
             <div className="lg:col-span-2">
-              <div className="text-xs text-gray-400 mb-2">Sales by Store</div>
+              <div className="text-sm text-gray-400 mb-2">Sales by Store</div>
               {salesByStore.length ? (
-                <SimpleBarChart data={salesByStore} height={220} color="#c8a951" prefix="GHS " />
+                <div className="max-w-2xl">
+                  <SimpleBarChart data={salesByStore} height={220} color="#c8a951" prefix="GHS " />
+                </div>
               ) : (
                 <EmptyState message="No store sales yet" hint="Add Daily Store Sales in the Commercial form." height={220} />
               )}
@@ -236,52 +243,58 @@ export default function ExecutiveCommandCenter() {
         </Section>
 
         {/* Store performance */}
-        <Section number={2} title="Store Performance">
-          {storePerformance.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-[var(--c-border)] text-gray-500">
-                    <th className="text-left py-2 pr-3 font-medium">Store</th>
-                    <th className="text-right py-2 px-3 font-medium">Sales</th>
-                    <th className="text-right py-2 px-3 font-medium">Ops Score</th>
-                    <th className="text-right py-2 pl-3 font-medium">VM Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {storePerformance.map((s) => (
-                    <tr key={s.store} className="border-b border-[var(--c-hover)]">
-                      <td className="py-2 pr-3">{s.store}</td>
-                      <td className="py-2 px-3 text-right">{s.sales ? fmtGHS(s.sales) : '—'}</td>
-                      <td className="py-2 px-3 text-right">{s.ops || '—'}</td>
-                      <td className="py-2 pl-3 text-right">{s.vm || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <Section number={2} title="Store Performance &amp; People Health">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2">
+              <div className="text-sm text-gray-400 mb-2">Store Performance</div>
+              {storePerformance.length ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--c-border)] text-gray-500">
+                        <th className="text-left py-2 pr-1.5 font-medium">Store</th>
+                        <th className="text-right py-2 px-1.5 font-medium">Sales</th>
+                        <th className="text-right py-2 px-1.5 font-medium">Ops</th>
+                        <th className="text-right py-2 pl-1.5 font-medium">VM</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <ShowMoreRows items={storePerformance} limit={7} colSpan={4}>
+                        {(s) => (
+                          <tr key={s.store} className="border-b border-[var(--c-hover)]">
+                            <td className="py-2 pr-1.5">{s.store}</td>
+                            <td className="py-2 px-1.5 text-right">{s.sales ? fmtGHS(s.sales) : '—'}</td>
+                            <td className="py-2 px-1.5 text-right">{s.ops || '—'}</td>
+                            <td className="py-2 pl-1.5 text-right">{s.vm || '—'}</td>
+                          </tr>
+                        )}
+                      </ShowMoreRows>
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <EmptyState message="No store data yet" hint="Store sales (Commercial) and audits (Operations) populate this." height={140} />
+              )}
             </div>
-          ) : (
-            <EmptyState message="No store data yet" hint="Store sales (Commercial) and audits (Operations) populate this." height={140} />
-          )}
-        </Section>
-
-        {/* People Health (Operations HR) */}
-        <Section number={3} title="People Health" subtitle="Operations HR">
-          {(ops?.peopleHealth?.count ?? 0) > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              <KPICard label="Overall Score" value={pct(ops?.peopleHealth?.score ?? 0)} status={(ops?.peopleHealth?.score ?? 0) >= 90 ? 'green' : (ops?.peopleHealth?.score ?? 0) >= 70 ? 'yellow' : 'red'} small />
-              <KPICard label="Attendance" value={pct(ops?.peopleHealth?.attendance ?? 0)} small />
-              <KPICard label="Punctuality" value={pct(ops?.peopleHealth?.punctuality ?? 0)} small />
-              <KPICard label="Training" value={pct(ops?.peopleHealth?.training ?? 0)} small />
-              <KPICard label="Absences" value={(ops?.peopleHealth?.absences ?? 0) ? String(ops?.peopleHealth?.absences) : '—'} small />
+            <div>
+              <div className="text-sm text-gray-400 mb-2">People Health <span className="text-gray-600">· Operations HR</span></div>
+              {(ops?.peopleHealth?.count ?? 0) > 0 ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <KPICard label="Overall Score" value={pct(ops?.peopleHealth?.score ?? 0)} status={(ops?.peopleHealth?.score ?? 0) >= 90 ? 'green' : (ops?.peopleHealth?.score ?? 0) >= 70 ? 'yellow' : 'red'} small />
+                  <KPICard label="Attendance" value={pct(ops?.peopleHealth?.attendance ?? 0)} small />
+                  <KPICard label="Punctuality" value={pct(ops?.peopleHealth?.punctuality ?? 0)} small />
+                  <KPICard label="Training" value={pct(ops?.peopleHealth?.training ?? 0)} small />
+                  <KPICard label="Absences" value={(ops?.peopleHealth?.absences ?? 0) ? String(ops?.peopleHealth?.absences) : '—'} small />
+                </div>
+              ) : (
+                <EmptyState message="No people-health data yet" hint="Captured via Operations → Human Resources." height={120} />
+              )}
             </div>
-          ) : (
-            <EmptyState message="No people-health data yet" hint="Captured via Operations → Human Resources." height={120} />
-          )}
+          </div>
         </Section>
 
         {/* Category performance */}
-        <Section number={4} title="Category Performance">
+        <Section number={3} title="Category Performance">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
               <div className="text-xs text-gray-400 mb-2">Sales by Category</div>
@@ -312,7 +325,7 @@ export default function ExecutiveCommandCenter() {
         </Section>
 
         {/* Department snapshot */}
-        <Section number={5} title="Departments">
+        <Section number={4} title="Departments">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {departments.map((d) => (
               <Link
@@ -351,7 +364,7 @@ export default function ExecutiveCommandCenter() {
         </Section>
 
         {/* CEO Attention */}
-        <Section number={6} title="CEO Attention Index">
+        <Section number={5} title="CEO Attention Index">
           {ceoAttention.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -383,7 +396,7 @@ export default function ExecutiveCommandCenter() {
         </Section>
 
         {/* Manager Voices (latest strategic answers per store) */}
-        <Section number={7} title="Manager Voices" subtitle="Latest from store managers">
+        <Section number={6} title="Manager Voices" subtitle="Latest from store managers">
           {managerVoices.length ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {managerVoices.map((v, i) => (
@@ -411,7 +424,7 @@ export default function ExecutiveCommandCenter() {
         </Section>
 
         {/* Action Tracker (cross-department) */}
-        <Section number={8} title="Action Tracker">
+        <Section number={7} title="Action Tracker">
           {actionTracker.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -443,7 +456,7 @@ export default function ExecutiveCommandCenter() {
         </Section>
 
         {/* Store Manager CEO Answers (from selected Weekly Review) */}
-        <Section number={9} title="Store Manager — Key Insights" subtitle={wrHeading}>
+        <Section number={8} title="Store Manager — Key Insights" subtitle={wrHeading}>
           {wr && wr.count > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
               {/* Week history list */}
