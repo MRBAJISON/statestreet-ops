@@ -214,7 +214,7 @@ export default function ExecutiveCommandCenter() {
               <div className="text-sm text-gray-400 mb-2">Group Revenue by Category</div>
               {revenueByCategory.length ? (
                 <>
-                  <SimpleDonutChart data={revenueByCategory} height={200} innerRadius={45} outerRadius={65} centerLabel="Total" centerValue={fmtGHS(fin?.revenueMtd ?? 0)} />
+                  <SimpleDonutChart data={revenueByCategory} height={230} innerRadius={60} outerRadius={85} centerLabel="Total" centerValue={fmtGHS(fin?.revenueMtd ?? 0)} />
                   <ShowMoreGrid items={revenueByCategory} limit={7} wrapClass="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
                     {(b, i) => (
                       <div key={b.name} className="flex items-center gap-1.5 text-xs">
@@ -232,7 +232,7 @@ export default function ExecutiveCommandCenter() {
             <div className="lg:col-span-2">
               <div className="text-sm text-gray-400 mb-2">Sales by Store</div>
               {salesByStore.length ? (
-                <div className="max-w-2xl">
+                <div className="lg:pl-8">
                   <SimpleBarChart data={salesByStore} height={220} color="#c8a951" prefix="GHS " />
                 </div>
               ) : (
@@ -262,7 +262,7 @@ export default function ExecutiveCommandCenter() {
                       <ShowMoreRows items={storePerformance} limit={7} colSpan={4}>
                         {(s) => (
                           <tr key={s.store} className="border-b border-[var(--c-hover)]">
-                            <td className="py-2 pr-1.5">{s.store}</td>
+                            <td className="py-2 pr-1.5 max-w-[6.5rem] truncate" title={s.store}>{s.store}</td>
                             <td className="py-2 px-1.5 text-right">{s.sales ? fmtGHS(s.sales) : '—'}</td>
                             <td className="py-2 px-1.5 text-right">{s.ops || '—'}</td>
                             <td className="py-2 pl-1.5 text-right">{s.vm || '—'}</td>
@@ -318,7 +318,9 @@ export default function ExecutiveCommandCenter() {
         {/* Brand performance */}
         <Section title="Brand Performance" subtitle="Sales rolled up by brand">
           {brandPerformance.length ? (
-            <SimpleBarChart data={brandPerformance} height={240} color="#3b82f6" horizontal prefix="GHS " />
+            <div className="max-w-2xl">
+              <SimpleBarChart data={brandPerformance} height={240} color="#3b82f6" horizontal prefix="GHS " />
+            </div>
           ) : (
             <EmptyState message="No brand sales yet" hint="Set Brand → Stores in Settings so store sales roll up to a brand." height={200} />
           )}
