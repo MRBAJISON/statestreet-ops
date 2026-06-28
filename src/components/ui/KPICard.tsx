@@ -11,9 +11,11 @@ interface KPICardProps {
   status?: 'green' | 'yellow' | 'red';
   icon?: React.ReactNode;
   small?: boolean;
+  // When set (0–100+), draws a gold progress bar + % of target under the value.
+  progress?: number;
 }
 
-export default function KPICard({ label, value, target, change, changeLabel, prefix, suffix, status, icon, small }: KPICardProps) {
+export default function KPICard({ label, value, target, change, changeLabel, prefix, suffix, status, icon, small, progress }: KPICardProps) {
   const statusColor = status === 'green' ? 'text-green-500' : status === 'yellow' ? 'text-yellow-500' : status === 'red' ? 'text-red-500' : 'text-[var(--c-fg)]';
   const statusBorder = status === 'green' ? 'border-green-500/30' : status === 'yellow' ? 'border-yellow-500/30' : status === 'red' ? 'border-red-500/30' : 'border-[var(--c-border)]';
 
@@ -38,6 +40,14 @@ export default function KPICard({ label, value, target, change, changeLabel, pre
           </span>
         )}
       </div>
+      {progress !== undefined && (
+        <div className="mt-0.5">
+          <div className="h-1.5 rounded-full bg-[var(--c-hover)] overflow-hidden">
+            <div className="h-full bg-[#c8a951] rounded-full" style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} />
+          </div>
+          <div className="text-[0.65rem] text-[#c8a951] font-semibold mt-0.5 text-right">{progress.toFixed(0)}% of target</div>
+        </div>
+      )}
     </div>
   );
 }

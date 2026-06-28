@@ -77,6 +77,9 @@ export default function FinancePage() {
   const { data: m, loading } = useMetrics<FinanceMetricsData>('finance', period, anchor, store);
 
   const revenueMtd = m?.revenueMtd ?? 0;
+  // Group Revenue MTD is the same figure the executive board targets, so fall back
+  // to that target when finance hasn't set its own (finance.revenueMtd defaults 0).
+  const revTarget = TARGETS.finance.revenueMtd || TARGETS.executive.revenueMtd;
   const revenueByCategory = m?.revenueByCategory ?? [];
   const daily = m?.daily ?? [];
   const labels = m?.labels ?? [];
@@ -132,8 +135,9 @@ export default function FinancePage() {
           <KPICard
             label="Revenue MTD"
             value={dash(revenueMtd, fmtGHS)}
-            target={TARGETS.finance.revenueMtd ? fmtGHS(TARGETS.finance.revenueMtd) : undefined}
-            status={ragStatus(revenueMtd, TARGETS.finance.revenueMtd) ?? 'green'}
+            target={revTarget ? fmtGHS(revTarget) : undefined}
+            progress={revTarget ? (revenueMtd / revTarget) * 100 : undefined}
+            status={ragStatus(revenueMtd, revTarget) ?? 'green'}
             small
           />
           <KPICard
