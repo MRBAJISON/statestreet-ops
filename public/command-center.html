@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>StateStreet — Executive Command Center</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0c12; --bg-2:#0e111a; --panel:#121622; --panel-2:#161b29;
+    --line:#222a3d; --line-soft:#1b2233;
+    --txt:#e8edf7; --txt-2:#9aa6be; --txt-3:#5d6781;
+    --accent:#c9a227; --accent-2:#e8c75a;
+    --pos:#34d399; --neg:#f87171; --info:#5b9dff; --violet:#a78bfa; --pink:#f472b6; --teal:#2dd4bf; --amber:#f59e0b;
+    --radius:14px; --shadow:0 1px 0 rgba(255,255,255,.02), 0 12px 30px -12px rgba(0,0,0,.6);
+    font-synthesis:none;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(201,162,39,.06), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(91,157,255,.05), transparent 55%),
+      var(--bg);
+    color:var(--txt);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    display:grid;grid-template-columns:74px 1fr;min-height:100vh;
+  }
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:#222a3d;border-radius:8px}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  /* RAIL */
+  .rail{background:linear-gradient(180deg,var(--bg-2),var(--bg));border-right:1px solid var(--line-soft);
+    display:flex;flex-direction:column;align-items:center;padding:18px 0;gap:6px;position:sticky;top:0;height:100vh}
+  .brandmark{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#8c6f12);
+    display:grid;place-items:center;color:#1a1606;font-weight:800;font-size:15px;letter-spacing:-1px;margin-bottom:14px;
+    box-shadow:0 6px 18px -6px rgba(201,162,39,.6)}
+  .nav{display:flex;flex-direction:column;gap:4px;width:100%;align-items:center;flex:1}
+  .nav button{width:46px;height:46px;border:0;border-radius:12px;background:transparent;color:var(--txt-3);
+    cursor:pointer;display:grid;place-items:center;position:relative;transition:.15s}
+  .nav button svg{width:21px;height:21px}
+  .nav button:hover{color:var(--txt);background:var(--panel)}
+  .nav button.active{color:var(--accent-2);background:var(--panel-2)}
+  .nav button.active::before{content:"";position:absolute;left:-14px;top:9px;bottom:9px;width:3px;background:var(--accent);border-radius:0 3px 3px 0}
+  .nav button .tip{position:absolute;left:56px;white-space:nowrap;background:#000;color:#fff;font-size:12px;padding:5px 9px;
+    border-radius:7px;opacity:0;pointer-events:none;transform:translateX(-6px);transition:.15s;z-index:50;border:1px solid var(--line)}
+  .nav button:hover .tip{opacity:1;transform:translateX(0)}
+
+  /* SHELL */
+  .shell{display:flex;flex-direction:column;min-width:0}
+  .topbar{position:sticky;top:0;z-index:40;background:rgba(10,12,18,.82);backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line-soft);display:flex;align-items:center;gap:14px;padding:14px 22px}
+  .title-block h1{font-size:15px;font-weight:700;letter-spacing:.2px;display:flex;align-items:center;gap:9px}
+  .live{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--pos);background:rgba(52,211,153,.1);
+    padding:3px 8px;border-radius:20px;font-weight:600;border:1px solid rgba(52,211,153,.2)}
+  .live .dot{width:6px;height:6px;border-radius:50%;background:var(--pos);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .title-block p{font-size:12px;color:var(--txt-3);margin-top:2px}
+  .spacer{flex:1}
+  .seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px}
+  .seg button{border:0;background:transparent;color:var(--txt-2);font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:7px;cursor:pointer;transition:.12s}
+  .seg button.on{background:var(--panel-2);color:var(--txt);box-shadow:var(--shadow)}
+  .selectwrap{position:relative}
+  select.ctl,.ctl{appearance:none;background:var(--panel);border:1px solid var(--line);color:var(--txt);font-size:12.5px;
+    font-weight:600;padding:8px 30px 8px 12px;border-radius:10px;cursor:pointer;font-family:inherit}
+  .selectwrap::after{content:"▾";position:absolute;right:11px;top:9px;color:var(--txt-3);pointer-events:none;font-size:11px}
+  .iconbtn{width:38px;height:38px;border:1px solid var(--line);background:var(--panel);border-radius:10px;color:var(--txt-2);
+    cursor:pointer;display:grid;place-items:center;position:relative}
+  .iconbtn:hover{color:var(--txt)}
+  .iconbtn .badge{position:absolute;top:-5px;right:-5px;background:var(--neg);color:#fff;font-size:10px;font-weight:700;
+    min-width:16px;height:16px;border-radius:9px;display:grid;place-items:center;padding:0 4px}
+  .avatar{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-weight:700;font-size:11px;
+    color:var(--accent-2);border:1px solid var(--line);background:var(--panel-2)}
+
+  .content{padding:22px;display:flex;flex-direction:column;gap:18px}
+
+  /* MISSION STRIP */
+  .mission{display:flex;align-items:center;gap:16px;background:linear-gradient(180deg,var(--panel),var(--bg-2));
+    border:1px solid var(--line-soft);border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow)}
+  .mission .m1{font-size:12px;font-weight:700;letter-spacing:1.5px;color:var(--accent-2);text-transform:uppercase}
+  .mission .sep{width:1px;height:24px;background:var(--line)}
+  .mission .m2{font-size:12.5px;color:var(--txt-2)}
+  .mission .m2 b{color:var(--txt)}
+
+  /* KPI ROW */
+  .kpis{display:grid;grid-template-columns:repeat(7,1fr);gap:12px}
+  .kpi{background:linear-gradient(180deg,var(--panel),var(--bg-2));border:1px solid var(--line-soft);border-radius:var(--radius);
+    padding:15px;position:relative;overflow:hidden;box-shadow:var(--shadow)}
+  .kpi .lbl{font-size:10.5px;color:var(--txt-3);font-weight:600;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px}
+  .kpi .lbl .ic{width:20px;height:20px;border-radius:6px;display:grid;place-items:center;background:var(--panel-2);font-size:11px}
+  .kpi .val{font-size:23px;font-weight:750;margin-top:9px;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+  .kpi .sub{display:flex;align-items:center;gap:7px;margin-top:6px;font-size:11.5px;color:var(--txt-2)}
+  .kpi .sub2{font-size:11px;color:var(--txt-3);margin-top:3px}
+  .kpi .pbar{margin-top:9px;height:5px;border-radius:4px;background:var(--panel-2);overflow:hidden}
+  .kpi .pbar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+  .kpi .pct{font-size:10.5px;font-weight:700;color:var(--accent-2);text-align:right;margin-top:3px}
+  .chip{display:inline-flex;align-items:center;gap:3px;font-weight:700;padding:2px 6px;border-radius:6px;font-size:11px}
+  .chip.up{color:var(--pos);background:rgba(52,211,153,.1)}
+  .chip.down{color:var(--neg);background:rgba(248,113,113,.1)}
+  .spark{position:absolute;right:0;bottom:0;width:100%;height:34px;opacity:.5}
+
+  /* GRID + PANELS */
+  .panel{background:linear-gradient(180deg,var(--panel),var(--bg-2));border:1px solid var(--line-soft);border-radius:var(--radius);
+    padding:18px;box-shadow:var(--shadow);min-width:0}
+  .phead{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .phead h3{font-size:13.5px;font-weight:700;letter-spacing:.2px}
+  .phead .num{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:5px;background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    color:#1a1606;font-size:11px;font-weight:800;margin-right:8px}
+  .phead .meta{font-size:11.5px;color:var(--txt-3);margin-top:3px;font-weight:500}
+  .pill{font-size:11px;font-weight:600;color:var(--txt-2);background:var(--panel-2);border:1px solid var(--line);padding:4px 9px;border-radius:7px;cursor:pointer}
+  .pill.on{color:var(--accent-2);border-color:rgba(201,162,39,.4)}
+
+  .bento{display:grid;grid-template-columns:repeat(12,1fr);gap:16px;align-items:stretch}
+  .bento .panel{display:flex;flex-direction:column}
+  .bento .panel .canvas-wrap,.bento .panel .fill{flex:1}
+  .c3{grid-column:span 3}.c4{grid-column:span 4}.c5{grid-column:span 5}.c6{grid-column:span 6}
+  .c7{grid-column:span 7}.c8{grid-column:span 8}.c12{grid-column:span 12}
+  @media(max-width:1300px){.kpis{grid-template-columns:repeat(4,1fr)}}
+  @media(max-width:1200px){.bento>*{grid-column:span 12 !important}}
+  @media(max-width:760px){.kpis{grid-template-columns:repeat(2,1fr)}}
+
+  .canvas-wrap{position:relative;height:260px}
+  .canvas-wrap.sm{height:210px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px}
+  .legend span{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--txt-2)}
+  .legend i{width:9px;height:9px;border-radius:3px}
+
+  /* leaderboard */
+  .store{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line-soft)}
+  .store:last-child{border-bottom:0}
+  .store .rank{width:20px;color:var(--txt-3);font-weight:700;font-size:13px;text-align:center}
+  .store .flag{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:14px;background:var(--panel-2);border:1px solid var(--line)}
+  .store .info{flex:1;min-width:0}
+  .store .info b{font-size:12.5px;font-weight:650;display:block}
+  .store .info small{font-size:11px;color:var(--txt-3)}
+  .store .bar{height:5px;background:var(--panel-2);border-radius:4px;overflow:hidden;margin-top:5px}
+  .store .bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+  .store .amt{text-align:right;font-weight:700;font-size:12.5px;font-variant-numeric:tabular-nums}
+  .store .amt small{display:block;font-size:10.5px;font-weight:600;margin-top:2px}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:10.5px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;padding:0 10px 11px;border-bottom:1px solid var(--line-soft)}
+  td{padding:11px 10px;border-bottom:1px solid var(--line-soft);font-size:12.5px}
+  tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:var(--panel-2)}
+  .tag{font-size:10.5px;font-weight:650;padding:3px 8px;border-radius:6px;display:inline-block}
+  .tag.cat{background:rgba(167,139,250,.12);color:var(--violet)}
+  .status{font-size:11.5px;font-weight:650;display:inline-flex;align-items:center;gap:6px}
+  .status .d{width:7px;height:7px;border-radius:50%}
+  .prio{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:6px}
+
+  /* feed */
+  .feed{display:flex;flex-direction:column;gap:2px;max-height:320px;overflow:auto}
+  .alert{display:flex;gap:11px;padding:11px;border-radius:10px;transition:.12s}
+  .alert:hover{background:var(--panel-2)}
+  .alert .ai{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex-shrink:0}
+  .alert .ab{flex:1;min-width:0}
+  .alert .ab b{font-size:12px;font-weight:650;display:block}
+  .alert .ab p{font-size:11.5px;color:var(--txt-3);margin-top:2px;line-height:1.4}
+  .alert .at{font-size:10.5px;color:var(--txt-3);white-space:nowrap}
+
+  /* stat tiles (people health, ratios) */
+  .statgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .stat{background:var(--panel-2);border:1px solid var(--line-soft);border-radius:10px;padding:11px 12px}
+  .stat .l{font-size:10px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+  .stat .v{font-size:19px;font-weight:750;margin-top:5px;font-variant-numeric:tabular-nums}
+  .stat .rt{font-size:11px;font-weight:700;margin-top:4px}
+
+  /* department cards */
+  .deptgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .deptcard{background:var(--panel-2);border:1px solid var(--line-soft);border-radius:11px;padding:14px;cursor:pointer;transition:.15s}
+  .deptcard:hover{border-color:rgba(201,162,39,.45);transform:translateY(-2px)}
+  .deptcard b{font-size:13px;font-weight:650}
+  .deptcard .m{font-size:10px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.5px;margin-top:10px}
+  .deptcard .vv{font-size:17px;font-weight:750;color:var(--accent-2);margin-top:2px}
+
+  /* manager voices */
+  .voicegrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .voice{background:var(--panel-2);border:1px solid var(--line-soft);border-radius:11px;padding:14px;display:flex;flex-direction:column;gap:10px}
+  .voice .vh b{font-size:12.5px;font-weight:650;display:block}
+  .voice .vh small{font-size:10.5px;color:var(--txt-3)}
+  .voice .qa .q{font-size:10.5px;color:var(--accent-2);font-weight:600;line-height:1.35}
+  .voice .qa .a{font-size:12px;color:var(--txt-2);margin-top:3px;line-height:1.45}
+
+  /* weekly review insights */
+  .weekrow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .weekbtn{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:7px 12px;font-size:11.5px;color:var(--txt-2);cursor:pointer;transition:.12s}
+  .weekbtn:hover{color:var(--txt)}
+  .weekbtn.on{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#1a1606;border-color:transparent;font-weight:700}
+  .inscol{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+  .ins{background:var(--panel-2);border:1px solid var(--line-soft);border-radius:11px;padding:14px}
+  .ins .ih{font-size:11.5px;color:var(--accent-2);font-weight:650;margin-bottom:10px}
+  .ins ul{list-style:none;display:flex;flex-direction:column;gap:7px}
+  .ins li{font-size:12.5px;color:var(--txt);display:flex;align-items:center;gap:8px}
+  .ins li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent-2);flex-shrink:0}
+  .planrow{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+  .plan{background:var(--panel-2);border:1px solid var(--line-soft);border-radius:11px;padding:13px}
+  .plan .q{font-size:11px;color:var(--accent-2);font-weight:600;margin-bottom:4px}
+  .plan .a{font-size:12.5px;color:var(--txt-2);line-height:1.5}
+
+  .sublabel{font-size:12px;color:var(--txt-2);font-weight:600;margin:2px 0 12px}
+
+  .view{display:none}
+  .view.active{display:flex;flex-direction:column;gap:18px}
+  .placeholder{display:grid;place-items:center;padding:80px 20px;color:var(--txt-3);text-align:center}
+  .placeholder svg{width:44px;height:44px;margin-bottom:14px;opacity:.5}
+  .placeholder h3{font-size:16px;color:var(--txt-2);margin-bottom:6px}
+  .placeholder p{font-size:13px;max-width:380px;line-height:1.5}
+</style>
+</head>
+<body>
+
+<!-- RAIL -->
+<aside class="rail">
+  <div class="brandmark">SS</div>
+  <nav class="nav" id="nav">
+    <button class="active" data-view="overview"><span class="tip">Executive Command Center</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></button>
+    <button data-view="finance"><span class="tip">Finance</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5a2.5 2 0 012.5-1.5c1.4 0 2.5.7 2.5 1.8M14.5 14.5a2.5 2 0 01-2.5 1.5c-1.4 0-2.5-.7-2.5-1.8"/></svg></button>
+    <button data-view="commercial"><span class="tip">Commercial</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 7v5"/><path d="M21 7h-5"/></svg></button>
+    <button data-view="marketing"><span class="tip">Marketing</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l18-8-5 18-4-7-9-3z"/></svg></button>
+    <button data-view="operations"><span class="tip">Operations</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg></button>
+    <button data-view="inventory"><span class="tip">Inventory</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="6" rx="1.5"/><path d="M5 10v9a1 1 0 001 1h12a1 1 0 001-1v-9M9 14h6"/></svg></button>
+    <button data-view="brand"><span class="tip">Brand Health</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 21l-4.9-2.6.9-5.5-4-3.9 5.5-.8L12 3z"/></svg></button>
+  </nav>
+  <button class="iconbtn" style="border:0;background:transparent">
+    <svg viewBox="0 0 24 24" width="21" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7.7 2 2 0 11-3.8 0 1.6 1.6 0 00-2.7-.7l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.6 1.6 0 005 15a2 2 0 110-3.8 1.6 1.6 0 00.7-2.7l-.1-.1A2 2 0 118.3 5.6l.1.1A1.6 1.6 0 0011 5a2 2 0 113.8 0 1.6 1.6 0 002.7.7l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 00.7 2.7 2 2 0 110 3.8z"/></svg>
+  </button>
+</aside>
+
+<!-- SHELL -->
+<div class="shell">
+  <header class="topbar">
+    <div class="title-block">
+      <h1 id="viewTitle">Executive Command Center <span class="live"><span class="dot"></span>LIVE</span></h1>
+      <p id="viewSub">All brands · All stores · Month-to-date · updated 2m ago</p>
+    </div>
+    <div class="spacer"></div>
+    <div class="selectwrap">
+      <select class="ctl" id="brandSel">
+        <option>All Brands</option><option>Boulevard Men</option><option>Boulevard Women</option>
+        <option>D'Angelo</option><option>Woodpeckers</option><option>Carbon Shoes</option>
+      </select>
+    </div>
+    <div class="selectwrap">
+      <select class="ctl" id="storeSel">
+        <option>All Stores</option><option>Dzorwulu Men</option><option>East Legon Men</option><option>Labone Men</option>
+        <option>Boulevard Women Labone</option><option>Boulevard Women Dzorwulu</option><option>D'Angelo Palace</option><option>Woodpeckers</option>
+      </select>
+    </div>
+    <div class="seg" id="range"><button>D</button><button>W</button><button class="on">M</button><button>Q</button><button>Y</button><button data-custom="1">Custom</button></div>
+    <span id="dateRange" style="display:none;align-items:center;gap:6px">
+      <input type="date" class="ctl" id="dateFrom" style="padding:7px 10px;color-scheme:dark" aria-label="Start date">
+      <span style="color:var(--txt-3);font-size:12px">to</span>
+      <input type="date" class="ctl" id="dateTo" style="padding:7px 10px;color-scheme:dark" aria-label="End date">
+    </span>
+    <button class="iconbtn"><span class="badge">5</span>
+      <svg viewBox="0 0 24 24" width="19" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+    </button>
+    <div class="avatar">CEO</div>
+  </header>
+
+  <main class="content">
+    <section class="view active" id="view-overview">
+
+      <!-- MISSION -->
+      <div class="mission">
+        <span class="m1">One Vision · One Team · One Destination</span>
+        <span class="sep"></span>
+        <span class="m2"><b>Mission:</b> Build Ghana's most trusted premium retail group.</span>
+      </div>
+
+      <!-- KPI BAR (7) -->
+      <div class="kpis">
+        <div class="kpi"><div class="lbl"><span class="ic">💰</span>Group Revenue (MTD)</div>
+          <div class="val">₵ 4.82M</div><div class="sub2">Target: ₵ 4.45M</div>
+          <div class="pbar"><i style="width:100%"></i></div><div class="pct">108.3%</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">🪙</span>Gross Profit (MTD)</div>
+          <div class="val">₵ 2.10M</div><div class="sub2">Target: ₵ 2.18M</div>
+          <div class="pbar"><i style="width:96%"></i></div><div class="pct">96.3%</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">📈</span>Operating Profit (MTD)</div>
+          <div class="val">₵ 1.34M</div><div class="sub2">Target: ₵ 1.40M</div>
+          <div class="pbar"><i style="width:95%"></i></div><div class="pct">95.7%</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">🧮</span>Group GM% (MTD)</div>
+          <div class="val">58.2%</div><div class="sub"><span class="chip up">▲ 1.8pp</span></div>
+          <div class="sub2">Target: 56.4%</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">🛒</span>Sell-Through (YTD)</div>
+          <div class="val">71.3%</div><div class="sub"><span class="chip up">▲ 3.2pp</span></div>
+          <div class="sub2">Target: 68.0%</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">🏬</span>Active Stores</div>
+          <div class="val">7</div><div class="sub2">Total Stores: 7</div>
+          <div class="sub2">Open: 7 · Closed: 0</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">👥</span>Total Employees</div>
+          <div class="val">96</div><div class="sub2">On Duty: 88</div>
+          <div class="sub2">Absent: 8</div></div>
+      </div>
+
+      <!-- BENTO -->
+      <div class="bento">
+
+        <!-- Trend + Revenue by Category -->
+        <div class="panel c8">
+          <div class="phead"><div><h3><span class="num">1</span>Group Revenue & Margin Trend</h3><div class="meta">Daily net revenue vs gross margin · last 14 days · Live</div></div>
+            <div style="display:flex;gap:6px"><span class="pill on">Revenue</span><span class="pill">Margin</span></div></div>
+          <div class="canvas-wrap"><canvas id="trend"></canvas></div>
+        </div>
+        <div class="panel c4">
+          <div class="phead"><div><h3>Revenue by Category</h3><div class="meta">Share of group revenue</div></div></div>
+          <div class="canvas-wrap"><canvas id="catDonut"></canvas></div>
+          <div class="legend" id="catLegend"></div>
+        </div>
+
+        <!-- Sales by Store / Sales by Brand / Payment Mix -->
+        <div class="panel c4">
+          <div class="phead"><div><h3>Sales by Store</h3><div class="meta">Net sales MTD · ₵</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="storeBar"></canvas></div>
+        </div>
+        <div class="panel c4">
+          <div class="phead"><div><h3>Brand Performance</h3><div class="meta">Sales rolled up by brand</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="brandBar"></canvas></div>
+        </div>
+        <div class="panel c4">
+          <div class="phead"><div><h3>Payment Mix</h3><div class="meta">How customers pay</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="payDonut"></canvas></div>
+        </div>
+
+        <!-- Category Performance -->
+        <div class="panel c6">
+          <div class="phead"><div><h3><span class="num">3</span>Sales by Category</h3><div class="meta">Top categories · ₵ MTD</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="catSales"></canvas></div>
+        </div>
+        <div class="panel c6">
+          <div class="phead"><div><h3>Sell-Through by Category</h3><div class="meta">% of received stock sold</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="catSell"></canvas></div>
+        </div>
+
+        <!-- Store Performance table + People Health -->
+        <div class="panel c8">
+          <div class="phead"><div><h3><span class="num">2</span>Store Performance</h3><div class="meta">Sales + audit scores · this period</div></div>
+            <span class="pill">7 stores</span></div>
+          <table>
+            <thead><tr><th>Store</th><th>Brand</th><th>Sales</th><th>Ops</th><th>VM</th><th>vs Target</th></tr></thead>
+            <tbody id="storeTbl"></tbody>
+          </table>
+        </div>
+        <div class="panel c4">
+          <div class="phead"><div><h3>People Health</h3><div class="meta">Operations · HR</div></div></div>
+          <div class="statgrid" id="peopleGrid"></div>
+        </div>
+
+        <!-- Departments + Profitability Ratios -->
+        <div class="panel c8">
+          <div class="phead"><div><h3><span class="num">4</span>Departments</h3><div class="meta">Jump to any department dashboard</div></div></div>
+          <div class="deptgrid" id="deptGrid"></div>
+        </div>
+        <div class="panel c4">
+          <div class="phead"><div><h3>Profitability Ratios</h3><div class="meta">Rated · best on Year / All</div></div></div>
+          <div class="statgrid" id="ratioGrid" style="grid-template-columns:1fr"></div>
+        </div>
+
+        <!-- CEO Attention + Operations Feed -->
+        <div class="panel c8">
+          <div class="phead"><div><h3><span class="num">5</span>CEO Attention Index</h3><div class="meta">Issues escalated for the CEO</div></div></div>
+          <table>
+            <thead><tr><th>Priority</th><th>Issue</th><th>Impact</th><th>Owner</th><th>Status</th></tr></thead>
+            <tbody id="ceoTbl"></tbody>
+          </table>
+        </div>
+        <div class="panel c4">
+          <div class="phead"><div><h3>Operations Feed</h3><div class="meta">Live across the group</div></div></div>
+          <div class="feed" id="feed"></div>
+        </div>
+
+        <!-- Action Tracker -->
+        <div class="panel c12">
+          <div class="phead"><div><h3><span class="num">7</span>Action Tracker</h3><div class="meta">Cross-department · Marketing + Operations</div></div></div>
+          <table>
+            <thead><tr><th>Dept</th><th>Task</th><th>Owner</th><th>Priority</th><th>Status</th></tr></thead>
+            <tbody id="actTbl"></tbody>
+          </table>
+        </div>
+
+        <!-- Manager Voices -->
+        <div class="panel c12">
+          <div class="phead"><div><h3><span class="num">6</span>Manager Voices</h3><div class="meta">Latest strategic answers from store managers</div></div></div>
+          <div class="voicegrid" id="voiceGrid"></div>
+        </div>
+
+        <!-- Store Manager Key Insights -->
+        <div class="panel c12">
+          <div class="phead"><div><h3><span class="num">8</span>Store Manager — Key Insights</h3><div class="meta" id="wrHeading">Latest · D'Angelo Palace · week ending 21 Jun 2026</div></div></div>
+          <div class="weekrow" id="weekRow"></div>
+          <div class="statgrid" id="wrKpis" style="grid-template-columns:repeat(4,1fr)"></div>
+          <div class="inscol" id="insCol"></div>
+          <div class="sublabel" style="margin-top:16px">Manager's Plan</div>
+          <div class="planrow" id="planRow"></div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============ FINANCE ============ -->
+    <section class="view" id="view-finance">
+      <div class="mission">
+        <span class="m1">Financial Discipline · Profitable Growth · Cash Confidence</span>
+        <span class="sep"></span>
+        <span class="m2"><b>Finance Mission:</b> Maximize profitability, protect cash, and drive sustainable value.</span>
+      </div>
+
+      <div class="kpis" style="grid-template-columns:repeat(6,1fr)">
+        <div class="kpi"><div class="lbl"><span class="ic">💰</span>Revenue MTD</div><div class="val">₵ 4.82M</div>
+          <div class="sub2">Target: ₵ 4.45M</div><div class="pbar"><i style="width:100%"></i></div><div class="pct">108.3%</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">🪙</span>Gross Profit</div><div class="val">₵ 2.10M</div>
+          <div class="sub"><span class="chip up">43.6% margin</span></div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">📈</span>Operating Profit</div><div class="val">₵ 1.34M</div>
+          <div class="sub"><span class="chip up">27.8% margin</span></div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">🧾</span>Debtors</div><div class="val">₵ 640k</div><div class="sub2">Receivables outstanding</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">📑</span>Creditors</div><div class="val">₵ 420k</div><div class="sub2">Payables outstanding</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">🛒</span>Transactions</div><div class="val">3,180</div><div class="sub2">MTD across stores</div></div>
+      </div>
+
+      <div class="bento">
+        <!-- 1 Revenue -->
+        <div class="panel c8"><div class="phead"><div><h3><span class="num">1</span>Daily Revenue</h3><div class="meta">MTD · ₵</div></div></div>
+          <div class="canvas-wrap"><canvas id="f_daily"></canvas></div></div>
+        <div class="panel c4"><div class="phead"><div><h3>Revenue by Category</h3><div class="meta">Share of MTD revenue</div></div></div>
+          <div class="canvas-wrap"><canvas id="f_catDonut"></canvas></div><div class="legend" id="f_catLegend"></div></div>
+
+        <!-- 2 Profitability -->
+        <div class="panel c6"><div class="phead"><div><h3><span class="num">2</span>Revenue → Profit Bridge</h3><div class="meta">MTD · ₵</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="f_bridge"></canvas></div></div>
+        <div class="panel c3"><div class="phead"><div><h3>Key Margins</h3><div class="meta">MTD</div></div></div>
+          <div class="fill" id="f_margins"></div></div>
+        <div class="panel c3"><div class="phead"><div><h3>Profitability Ratios</h3><div class="meta">Rated</div></div></div>
+          <div class="statgrid" id="f_ratios" style="grid-template-columns:1fr"></div></div>
+
+        <!-- 3 Cash flow -->
+        <div class="panel c8"><div class="phead"><div><h3><span class="num">3</span>Weekly Net Cash Flow</h3><div class="meta">Inflows − outflows · ₵</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="f_cash"></canvas></div></div>
+        <div class="panel c4"><div class="phead"><div><h3>Cash Position</h3><div class="meta">MTD</div></div></div>
+          <div class="statgrid" id="f_cashTiles"></div></div>
+
+        <!-- Payments by mode -->
+        <div class="panel c8"><div class="phead"><div><h3>Payments by Mode</h3><div class="meta">Takings · all stores · ₵</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="f_pay"></canvas></div></div>
+        <div class="panel c4"><div class="phead"><div><h3>Total Collected</h3><div class="meta">All modes</div></div></div>
+          <div class="fill" id="f_payList"></div></div>
+
+        <!-- 4 Expense control -->
+        <div class="panel c8"><div class="phead"><div><h3><span class="num">4</span>Spend by Category</h3><div class="meta">Actual vs budget · ₵</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="f_spend"></canvas></div></div>
+        <div class="panel c4"><div class="phead"><div><h3>OpEx Mix</h3><div class="meta">Share of total OpEx</div></div></div>
+          <div class="fill" id="f_opex"></div></div>
+
+        <!-- Budget vs actual -->
+        <div class="panel c12"><div class="phead"><div><h3>Budget vs Actual</h3><div class="meta">Annual budgets · YTD spend</div></div></div>
+          <table><thead><tr><th>Item</th><th>Budget</th><th>Spent</th><th>Remaining</th><th>Status</th></tr></thead><tbody id="f_budget"></tbody></table></div>
+
+        <!-- 5 Store P&L + debtor aging -->
+        <div class="panel c4"><div class="phead"><div><h3><span class="num">5</span>Revenue by Store</h3><div class="meta">MTD · ₵</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="f_revStore"></canvas></div></div>
+        <div class="panel c4"><div class="phead"><div><h3>Expenses by Store</h3><div class="meta">MTD · ₵</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="f_expStore"></canvas></div></div>
+        <div class="panel c4"><div class="phead"><div><h3>Debtor Aging</h3><div class="meta">Receivables by age</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="f_debtor"></canvas></div></div>
+
+        <!-- Forecast -->
+        <div class="panel c12"><div class="phead"><div><h3><span class="num">6</span>Forecast & Outlook</h3><div class="meta">Month-end projection</div></div></div>
+          <div class="statgrid" id="f_forecast" style="grid-template-columns:repeat(4,1fr)"></div></div>
+      </div>
+    </section>
+    <!-- ============ COMMERCIAL ============ -->
+    <section class="view" id="view-commercial">
+      <div class="mission">
+        <span class="m1">Right Product, Right Store · Right Price, Right Time</span>
+        <span class="sep"></span>
+        <span class="m2"><b>Commercial Mission:</b> Drive profitable sell-through across every store and category.</span>
+      </div>
+
+      <div class="kpis" style="grid-template-columns:repeat(7,1fr)">
+        <div class="kpi"><div class="lbl"><span class="ic">💵</span>Group Sales</div><div class="val">₵ 3.41M</div><div class="sub2">Target: ₵ 3.30M</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">🧺</span>ATV</div><div class="val">₵ 1,072</div><div class="sub2">Avg transaction</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">🛍️</span>UPT</div><div class="val">2.4</div><div class="sub2">Units per txn</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">🎯</span>Conversion</div><div class="val">28.6%</div><div class="sub2">Visit → buy</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">🧮</span>Gross Margin</div><div class="val">58.2%</div><div class="sub2">Blended</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">📦</span>Sell-Through</div><div class="val">71.3%</div><div class="sub2">YTD</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">🏷️</span>Active SKUs</div><div class="val">842</div><div class="sub2">Live this period</div></div>
+      </div>
+
+      <div class="bento">
+        <!-- 1 Sales performance -->
+        <div class="panel c4"><div class="phead"><div><h3><span class="num">1</span>Sales by Store</h3><div class="meta">MTD · ₵</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="c_salesStore"></canvas></div></div>
+        <div class="panel c4"><div class="phead"><div><h3>Category Sales Mix</h3><div class="meta">Top categories · ₵</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="c_catMix"></canvas></div></div>
+        <div class="panel c4"><div class="phead"><div><h3>Brand Performance</h3><div class="meta">Rolled up by brand · ₵</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="c_brand"></canvas></div></div>
+
+        <!-- 2 Sell-through -->
+        <div class="panel c4"><div class="phead"><div><h3><span class="num">2</span>Sell-Through by Category</h3><div class="meta">% sold</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="c_sellDonut"></canvas></div></div>
+        <div class="panel c8"><div class="phead"><div><h3>Sell-Through Detail</h3><div class="meta">% of received stock sold by category</div></div></div>
+          <div class="fill" id="c_sellGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-content:start"></div></div>
+
+        <!-- 3 SKU performance -->
+        <div class="panel c4"><div class="phead"><div><h3><span class="num">3</span>Top Selling</h3><div class="meta">By value</div></div></div>
+          <table><thead><tr><th>Item</th><th>Sales</th><th>Units</th></tr></thead><tbody id="c_top"></tbody></table></div>
+        <div class="panel c4"><div class="phead"><div><h3>Low Moving</h3><div class="meta">60–180 days</div></div></div>
+          <table><thead><tr><th>Item</th><th>Sales</th><th>Days</th></tr></thead><tbody id="c_low"></tbody></table></div>
+        <div class="panel c4"><div class="phead"><div><h3>Dead Stock</h3><div class="meta">180 days+</div></div></div>
+          <table><thead><tr><th>Item</th><th>Stock</th><th>Days</th></tr></thead><tbody id="c_dead"></tbody></table></div>
+
+        <!-- Commercial insight -->
+        <div class="panel c12"><div class="phead"><div><h3>Commercial Insight on Items</h3><div class="meta">Performance & promo guidance</div></div></div>
+          <table><thead><tr><th>Item</th><th>Category</th><th>Sell-Through</th><th>Performance</th><th>Promo</th><th>Insight</th></tr></thead><tbody id="c_insight"></tbody></table></div>
+
+        <!-- 4 Accountability -->
+        <div class="panel c12"><div class="phead"><div><h3><span class="num">4</span>Accountability</h3><div class="meta">KPI ownership across the team</div></div></div>
+          <table><thead><tr><th>Member</th><th>Role</th><th>KPI</th><th>Target</th><th>Actual</th><th>Status</th></tr></thead><tbody id="c_acct"></tbody></table></div>
+
+        <!-- 5 Weekly review -->
+        <div class="panel c4"><div class="phead"><div><h3><span class="num">5</span>Weekly Review</h3><div class="meta">Latest · D'Angelo Palace</div></div></div>
+          <div class="statgrid" id="c_wrKpis" style="grid-template-columns:1fr 1fr"></div></div>
+        <div class="panel c5"><div class="phead"><div><h3>Revenue by Category</h3><div class="meta">This week · ₵</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="c_wrCat"></canvas></div></div>
+        <div class="panel c3"><div class="phead"><div><h3>Category Ratings</h3><div class="meta">Manager scores</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="c_wrRating"></canvas></div></div>
+
+        <!-- 6 Achievement trend -->
+        <div class="panel c12"><div class="phead"><div><h3><span class="num">6</span>Sales Achievement Trend</h3><div class="meta">Weekly target achievement · gold line = 100% target</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="c_trend"></canvas></div></div>
+
+        <!-- 7 Customer database -->
+        <div class="panel c4"><div class="phead"><div><h3><span class="num">7</span>Customer Database</h3><div class="meta">Walk-in captures</div></div></div>
+          <div class="statgrid" id="c_custKpis" style="grid-template-columns:1fr 1fr;margin-bottom:14px"></div>
+          <div class="canvas-wrap sm" style="height:170px"><canvas id="c_leadSource"></canvas></div></div>
+        <div class="panel c8"><div class="phead"><div><h3>Recent Customers</h3><div class="meta">Latest captures</div></div></div>
+          <table><thead><tr><th>Date</th><th>Name</th><th>Type</th><th>Item</th><th>Source</th><th>Store</th></tr></thead><tbody id="c_cust"></tbody></table></div>
+      </div>
+    </section>
+    <!-- ============ MARKETING ============ -->
+    <section class="view" id="view-marketing">
+      <div class="mission">
+        <span class="m1">Demand Generation · Brand Building · Customer Acquisition</span>
+        <span class="sep"></span>
+        <span class="m2"><b>Marketing Mission:</b> Generate qualified demand and grow brand equity efficiently.</span>
+      </div>
+
+      <div class="kpis" style="grid-template-columns:repeat(6,1fr)">
+        <div class="kpi"><div class="lbl"><span class="ic">🎯</span>Total Leads</div><div class="val">1,240</div><div class="sub2">MTD captured</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">✅</span>Converted</div><div class="val">320</div><div class="sub2">25.8% of leads</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">💸</span>Campaign Revenue</div><div class="val">₵ 980k</div><div class="sub2">Influenced</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">📣</span>Marketing Spend</div><div class="val">₵ 245k</div><div class="sub2">MTD</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">📈</span>ROAS</div><div class="val">4.0x</div><div class="sub"><span class="chip up">healthy</span></div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">👁️</span>Total Reach</div><div class="val">420k</div><div class="sub2">Across channels</div></div>
+      </div>
+
+      <div class="bento">
+        <!-- 1 Lead generation -->
+        <div class="panel c6"><div class="phead"><div><h3><span class="num">1</span>Lead Channel Mix</h3><div class="meta">Leads by source</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="m_channelMix"></canvas></div></div>
+        <div class="panel c6"><div class="phead"><div><h3>Campaign Funnel</h3><div class="meta">Reach → revenue influenced</div></div></div>
+          <div class="fill" id="m_funnel" style="margin-top:4px"></div></div>
+
+        <!-- 2 Lead qualification -->
+        <div class="panel c4"><div class="phead"><div><h3><span class="num">2</span>Lead Qualification</h3><div class="meta">Total → qualified → converted</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="m_qualFunnel"></canvas></div></div>
+        <div class="panel c4"><div class="phead"><div><h3>Funnel Rates</h3><div class="meta">Quality of pipeline</div></div></div>
+          <div class="statgrid" id="m_rates" style="grid-template-columns:1fr 1fr"></div></div>
+        <div class="panel c4"><div class="phead"><div><h3>Content Cadence</h3><div class="meta">Published this period</div></div></div>
+          <div class="statgrid" id="m_cadence" style="grid-template-columns:repeat(3,1fr)"></div></div>
+
+        <!-- 3 Campaign performance -->
+        <div class="panel c8"><div class="phead"><div><h3><span class="num">3</span>Campaign Performance</h3><div class="meta">Per campaign</div></div></div>
+          <table><thead><tr><th>Campaign</th><th>Platform</th><th>Reach</th><th>Leads</th><th>Revenue</th><th>Spend</th><th>ROAS</th><th>Status</th></tr></thead><tbody id="m_campaigns"></tbody></table></div>
+        <div class="panel c4"><div class="phead"><div><h3>ROI by Brand</h3><div class="meta">Campaign ROAS</div></div></div>
+          <div class="fill" id="m_brandRoi"></div></div>
+
+        <!-- 4 Social -->
+        <div class="panel c12"><div class="phead"><div><h3><span class="num">4</span>Social Media by Channel</h3><div class="meta">Followers · reach · engagement</div></div></div>
+          <table><thead><tr><th>Channel</th><th>Followers</th><th>Reach</th><th>Impressions</th><th>Engagement</th><th>Clicks</th></tr></thead><tbody id="m_social"></tbody></table></div>
+
+        <!-- 5 Clienteling + 6 CX -->
+        <div class="panel c5"><div class="phead"><div><h3><span class="num">5</span>Clienteling</h3><div class="meta">1:1 outreach</div></div></div>
+          <div class="statgrid" id="m_cl" style="grid-template-columns:repeat(3,1fr)"></div></div>
+        <div class="panel c7"><div class="phead"><div><h3><span class="num">6</span>Customer Experience</h3><div class="meta">NPS & feedback</div></div></div>
+          <div class="statgrid" id="m_cxKpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px"></div>
+          <div class="fill" id="m_cxFeed"></div></div>
+
+        <!-- 7 Action tracker -->
+        <div class="panel c12"><div class="phead"><div><h3><span class="num">7</span>Action Tracker</h3><div class="meta">Marketing priorities</div></div></div>
+          <table><thead><tr><th>Task</th><th>Owner</th><th>Priority</th><th>Deadline</th><th>Status</th></tr></thead><tbody id="m_actions"></tbody></table></div>
+
+        <!-- 8 Customer insights -->
+        <div class="panel c4"><div class="phead"><div><h3><span class="num">8</span>Most Requested Items</h3><div class="meta">Walk-in captures</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="m_items"></canvas></div></div>
+        <div class="panel c4"><div class="phead"><div><h3>Requested Sizes</h3><div class="meta">Demand by size</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="m_sizes"></canvas></div></div>
+        <div class="panel c4"><div class="phead"><div><h3>Acquisition Source</h3><div class="meta">How they found us</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="m_source"></canvas></div></div>
+      </div>
+    </section>
+    <!-- ============ OPERATIONS ============ -->
+    <section class="view" id="view-operations">
+      <div class="mission">
+        <span class="m1">Execution Excellence · Operational Discipline · Customer Experience</span>
+        <span class="sep"></span>
+        <span class="m2"><b>Operations Mission:</b> Consistent, compliant, customer-ready stores every day.</span>
+      </div>
+
+      <div class="kpis" style="grid-template-columns:repeat(7,1fr)">
+        <div class="kpi"><div class="lbl"><span class="ic">🏪</span>Store Ops Score</div><div class="val">88%</div><div class="sub"><span class="chip up">good</span></div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">🪟</span>VM Compliance</div><div class="val">84%</div><div class="sub"><span class="chip up">good</span></div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">✅</span>Store Readiness</div><div class="val">91%</div><div class="sub"><span class="chip up">strong</span></div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">😊</span>CX Score</div><div class="val">87%</div><div class="sub"><span class="chip up">good</span></div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">📋</span>SOP Compliance</div><div class="val">82%</div><div class="sub2">Across areas</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">🔧</span>Maintenance</div><div class="val">79%</div><div class="sub2">On-time fix rate</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">⚠️</span>Open Issues</div><div class="val">9</div><div class="sub2">Needing action</div></div>
+      </div>
+
+      <div class="bento">
+        <!-- 1 VM & risk -->
+        <div class="panel c8"><div class="phead"><div><h3><span class="num">1</span>VM Compliance by Store</h3><div class="meta">% compliant</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="o_vmStore"></canvas></div></div>
+        <div class="panel c4"><div class="phead"><div><h3>Incident Risk Levels</h3><div class="meta">Open incidents</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="o_riskDonut"></canvas></div></div>
+
+        <!-- 2 Store standards -->
+        <div class="panel c12"><div class="phead"><div><h3><span class="num">2</span>Store Standards Scores</h3><div class="meta">Audit scores by store</div></div></div>
+          <table><thead><tr><th>Store</th><th>Ops</th><th>VM</th><th>Readiness</th><th>CX</th><th>Clean &amp; Light</th><th>Safety</th></tr></thead><tbody id="o_standards"></tbody></table></div>
+
+        <!-- 3 Risk & incidents -->
+        <div class="panel c4"><div class="phead"><div><h3><span class="num">3</span>Incidents by Type</h3><div class="meta">MTD</div></div></div>
+          <div class="statgrid" id="o_incTypes" style="grid-template-columns:1fr 1fr"></div></div>
+        <div class="panel c4"><div class="phead"><div><h3>Incidents by Store</h3><div class="meta">Count</div></div></div>
+          <div class="fill" id="o_incStore" style="display:flex;flex-wrap:wrap;gap:8px;align-content:start"></div></div>
+        <div class="panel c4"><div class="phead"><div><h3>Top Risks</h3><div class="meta">High / critical</div></div></div>
+          <div class="fill" id="o_topRisks"></div></div>
+
+        <!-- 4 Priority actions -->
+        <div class="panel c4"><div class="phead"><div><h3><span class="num">4</span>Maintenance</h3><div class="meta">Spend & backlog</div></div></div>
+          <div class="statgrid" id="o_maintKpis" style="grid-template-columns:1fr"></div></div>
+        <div class="panel c8"><div class="phead"><div><h3>Priority Actions</h3><div class="meta">Open maintenance & ops actions</div></div></div>
+          <table><thead><tr><th>Action</th><th>Priority</th><th>Owner</th><th>Store</th><th>Status</th></tr></thead><tbody id="o_actions"></tbody></table></div>
+
+        <!-- 5 Maintenance backlog -->
+        <div class="panel c6"><div class="phead"><div><h3><span class="num">5</span>Open Work by Category</h3><div class="meta">Maintenance backlog</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="o_maintCat"></canvas></div></div>
+        <div class="panel c6"><div class="phead"><div><h3>Workload by Assignee</h3><div class="meta">Open vs total</div></div></div>
+          <table><thead><tr><th>Assignee</th><th>Open</th><th>Total</th><th>Open Cost</th></tr></thead><tbody id="o_assignee"></tbody></table></div>
+
+        <!-- 6 CX & VM detail + 7 People health -->
+        <div class="panel c4"><div class="phead"><div><h3><span class="num">6</span>Customer Experience</h3><div class="meta">In-store feedback</div></div></div>
+          <div class="statgrid" id="o_cx" style="grid-template-columns:1fr"></div></div>
+        <div class="panel c4"><div class="phead"><div><h3>VM Breakdown</h3><div class="meta">By element</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="o_vmBreak"></canvas></div></div>
+        <div class="panel c4"><div class="phead"><div><h3><span class="num">7</span>People Health</h3><div class="meta">HR</div></div></div>
+          <div class="statgrid" id="o_people" style="grid-template-columns:1fr 1fr"></div></div>
+
+        <!-- 8 SOP -->
+        <div class="panel c6"><div class="phead"><div><h3><span class="num">8</span>SOP Compliance by Area</h3><div class="meta">% compliant</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="o_sopArea"></canvas></div></div>
+        <div class="panel c6"><div class="phead"><div><h3>Deviations Found</h3><div class="meta">With corrective action</div></div></div>
+          <div class="fill" id="o_dev"></div></div>
+
+        <!-- 9 Corrective register -->
+        <div class="panel c12"><div class="phead"><div><h3><span class="num">9</span>Corrective Action Register</h3><div class="meta">Issues tracked to closure</div></div></div>
+          <table><thead><tr><th>Source</th><th>Action / Issue</th><th>Store</th><th>Status</th></tr></thead><tbody id="o_corrective"></tbody></table></div>
+      </div>
+    </section>
+    <!-- ============ INVENTORY ============ -->
+    <section class="view" id="view-inventory">
+      <div class="mission">
+        <span class="m1">Right Stock · Right Place · Right Time · Maximum Returns</span>
+        <span class="sep"></span>
+        <span class="m2"><b>Inventory Mission:</b> Optimize inventory value, eliminate dead stock, maximize availability.</span>
+      </div>
+
+      <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+        <div class="kpi"><div class="lbl"><span class="ic">📦</span>Inventory Value</div><div class="val">₵ 9.1M</div><div class="sub2">On-hand at cost</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">🎯</span>Stock Accuracy</div><div class="val">97.4%</div><div class="sub"><span class="chip up">▲ 0.6pt</span></div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">🪦</span>Dead Stock %</div><div class="val">6.2%</div><div class="sub"><span class="chip up">below 8% target</span></div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">🔁</span>Replenishment Reqs</div><div class="val">28</div><div class="sub2">Open requests</div></div>
+      </div>
+
+      <div class="bento">
+        <div class="panel c8"><div class="phead"><div><h3><span class="num">1</span>Goods Received by Month</h3><div class="meta">Inbound value · ₵</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="i_goods"></canvas></div></div>
+        <div class="panel c4"><div class="phead"><div><h3>Value by Brand</h3><div class="meta">Received stock</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="i_brand"></canvas></div></div>
+
+        <div class="panel c4"><div class="phead"><div><h3><span class="num">2</span>Stock Accuracy</h3><div class="meta">Count vs system</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="i_acc"></canvas></div></div>
+        <div class="panel c8"><div class="phead"><div><h3><span class="num">3</span>Stock Movement</h3><div class="meta">MTD flows</div></div></div>
+          <div class="statgrid" id="i_move" style="grid-template-columns:repeat(5,1fr)"></div></div>
+
+        <div class="panel c6"><div class="phead"><div><h3><span class="num">4</span>Goods Received by Supplier</h3><div class="meta">₵</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="i_supplier"></canvas></div></div>
+        <div class="panel c6"><div class="phead"><div><h3>Replenishment Requests</h3><div class="meta">By urgency</div></div></div>
+          <table><thead><tr><th>Item</th><th>In Stock</th><th>Reorder</th><th>Urgency</th></tr></thead><tbody id="i_replen"></tbody></table></div>
+
+        <div class="panel c6"><div class="phead"><div><h3><span class="num">5</span>Dead-Stock Action by Value</h3><div class="meta">₵</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="i_dead"></canvas></div></div>
+        <div class="panel c6"><div class="phead"><div><h3>Top Dead-Stock Items</h3><div class="meta">Recommended action</div></div></div>
+          <table><thead><tr><th>Item</th><th>Action</th><th>Value</th></tr></thead><tbody id="i_deadItems"></tbody></table></div>
+
+        <div class="panel c4"><div class="phead"><div><h3><span class="num">6</span>Goods-Receipt Quality</h3><div class="meta">Condition mix</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="i_cond"></canvas></div></div>
+        <div class="panel c8"><div class="phead"><div><h3>Flagged Receipts</h3><div class="meta">Damaged / short</div></div></div>
+          <table><thead><tr><th>Supplier</th><th>Condition</th><th>Discrepancy</th><th>Date</th></tr></thead><tbody id="i_flag"></tbody></table></div>
+
+        <div class="panel c12"><div class="phead"><div><h3><span class="num">7</span>Stock Transfers</h3><div class="meta">Inter-store movement</div></div></div>
+          <table><thead><tr><th>Date</th><th>From → To</th><th>Item</th><th>Units</th></tr></thead><tbody id="i_transfers"></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- ============ BRAND HEALTH ============ -->
+    <section class="view" id="view-brand">
+      <div class="mission">
+        <span class="m1">Measure Brand Equity · Drive Demand · Grow Value</span>
+        <span class="sep"></span>
+        <span class="m2"><b>Brand Health Mission:</b> Stronger brands, deeper connections, sustainable growth.</span>
+      </div>
+
+      <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+        <div class="kpi"><div class="lbl"><span class="ic">💎</span>Brand Health Index</div><div class="val">82</div><div class="sub"><span class="chip up">Healthy</span></div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">📣</span>NPS</div><div class="val">62</div><div class="sub2">Net Promoter Score</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">🚀</span>Brand Momentum</div><div class="val">+14</div><div class="sub2">Trend index</div></div>
+        <div class="kpi"><div class="lbl"><span class="ic">😊</span>Positive Sentiment</div><div class="val">72%</div><div class="sub"><span class="chip up">▲ 4pt</span></div></div>
+      </div>
+
+      <div class="bento">
+        <div class="panel c4"><div class="phead"><div><h3><span class="num">1</span>Brand Health Index</h3><div class="meta">5 brands tracked</div></div></div>
+          <div class="canvas-wrap sm" style="position:relative"><canvas id="b_gauge"></canvas>
+            <div style="position:absolute;inset:0;display:grid;place-items:center;pointer-events:none"><div style="text-align:center"><div style="font-size:30px;font-weight:750">82</div><div style="font-size:11px;color:var(--pos);font-weight:700;letter-spacing:1px">HEALTHY</div></div></div></div></div>
+        <div class="panel c8"><div class="phead"><div><h3>Portfolio Health</h3><div class="meta">Score by brand</div></div></div>
+          <div class="fill" id="b_portfolio" style="margin-top:6px"></div></div>
+
+        <div class="panel c8"><div class="phead"><div><h3><span class="num">2</span>Brand Equity Dimensions</h3><div class="meta">Funnel strength</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="b_equity"></canvas></div></div>
+        <div class="panel c4"><div class="phead"><div><h3><span class="num">3</span>Sentiment Split</h3><div class="meta">Of mentions</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="b_sentiment"></canvas></div></div>
+
+        <div class="panel c8"><div class="phead"><div><h3>Positive Sentiment Trend</h3><div class="meta">% positive · monthly</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="b_trend"></canvas></div></div>
+        <div class="panel c4"><div class="phead"><div><h3><span class="num">4</span>Share of Conversation</h3><div class="meta">vs market</div></div></div>
+          <div class="canvas-wrap sm"><canvas id="b_share"></canvas></div></div>
+
+        <div class="panel c12"><div class="phead"><div><h3><span class="num">5</span>Digital Reputation & Social</h3><div class="meta">Online standing</div></div></div>
+          <div class="statgrid" id="b_digital" style="grid-template-columns:repeat(5,1fr)"></div></div>
+
+        <div class="panel c6"><div class="phead"><div><h3><span class="num">6</span>Risks</h3><div class="meta">Brand threats</div></div></div>
+          <div class="fill" id="b_risks"></div></div>
+        <div class="panel c6"><div class="phead"><div><h3>Opportunities</h3><div class="meta">Upside to capture</div></div></div>
+          <div class="fill" id="b_opps"></div></div>
+
+        <div class="panel c12"><div class="phead"><div><h3><span class="num">7</span>CEO Attention Index</h3><div class="meta">Brand issues for the CEO</div></div></div>
+          <table><thead><tr><th>Priority</th><th>Issue</th><th>Impact</th><th>Owner</th><th>Status</th></tr></thead><tbody id="b_ceo"></tbody></table></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const C={gold:'#c9a227',gold2:'#e8c75a',pos:'#34d399',neg:'#f87171',info:'#5b9dff',violet:'#a78bfa',pink:'#f472b6',teal:'#2dd4bf',amber:'#f59e0b',grid:'#1b2233',txt:'#9aa6be'};
+Chart.defaults.color=C.txt;Chart.defaults.font.family="'Inter',sans-serif";Chart.defaults.font.size=11;
+const TT={backgroundColor:'#000',borderColor:C.grid,borderWidth:1,padding:10};
+
+/* trend */
+const days=['15','16','17','18','19','20','21','22','23','24','25','26','27','28'];
+new Chart(trend,{type:'line',data:{labels:days,datasets:[
+  {label:'Net Revenue (₵k)',data:[280,310,295,340,360,330,410,395,430,460,440,490,520,540],borderColor:C.gold2,borderWidth:2.5,tension:.4,pointRadius:0,fill:true,
+    backgroundColor:c=>{const g=c.chart.ctx.createLinearGradient(0,0,0,260);g.addColorStop(0,'rgba(232,199,90,.28)');g.addColorStop(1,'rgba(232,199,90,0)');return g;}},
+  {label:'Gross Margin (₵k)',data:[150,168,160,182,195,178,220,212,232,250,238,262,280,292],borderColor:C.teal,borderWidth:2,borderDash:[5,4],tension:.4,pointRadius:0}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,...TT}},
+    scales:{x:{grid:{display:false},border:{display:false}},y:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>'₵'+v+'k'}}},interaction:{mode:'index',intersect:false}}});
+
+/* revenue by category donut */
+const cats=['Luxury Suits','Business Suits','Formal Shirts','Denim Jeans','Sneakers','Watches','Other'];
+const catShare=[22,17,13,11,12,8,17];
+const catCol=[C.gold2,C.violet,C.teal,C.info,C.pink,C.amber,'#475569'];
+new Chart(catDonut,{type:'doughnut',data:{labels:cats,datasets:[{data:catShare,backgroundColor:catCol,borderColor:'#0e111a',borderWidth:3,hoverOffset:6}]},
+  options:{responsive:true,maintainAspectRatio:false,cutout:'66%',plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' '+c.label+': '+c.raw+'%'}}}}});
+catLegend.innerHTML=cats.map((b,i)=>`<span><i style="background:${catCol[i]}"></i>${b} · <b style="color:#e8edf7">${catShare[i]}%</b></span>`).join('');
+
+/* sales by store */
+new Chart(storeBar,{type:'bar',data:{labels:['Dzorwulu','E.Legon','Labone','BW Labone','BW Dzor','D\'Angelo','Woodpkr'],
+  datasets:[{data:[540,610,480,520,470,700,390],backgroundColor:C.gold2,borderRadius:5,barPercentage:.72}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' ₵'+c.raw+'k'}}},
+    scales:{x:{grid:{display:false},border:{display:false},ticks:{font:{size:9.5}}},y:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>'₵'+v+'k'}}}}});
+
+/* brand performance horizontal */
+new Chart(brandBar,{type:'bar',data:{labels:['Boulevard Men','Boulevard Women','D\'Angelo','Woodpeckers','Carbon Shoes'],
+  datasets:[{data:[1180,990,720,540,390],backgroundColor:C.violet,borderRadius:5,barThickness:16}]},
+  options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' ₵'+c.raw+'k'}}},
+    scales:{x:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>'₵'+v+'k'}},y:{grid:{display:false},border:{display:false},ticks:{font:{size:10}}}}}});
+
+/* payment mix */
+const pays=['Mobile Money','Bank Transfer','POS UMB','POS OmniBSIC','Cash','Cheque'];
+new Chart(payDonut,{type:'doughnut',data:{labels:pays,datasets:[{data:[34,22,16,14,10,4],backgroundColor:[C.teal,C.info,C.gold2,C.violet,C.pos,C.pink],borderColor:'#0e111a',borderWidth:3}]},
+  options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'right',labels:{boxWidth:9,boxHeight:9,padding:7,font:{size:10.5}}},tooltip:{...TT,callbacks:{label:c=>' '+c.label+': '+c.raw+'%'}}}}});
+
+/* sales by category */
+const catL=['Luxury Suits','Business Suits','Formal Shirts','Denim Jeans','Sneakers','Watches','Chinos','Leather Bags'];
+new Chart(catSales,{type:'bar',data:{labels:catL,datasets:[{data:[920,760,540,470,510,360,300,280],backgroundColor:C.gold2,borderRadius:4,barPercentage:.78}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' ₵'+c.raw+'k'}}},
+    scales:{x:{grid:{display:false},border:{display:false},ticks:{font:{size:9},maxRotation:35,minRotation:35}},y:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>'₵'+v+'k'}}}}});
+
+/* sell-through by category */
+new Chart(catSell,{type:'bar',data:{labels:catL,datasets:[{data:[78,71,64,69,58,74,61,66],backgroundColor:C.pos,borderRadius:4,barPercentage:.78}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' '+c.raw+'%'}}},
+    scales:{x:{grid:{display:false},border:{display:false},ticks:{font:{size:9},maxRotation:35,minRotation:35}},y:{grid:{color:C.grid},border:{display:false},max:100,ticks:{callback:v=>v+'%'}}}}});
+
+/* store performance table */
+const stores=[
+  {s:'D\'Angelo Palace',b:'D\'Angelo',sales:'₵ 700k',ops:92,vm:88,pct:112,pc:'#34d399'},
+  {s:'East Legon Men',b:'Boulevard Men',sales:'₵ 610k',ops:90,vm:85,pct:104,pc:'#34d399'},
+  {s:'Boulevard Women Labone',b:'Boulevard Women',sales:'₵ 520k',ops:89,vm:86,pct:98,pc:'#e8c75a'},
+  {s:'Dzorwulu Men',b:'Boulevard Men',sales:'₵ 540k',ops:87,vm:82,pct:96,pc:'#e8c75a'},
+  {s:'Labone Men',b:'Boulevard Men',sales:'₵ 480k',ops:84,vm:80,pct:90,pc:'#e8c75a'},
+  {s:'Boulevard Women Dzorwulu',b:'Boulevard Women',sales:'₵ 470k',ops:86,vm:83,pct:88,pc:'#e8c75a'},
+  {s:'Woodpeckers',b:'Woodpeckers',sales:'₵ 390k',ops:81,vm:78,pct:79,pc:'#f87171'},
+];
+storeTbl.innerHTML=stores.map(r=>`<tr><td><b>${r.s}</b></td><td><span class="tag cat">${r.b}</span></td><td><b>${r.sales}</b></td><td>${r.ops}</td><td>${r.vm}</td>
+  <td><span class="status"><span class="d" style="background:${r.pc}"></span>${r.pct}%</span></td></tr>`).join('');
+
+/* people health */
+const people=[['Overall Score','88%'],['Attendance','94%'],['Punctuality','90%'],['Training','76%'],['Absences','8']];
+peopleGrid.innerHTML=people.map(p=>`<div class="stat"><div class="l">${p[0]}</div><div class="v">${p[1]}</div></div>`).join('');
+
+/* departments */
+const depts=[['Finance','Revenue MTD','₵ 4.82M'],['Commercial','Group Sales','₵ 3.41M'],['Marketing','Total Leads','1,240'],
+  ['Operations','Ops Score','88%'],['Inventory','Inventory Value','₵ 9.1M'],['Brand Health','Health Index','82']];
+deptGrid.innerHTML=depts.map(d=>`<div class="deptcard"><b>${d[0]}</b><div class="m">${d[1]}</div><div class="vv">${d[2]}</div></div>`).join('');
+
+/* profitability ratios */
+const ratios=[['Net Profit Margin','11.2%','Very Good','#34d399'],['ROCE','18.4%','Good','#34d399'],['ROI','22.1%','Very Good','#34d399']];
+ratioGrid.innerHTML=ratios.map(r=>`<div class="stat"><div class="l">${r[0]}</div><div class="v">${r[1]}</div><div class="rt" style="color:${r[3]}">${r[2]}</div></div>`).join('');
+
+/* CEO attention */
+const PRI={High:['#f87171','rgba(248,113,113,.12)'],Medium:['#e8c75a','rgba(232,199,90,.12)'],Low:['#5b9dff','rgba(91,157,255,.12)']};
+const ceo=[
+  ['High','GM% below target at D\'Angelo Palace','Margin','Finance','In Progress'],
+  ['High','Stockout — Carbon Shoes Sneakers','Sales','Inventory','Open'],
+  ['Medium','Returns spike — Boulevard Men Business Suits','CX','Commercial','Monitoring'],
+  ['Medium','Low training completion — Woodpeckers','People','Operations','Open'],
+  ['Low','Slow-moving Sandals stock','Margin','Commercial','Planned'],
+];
+ceoTbl.innerHTML=ceo.map(c=>`<tr><td><span class="prio" style="color:${PRI[c[0]][0]};background:${PRI[c[0]][1]}">${c[0]}</span></td>
+  <td>${c[1]}</td><td>${c[2]}</td><td>${c[3]}</td><td>${c[4]}</td></tr>`).join('');
+
+/* operations feed */
+const feed=[
+  ['⚠️','rgba(248,113,113,.12)','Stockout risk — Carbon Shoes Sneakers','D\'Angelo Palace at 12% cover. Reorder draft ready.','4m'],
+  ['📥','rgba(91,157,255,.12)','Weekly review submitted','East Legon Men logged by store manager.','18m'],
+  ['🎯','rgba(52,211,153,.12)','D\'Angelo Palace hit 112% of target','Leading all stores this period.','1h'],
+  ['↩️','rgba(232,199,90,.12)','Return spike — Business Suits','Sizing complaints up 6%. Flagged to Commercial.','2h'],
+  ['🧾','rgba(167,139,250,.12)','CEO attention raised','GM% below target at Woodpeckers.','3h'],
+];
+document.getElementById('feed').innerHTML=feed.map(f=>`<div class="alert"><div class="ai" style="background:${f[1]}">${f[0]}</div>
+  <div class="ab"><b>${f[2]}</b><p>${f[3]}</p></div><div class="at">${f[4]}</div></div>`).join('');
+
+/* action tracker */
+const acts=[
+  ['Marketing','Eid campaign — Fragrances & Watches','A. Mensah','High','In Progress'],
+  ['Marketing','Refresh Boulevard Women lookbook','K. Asare','Medium','Open'],
+  ['Operations','Repair A/C — Labone Men','Facilities','High','In Progress'],
+  ['Operations','Restock fitting-room supplies — Dzorwulu','Ops Team','Low','Done'],
+  ['Marketing','Re-target walk-in leads from Instagram','A. Mensah','Medium','Open'],
+];
+actTbl.innerHTML=acts.map(a=>`<tr><td style="color:var(--accent-2);font-weight:650">${a[0]}</td><td>${a[1]}</td><td>${a[2]}</td>
+  <td><span class="prio" style="color:${PRI[a[3]][0]};background:${PRI[a[3]][1]}">${a[3]}</span></td><td>${a[4]}</td></tr>`).join('');
+
+/* manager voices */
+const voices=[
+  {store:'D\'Angelo Palace',mgr:'Manager · week ending 21 Jun',qa:[['Which category should Marketing amplify?','Luxury Suits — strong walk-in demand for the new season.'],['What will you do differently this week?','Pair Watches with suit purchases at the till to lift basket size.']]},
+  {store:'East Legon Men',mgr:'Manager · week ending 21 Jun',qa:[['Which category should Marketing amplify?','Formal Shirts — fast sell-through, need restock + push.'],['First three actions if this were your store?','Re-merchandise window, train staff on upsell, fix stockouts.']]},
+  {store:'Boulevard Women Labone',mgr:'Manager · week ending 21 Jun',qa:[['Which category should Marketing amplify?','Leather Bags & Accessories for gifting season.'],['What will you do differently this week?','Run a styling event to convert browsers to buyers.']]},
+];
+voiceGrid.innerHTML=voices.map(v=>`<div class="voice"><div class="vh"><b>${v.store}</b><small>${v.mgr}</small></div>
+  ${v.qa.map(q=>`<div class="qa"><div class="q">${q[0]}</div><div class="a">${q[1]}</div></div>`).join('')}</div>`).join('');
+
+/* weekly review key insights */
+const weeks=['Latest / All','Wk ending 21 Jun','Wk ending 14 Jun','Wk ending 7 Jun'];
+weekRow.innerHTML=weeks.map((w,i)=>`<button class="weekbtn${i===0?' on':''}">${w}</button>`).join('');
+weekRow.querySelectorAll('.weekbtn').forEach(b=>b.addEventListener('click',()=>{weekRow.querySelectorAll('.weekbtn').forEach(x=>x.classList.remove('on'));b.classList.add('on');}));
+const wrKpis=[['Weekly Reviews','7'],['Achievement','104%'],['Stock at Risk','₵ 180k'],['At-Risk Categories','3']];
+document.getElementById('wrKpis').innerHTML=wrKpis.map(k=>`<div class="stat"><div class="l">${k[0]}</div><div class="v">${k[1]}</div></div>`).join('');
+const ins=[
+  ['Best performing categories',['Luxury Suits','Watches','Formal Shirts']],
+  ['Categories needing attention',['Sandals','Polo Shirts','Streetwear Sets']],
+  ['Greatest commercial / stock risk',['Carbon Shoes Sneakers — low cover','Business Suits returns','Sandals ageing stock']],
+];
+insCol.innerHTML=ins.map(i=>`<div class="ins"><div class="ih">${i[0]}</div><ul>${i[1].map(x=>`<li>${x}</li>`).join('')}</ul></div>`).join('');
+const plan=[
+  ['Which category should Marketing amplify this week?','Luxury Suits — convert the high walk-in interest into bookings with a made-to-measure offer.'],
+  ['What will you do differently this week to increase sales?','Daily upsell huddle, pair Watches & Belts with suits, and clear ageing Sandals via a bundle.'],
+  ['If this store belonged to you, what would be your first three actions?','1) Fix the Sneakers stockout, 2) retrain on the suit fitting journey, 3) refresh the window display.'],
+];
+planRow.innerHTML=plan.map(p=>`<div class="plan"><div class="q">${p[0]}</div><div class="a">${p[1]}</div></div>`).join('');
+
+/* dept stubs */
+const stub=(t,d)=>`<div class="panel"><div class="placeholder">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg>
+  <h3>${t}</h3><p>${d}</p></div></div>`;
+/* ===== FINANCE (lazy init) ===== */
+let financeReady=false;
+function initFinance(){
+  if(financeReady)return; financeReady=true;
+  const gAxis={x:{grid:{display:false},border:{display:false}},y:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>'₵'+v+'k'}}};
+
+  /* daily revenue area */
+  const dl=Array.from({length:14},(_,i)=>String(15+i));
+  new Chart(f_daily,{type:'line',data:{labels:dl,datasets:[{data:[280,310,295,340,360,330,410,395,430,460,440,490,520,540],borderColor:C.gold2,borderWidth:2.5,tension:.4,pointRadius:0,fill:true,
+    backgroundColor:c=>{const g=c.chart.ctx.createLinearGradient(0,0,0,260);g.addColorStop(0,'rgba(232,199,90,.28)');g.addColorStop(1,'rgba(232,199,90,0)');return g;}}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' ₵'+c.raw+'k'}}},scales:gAxis}});
+
+  /* revenue by category donut */
+  const fc=['Luxury Suits','Business Suits','Formal Shirts','Denim Jeans','Sneakers','Watches','Other'];
+  const fcv=[22,17,13,11,12,8,17],fcc=[C.gold2,C.violet,C.teal,C.info,C.pink,C.amber,'#475569'];
+  new Chart(f_catDonut,{type:'doughnut',data:{labels:fc,datasets:[{data:fcv,backgroundColor:fcc,borderColor:'#0e111a',borderWidth:3}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'66%',plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' '+c.label+': '+c.raw+'%'}}}}});
+  f_catLegend.innerHTML=fc.map((b,i)=>`<span><i style="background:${fcc[i]}"></i>${b} · <b style="color:#e8edf7">${fcv[i]}%</b></span>`).join('');
+
+  /* profit bridge */
+  new Chart(f_bridge,{type:'bar',data:{labels:['Revenue','COGS','Gross Profit','Expenses','Net Profit'],
+    datasets:[{data:[4820,-2720,2100,-1280,820],backgroundColor:[C.gold2,C.neg,C.teal,C.neg,C.pos],borderRadius:4,barPercentage:.7}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' ₵'+Math.abs(c.raw)+'k'}}},scales:gAxis}});
+
+  /* margins */
+  const mg=[['Gross Margin',43.6],['Operating Margin',27.8],['Net Margin',17.0]];
+  f_margins.innerHTML=mg.map(x=>`<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span style="color:var(--txt-2)">${x[0]}</span><b style="color:var(--accent-2)">${x[1]}%</b></div>
+    <div class="stage"><div class="track" style="width:100%"><i style="width:${Math.min(100,x[1]/60*100)}%;background:linear-gradient(90deg,var(--accent),var(--accent-2))"></i></div></div></div>`).join('');
+
+  /* ratios */
+  const fr=[['Net Profit Margin','17.0%','Excellent','#34d399'],['ROCE','18.4%','Good','#34d399'],['ROI','22.1%','Very Good','#34d399']];
+  f_ratios.innerHTML=fr.map(r=>`<div class="stat"><div class="l">${r[0]}</div><div class="v">${r[1]}</div><div class="rt" style="color:${r[3]}">${r[2]}</div></div>`).join('');
+
+  /* weekly net cash */
+  new Chart(f_cash,{type:'line',data:{labels:['Wk1','Wk2','Wk3','Wk4'],datasets:[{data:[180,240,210,290],borderColor:C.pos,borderWidth:2.5,tension:.4,pointRadius:3,pointBackgroundColor:C.pos,fill:true,
+    backgroundColor:c=>{const g=c.chart.ctx.createLinearGradient(0,0,0,210);g.addColorStop(0,'rgba(52,211,153,.25)');g.addColorStop(1,'rgba(52,211,153,0)');return g;}}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' ₵'+c.raw+'k'}}},scales:gAxis}});
+
+  /* cash tiles */
+  const ct=[['Cash Inflow','₵ 3.46M','#34d399'],['Cash Outflow','₵ 2.54M','#f87171'],['Net Position','₵ 920k','#e8c75a'],['Cash Runway','142 days','#5b9dff']];
+  f_cashTiles.innerHTML=ct.map(t=>`<div class="stat"><div class="l">${t[0]}</div><div class="v" style="color:${t[2]}">${t[1]}</div></div>`).join('');
+
+  /* payments by mode */
+  new Chart(f_pay,{type:'bar',data:{labels:['Mobile Money','Bank Transfer','POS UMB','POS OmniBSIC','Cash','Cheque'],
+    datasets:[{data:[1180,760,560,480,340,140],backgroundColor:C.teal,borderRadius:5,barThickness:15}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' ₵'+c.raw+'k'}}},
+      scales:{x:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>'₵'+v+'k'}},y:{grid:{display:false},border:{display:false},ticks:{font:{size:10}}}}}});
+  const pl=[['Total Collected','₵ 3.46M'],['Mobile Money','₵ 1.18M'],['Bank Transfer','₵ 760k'],['POS (UMB+OmniBSIC)','₵ 1.04M']];
+  f_payList.innerHTML=pl.map((p,i)=>`<div class="stat" style="margin-bottom:9px;${i===0?'border-color:rgba(201,162,39,.35)':''}"><div class="l">${p[0]}</div><div class="v" style="${i===0?'color:var(--accent-2)':''}">${p[1]}</div></div>`).join('');
+
+  /* spend by category */
+  new Chart(f_spend,{type:'bar',data:{labels:['Stock Purch.','Payroll','Rent','Marketing','Utilities','Freight','Prof. Fees','Insurance'],
+    datasets:[{label:'Actual',data:[820,420,240,180,120,160,90,70],backgroundColor:C.gold2,borderRadius:4,barPercentage:.78},
+      {label:'Budget',data:[800,440,240,200,130,150,100,80],backgroundColor:'#3a4459',borderRadius:4,barPercentage:.78}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT}},
+      scales:{x:{grid:{display:false},border:{display:false},ticks:{font:{size:9},maxRotation:35,minRotation:35}},y:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>'₵'+v+'k'}}}}});
+
+  /* opex mix */
+  const ox=[['Stock Purchases',38],['Payroll Cost',19],['Rent',11],['Marketing Spend',8],['Utilities',6],['Freight & Clearance',7]];
+  f_opex.innerHTML=ox.map(o=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px;font-size:12px"><span style="color:var(--txt-2);width:96px;flex-shrink:0">${o[0]}</span>
+    <div style="flex:1;height:6px;background:var(--panel-2);border-radius:4px;overflow:hidden"><i style="display:block;height:100%;width:${o[1]}%;background:linear-gradient(90deg,var(--accent),var(--accent-2))"></i></div>
+    <b style="color:var(--txt);width:30px;text-align:right">${o[1]}%</b></div>`).join('');
+
+  /* budget vs actual table */
+  const bv=[
+    ['Stock Purchases','₵ 9.6M','₵ 8.2M','₵ 1.4M',false],['Payroll Cost','₵ 5.3M','₵ 4.9M','₵ 0.4M',false],
+    ['Rent','₵ 2.9M','₵ 2.4M','₵ 0.5M',false],['Marketing Spend','₵ 2.4M','₵ 2.6M','-₵ 0.2M',true],
+    ['Utilities','₵ 1.6M','₵ 1.5M','₵ 0.1M',false],['Freight & Clearance','₵ 1.8M','₵ 1.9M','-₵ 0.1M',true],
+  ];
+  f_budget.innerHTML=bv.map(b=>`<tr><td><b>${b[0]}</b></td><td>${b[1]}</td><td>${b[2]}</td><td style="color:${b[4]?'#f87171':'#34d399'}">${b[3]}</td>
+    <td>${b[4]?'<span class="prio" style="color:#f87171;background:rgba(248,113,113,.12)">Over</span>':'<span class="prio" style="color:#34d399;background:rgba(52,211,153,.12)">On track</span>'}</td></tr>`).join('');
+
+  /* revenue / expenses by store */
+  const sl=['Dzorwulu','E.Legon','Labone','BW Labone','BW Dzor','D\'Angelo','Woodpkr'];
+  new Chart(f_revStore,{type:'bar',data:{labels:sl,datasets:[{data:[540,610,480,520,470,700,390],backgroundColor:C.gold2,borderRadius:4,barThickness:13}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' ₵'+c.raw+'k'}}},
+      scales:{x:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>'₵'+v+'k'}},y:{grid:{display:false},border:{display:false},ticks:{font:{size:9.5}}}}}});
+  new Chart(f_expStore,{type:'bar',data:{labels:sl,datasets:[{data:[300,330,280,290,270,360,240],backgroundColor:C.neg,borderRadius:4,barThickness:13}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' ₵'+c.raw+'k'}}},
+      scales:{x:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>'₵'+v+'k'}},y:{grid:{display:false},border:{display:false},ticks:{font:{size:9.5}}}}}});
+
+  /* debtor aging donut */
+  new Chart(f_debtor,{type:'doughnut',data:{labels:['0–30 days','31–60 days','61–90 days','90+ days'],datasets:[{data:[320,180,90,50],backgroundColor:[C.pos,C.gold2,C.amber,C.neg],borderColor:'#0e111a',borderWidth:3}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'right',labels:{boxWidth:9,boxHeight:9,padding:7,font:{size:10.5}}},tooltip:{...TT,callbacks:{label:c=>' ₵'+c.raw+'k'}}}}});
+
+  /* forecast tiles */
+  const fct=[['Revenue Forecast','₵ 5.10M','#e8c75a'],['Gross Profit','₵ 2.24M','#e8edf7'],['Net Profit','₵ 0.91M','#e8edf7'],['Cash','₵ 1.02M','#e8edf7']];
+  f_forecast.innerHTML=fct.map((t,i)=>`<div class="stat" style="${i===0?'border-color:rgba(201,162,39,.35)':''}"><div class="l">${t[0]}</div><div class="v" style="color:${t[2]}">${t[1]}</div></div>`).join('');
+}
+
+/* ===== COMMERCIAL (lazy init) ===== */
+let commercialReady=false;
+function initCommercial(){
+  if(commercialReady)return; commercialReady=true;
+  const hAxis={x:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>'₵'+v+'k'}},y:{grid:{display:false},border:{display:false},ticks:{font:{size:9.5}}}};
+  const sl=['Dzorwulu','E.Legon','Labone','BW Labone','BW Dzor','D\'Angelo','Woodpkr'];
+
+  new Chart(c_salesStore,{type:'bar',data:{labels:sl,datasets:[{data:[540,610,480,520,470,700,390],backgroundColor:C.gold2,borderRadius:4,barThickness:13}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' ₵'+c.raw+'k'}}},scales:hAxis}});
+
+  const cmL=['Luxury Suits','Business Suits','Formal Shirts','Denim Jeans','Sneakers','Watches','Chinos','Leather Bags'];
+  new Chart(c_catMix,{type:'bar',data:{labels:cmL,datasets:[{data:[920,760,540,470,510,360,300,280],backgroundColor:C.gold2,borderRadius:4,barPercentage:.78}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' ₵'+c.raw+'k'}}},
+      scales:{x:{grid:{display:false},border:{display:false},ticks:{font:{size:8.5},maxRotation:40,minRotation:40}},y:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>'₵'+v+'k'}}}}});
+
+  new Chart(c_brand,{type:'bar',data:{labels:['Boulevard Men','Boulevard Women','D\'Angelo','Woodpeckers','Carbon Shoes'],
+    datasets:[{data:[1180,990,720,540,390],backgroundColor:C.violet,borderRadius:4,barThickness:15}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' ₵'+c.raw+'k'}}},
+      scales:{x:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>'₵'+v+'k'}},y:{grid:{display:false},border:{display:false},ticks:{font:{size:10}}}}}});
+
+  const st=[['Luxury Suits',78],['Business Suits',71],['Formal Shirts',64],['Denim Jeans',69],['Sneakers',58],['Watches',74],['Chinos',61],['Leather Bags',66],['Polo Shirts',52]];
+  new Chart(c_sellDonut,{type:'doughnut',data:{labels:st.slice(0,6).map(x=>x[0]),datasets:[{data:st.slice(0,6).map(x=>x[1]),backgroundColor:[C.gold2,C.violet,C.teal,C.info,C.pink,C.amber],borderColor:'#0e111a',borderWidth:3}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'64%',plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' '+c.label+': '+c.raw+'%'}}}}});
+  c_sellGrid.innerHTML=st.map(s=>`<div class="stat"><div class="l">${s[0]}</div><div class="v" style="color:var(--accent-2)">${s[1]}%</div></div>`).join('');
+
+  const tbl=(el,rows)=>{el.innerHTML=rows.map(r=>`<tr>${r.map((c,i)=>i===0?`<td><b>${c}</b></td>`:`<td>${c}</td>`).join('')}</tr>`).join('');};
+  tbl(c_top,[['Italian Wool Suit','₵ 248k','312'],['Oxford Brogue','₵ 186k','280'],['Egyptian Cotton Shirt','₵ 154k','410'],['Selvedge Denim','₵ 132k','198'],['Swiss Automatic Watch','₵ 121k','86']]);
+  tbl(c_low,[['Linen Safari Set','₵ 28k','94'],['Suede Loafer','₵ 22k','120'],['Pocket Square Set','₵ 14k','138'],['Knit Polo','₵ 12k','156']]);
+  tbl(c_dead,[['Patterned Blazer','41 u','214'],['Leather Sandal','58 u','228'],['Wide-leg Chino','33 u','252'],['Novelty Tie','77 u','301']]);
+  c_insight.innerHTML=[
+    ['Italian Wool Suit','Luxury Suits','78%','strong','—','Hero line — protect stock, feature in windows.'],
+    ['Egyptian Cotton Shirt','Formal Shirts','64%','strong','Bundle','Pair with suits to lift ATV.'],
+    ['Suede Loafer','Loafers','38%','underperforming','Markdown 15%','Ageing — clear before season end.'],
+    ['Linen Safari Set','Safari Sets','34%','underperforming','BOGO','Seasonal slow-down; bundle to move.'],
+    ['Swiss Automatic Watch','Watches','74%','strong','—','High margin — push clienteling outreach.'],
+  ].map(r=>{const tone=r[3]==='strong'?'#34d399':r[3]==='underperforming'?'#f87171':'#e8c75a';
+    return `<tr><td><b>${r[0]}</b></td><td style="color:var(--txt-3)">${r[1]}</td><td>${r[2]}</td><td style="color:${tone};text-transform:capitalize">${r[3]}</td><td>${r[4]}</td><td style="color:var(--txt-2)">${r[5]}</td></tr>`;}).join('');
+
+  const ST={'On track':['#34d399','rgba(52,211,153,.12)'],'At risk':['#e8c75a','rgba(232,199,90,.12)'],'Behind':['#f87171','rgba(248,113,113,.12)']};
+  c_acct.innerHTML=[
+    ['A. Mensah','Commercial Lead','Group Sales','₵ 3.30M','₵ 3.41M','On track'],
+    ['K. Asare','Buyer — Menswear','Sell-Through','70%','71%','On track'],
+    ['Ama Boateng','Buyer — Womenswear','Sell-Through','70%','66%','At risk'],
+    ['Kofi Owusu','Merchandiser','Dead Stock ↓','< 5%','7%','Behind'],
+    ['Yaa Darko','Store Ops','Conversion','30%','28.6%','At risk'],
+  ].map(a=>`<tr><td><b>${a[0]}</b></td><td>${a[1]}</td><td>${a[2]}</td><td>${a[3]}</td><td>${a[4]}</td>
+    <td><span class="prio" style="color:${ST[a[5]][0]};background:${ST[a[5]][1]}">${a[5]}</span></td></tr>`).join('');
+
+  c_wrKpis.innerHTML=[['Reviews','7'],['Achievement','104%'],['Stock at Risk','₵ 180k'],['At-Risk Cats','3']].map(k=>`<div class="stat"><div class="l">${k[0]}</div><div class="v">${k[1]}</div></div>`).join('');
+  new Chart(c_wrCat,{type:'bar',data:{labels:['Luxury Suits','Business Suits','Formal Shirts','Watches','Denim','Sneakers'],datasets:[{data:[210,180,120,96,88,74],backgroundColor:C.gold2,borderRadius:4,barPercentage:.74}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' ₵'+c.raw+'k'}}},
+      scales:{x:{grid:{display:false},border:{display:false},ticks:{font:{size:8.5},maxRotation:40,minRotation:40}},y:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>'₵'+v+'k'}}}}});
+  new Chart(c_wrRating,{type:'doughnut',data:{labels:['Excellent','Good','Average','Poor'],datasets:[{data:[12,9,5,2],backgroundColor:[C.pos,C.teal,C.gold2,C.neg],borderColor:'#0e111a',borderWidth:3}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom',labels:{boxWidth:8,boxHeight:8,padding:6,font:{size:9.5}}},tooltip:{...TT}}}});
+
+  new Chart(c_trend,{type:'line',data:{labels:['Wk1','Wk2','Wk3','Wk4','Wk5','Wk6','Wk7','Wk8'],
+    datasets:[{label:'Achievement %',data:[92,88,96,103,99,107,104,112],borderColor:C.gold2,borderWidth:2.5,tension:.4,pointRadius:3,pointBackgroundColor:C.gold2,fill:true,
+      backgroundColor:c=>{const g=c.chart.ctx.createLinearGradient(0,0,0,210);g.addColorStop(0,'rgba(232,199,90,.22)');g.addColorStop(1,'rgba(232,199,90,0)');return g;}},
+      {label:'Target',data:[100,100,100,100,100,100,100,100],borderColor:C.txt,borderWidth:1.5,borderDash:[5,4],pointRadius:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' '+c.raw+'%'}}},
+      scales:{x:{grid:{display:false},border:{display:false}},y:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>v+'%'}}}}});
+
+  c_custKpis.innerHTML=[['Captured','318'],['Buyers','176'],['Lead→Buyer','55%'],['Top Source','Instagram']].map(k=>`<div class="stat"><div class="l">${k[0]}</div><div class="v" style="font-size:16px">${k[1]}</div></div>`).join('');
+  new Chart(c_leadSource,{type:'bar',data:{labels:['Instagram','Walk-in','Referral','Facebook','Billboard'],datasets:[{data:[118,86,54,38,22],backgroundColor:C.info,borderRadius:4,barThickness:12}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT}},
+      scales:{x:{grid:{color:C.grid},border:{display:false}},y:{grid:{display:false},border:{display:false},ticks:{font:{size:10}}}}}});
+  c_cust.innerHTML=[
+    ['24 Jun','Kwabena O.','buyer','Italian Wool Suit','Instagram','D\'Angelo Palace'],
+    ['24 Jun','Akosua D.','lead','Leather Bag','Walk-in','BW Labone'],
+    ['23 Jun','Yaw M.','buyer','Oxford Brogue','Referral','East Legon Men'],
+    ['23 Jun','Efua A.','buyer','Swiss Watch','Instagram','D\'Angelo Palace'],
+    ['22 Jun','Kojo B.','lead','Selvedge Denim','Facebook','Dzorwulu Men'],
+  ].map(r=>`<tr><td>${r[0]}</td><td><b>${r[1]}</b></td><td style="text-transform:capitalize">${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td><td>${r[5]}</td></tr>`).join('');
+}
+
+/* ===== MARKETING (lazy init) ===== */
+let marketingReady=false;
+function initMarketing(){
+  if(marketingReady)return; marketingReady=true;
+
+  new Chart(m_channelMix,{type:'bar',data:{labels:['Instagram','Facebook','Billboard','Referral','Walk-in'],datasets:[{data:[480,260,180,210,110],backgroundColor:C.gold2,borderRadius:5,barPercentage:.72}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT}},scales:{x:{grid:{display:false},border:{display:false},ticks:{font:{size:10}}},y:{grid:{color:C.grid},border:{display:false}}}}});
+
+  const fn=[['Reach','420,000',100,C.info],['Engagement','86,000',65,C.violet],['Leads','1,240',41,C.teal],['Store Visits','540',28,C.gold2],['Revenue Influenced','₵ 980k',22,C.pos]];
+  m_funnel.innerHTML=fn.map(f=>`<div class="stage"><div class="sb"><div class="top"><b>${f[0]}</b><span>${f[1]}</span></div>
+    <div class="track"><i style="width:${f[2]}%;background:${f[3]}"></i></div></div></div>`).join('');
+
+  new Chart(m_qualFunnel,{type:'bar',data:{labels:['Total','Qualified','Converted'],datasets:[{data:[1240,720,320],backgroundColor:[C.info,C.gold2,C.pos],borderRadius:5,barPercentage:.6}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT}},scales:{x:{grid:{display:false},border:{display:false}},y:{grid:{color:C.grid},border:{display:false}}}}});
+  m_rates.innerHTML=[['Qualified Rate','58%'],['Convert Rate','44%']].map(r=>`<div class="stat"><div class="l">${r[0]}</div><div class="v" style="color:var(--accent-2)">${r[1]}</div></div>`).join('');
+  m_cadence.innerHTML=[['Posts','42'],['Reels','18'],['Stories','96']].map(c=>`<div class="stat"><div class="l">${c[0]}</div><div class="v">${c[1]}</div></div>`).join('');
+
+  const CS={live:['#34d399','rgba(52,211,153,.12)'],planned:['#5b9dff','rgba(91,157,255,.12)'],ended:['#5d6781','rgba(93,103,129,.15)']};
+  m_campaigns.innerHTML=[
+    ['Eid Edit','Instagram','142k','420','₵ 360k','₵ 70k','5.1x','live'],
+    ['Suit Season','Facebook','98k','280','₵ 240k','₵ 60k','4.0x','live'],
+    ['Watch Drop','Instagram','76k','180','₵ 180k','₵ 45k','4.0x','live'],
+    ['Denim Restock','TikTok','64k','210','₵ 120k','₵ 40k','3.0x','planned'],
+    ['Mid-Season Clearance','Email','40k','150','₵ 80k','₵ 30k','2.7x','ended'],
+  ].map(c=>`<tr><td><b>${c[0]}</b></td><td>${c[1]}</td><td>${c[2]}</td><td>${c[3]}</td><td>${c[4]}</td><td>${c[5]}</td>
+    <td style="color:var(--accent-2)">${c[6]}</td><td><span class="prio" style="color:${CS[c[7]][0]};background:${CS[c[7]][1]};text-transform:capitalize">${c[7]}</span></td></tr>`).join('');
+  m_brandRoi.innerHTML=[['Boulevard Men','5.2x','₵ 360k'],['Boulevard Women','4.4x','₵ 280k'],['D\'Angelo','4.0x','₵ 180k'],['Woodpeckers','3.1x','₵ 90k'],['Carbon Shoes','2.8x','₵ 70k']]
+    .map(b=>`<div class="stat" style="margin-bottom:9px;display:flex;justify-content:space-between;align-items:center">
+      <div><div class="l">${b[0]}</div><div style="font-size:10px;color:var(--txt-3);margin-top:2px">${b[2]} rev</div></div><div class="v" style="color:var(--accent-2)">${b[1]}</div></div>`).join('');
+
+  m_social.innerHTML=[
+    ['Instagram','84,200','142,000','310,000','5.8%','9,400'],
+    ['Facebook','61,500','98,000','210,000','3.9%','6,100'],
+    ['TikTok','38,900','120,000','264,000','7.2%','7,800'],
+    ['X (Twitter)','22,400','41,000','88,000','2.4%','2,200'],
+    ['YouTube','14,800','26,000','54,000','4.1%','1,500'],
+  ].map(s=>`<tr><td style="color:var(--accent-2);font-weight:650">${s[0]}</td><td>${s[1]}</td><td>${s[2]}</td><td>${s[3]}</td><td>${s[4]}</td><td>${s[5]}</td></tr>`).join('');
+
+  m_cl.innerHTML=[['Contacted','240'],['Responses','132'],['Response Rate','55%'],['Appointments','48'],['Est. Revenue','₵ 420k'],['Bookings','31']].map(c=>`<div class="stat"><div class="l">${c[0]}</div><div class="v" style="font-size:16px">${c[1]}</div></div>`).join('');
+
+  m_cxKpis.innerHTML=[['Responses','86'],['Avg NPS','62'],['Recommend','88%'],['Types','4']].map(k=>`<div class="stat"><div class="l">${k[0]}</div><div class="v" style="font-size:17px">${k[1]}</div></div>`).join('');
+  m_cxFeed.innerHTML=[
+    ['praise','“Best suit fitting in Accra — staff were superb.”','Instagram','D\'Angelo Palace'],
+    ['suggestion','“Wish you stocked more 42R formal shirts.”','Survey','East Legon Men'],
+    ['complaint','“Long wait at the till on Saturday.”','Walk-in','BW Labone'],
+  ].map(c=>`<div class="alert" style="padding:9px 0"><div class="ab"><b style="color:var(--accent-2);text-transform:capitalize">${c[0]}</b>
+    <p style="color:var(--txt-2)">${c[1]}</p><p style="margin-top:2px">${c[2]} · ${c[3]}</p></div></div>`).join('');
+
+  const AP={High:['#f87171','rgba(248,113,113,.12)'],Medium:['#e8c75a','rgba(232,199,90,.12)'],Low:['#5b9dff','rgba(91,157,255,.12)']};
+  m_actions.innerHTML=[
+    ['Eid campaign — Fragrances & Watches','A. Mensah','High','30 Jun','In Progress'],
+    ['Refresh Boulevard Women lookbook','K. Asare','Medium','5 Jul','Open'],
+    ['Re-target walk-in leads from Instagram','A. Mensah','Medium','2 Jul','Open'],
+    ['Influencer seeding — Carbon Shoes','Y. Darko','Low','12 Jul','Open'],
+  ].map(a=>`<tr><td><b>${a[0]}</b></td><td>${a[1]}</td><td><span class="prio" style="color:${AP[a[2]][0]};background:${AP[a[2]][1]}">${a[2]}</span></td><td>${a[3]}</td><td>${a[4]}</td></tr>`).join('');
+
+  new Chart(m_items,{type:'bar',data:{labels:['Italian Wool Suit','Oxford Brogue','Cotton Shirt','Selvedge Denim','Swiss Watch'],datasets:[{data:[64,52,48,37,29],backgroundColor:C.violet,borderRadius:4,barThickness:13}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT}},scales:{x:{grid:{color:C.grid},border:{display:false}},y:{grid:{display:false},border:{display:false},ticks:{font:{size:9}}}}}});
+  new Chart(m_sizes,{type:'bar',data:{labels:['M','L','XL','40R','42R','44R','10UK'],datasets:[{data:[88,76,54,42,38,26,31],backgroundColor:C.info,borderRadius:4,barPercentage:.7}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT}},scales:{x:{grid:{display:false},border:{display:false}},y:{grid:{color:C.grid},border:{display:false}}}}});
+  new Chart(m_source,{type:'doughnut',data:{labels:['Instagram','Walk-in','Referral','Facebook','Billboard'],datasets:[{data:[118,86,54,38,22],backgroundColor:[C.gold2,C.teal,C.violet,C.info,C.pink],borderColor:'#0e111a',borderWidth:3}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'right',labels:{boxWidth:9,boxHeight:9,padding:7,font:{size:10}}},tooltip:{...TT}}}});
+}
+
+/* ===== OPERATIONS (lazy init) ===== */
+let operationsReady=false;
+function initOperations(){
+  if(operationsReady)return; operationsReady=true;
+  const sl=['Dzorwulu','E.Legon','Labone','BW Labone','BW Dzor','D\'Angelo','Woodpkr'];
+  const hPct={x:{grid:{color:C.grid},border:{display:false},max:100,ticks:{callback:v=>v+'%'}},y:{grid:{display:false},border:{display:false},ticks:{font:{size:9.5}}}};
+
+  new Chart(o_vmStore,{type:'bar',data:{labels:sl,datasets:[{data:[88,90,80,86,83,92,78],backgroundColor:C.gold2,borderRadius:4,barThickness:14}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' '+c.raw+'%'}}},scales:hPct}});
+
+  new Chart(o_riskDonut,{type:'doughnut',data:{labels:['High','Medium','Low'],datasets:[{data:[3,6,14],backgroundColor:[C.neg,C.amber,C.pos],borderColor:'#0e111a',borderWidth:3}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'right',labels:{boxWidth:9,boxHeight:9,padding:8,font:{size:11}}},tooltip:{...TT}}}});
+
+  const sc=[['D\'Angelo Palace',92,88,94,90,93,95],['East Legon Men',90,85,92,88,90,92],['Boulevard Women Labone',89,86,90,89,91,90],
+    ['Dzorwulu Men',87,80,88,85,86,89],['Labone Men',84,80,86,83,85,87],['Boulevard Women Dzorwulu',86,83,87,84,88,86],['Woodpeckers',81,78,82,80,82,84]];
+  const sCol=v=>v>=90?'#34d399':v>=80?'#e8c75a':'#f87171';
+  o_standards.innerHTML=sc.map(r=>`<tr><td><b>${r[0]}</b></td>${r.slice(1).map(v=>`<td style="color:${sCol(v)}">${v}</td>`).join('')}</tr>`).join('');
+
+  o_incTypes.innerHTML=[['Theft / Shrinkage','4'],['Safety','3'],['Stock Loss','5'],['Customer','6'],['IT / System','2'],['Other','3']].map(t=>`<div class="stat"><div class="l">${t[0]}</div><div class="v">${t[1]}</div></div>`).join('');
+  o_incStore.innerHTML=[['D\'Angelo',2],['E.Legon',3],['Dzorwulu',4],['BW Labone',2],['Labone',5],['Woodpkr',7]].map(s=>`<span style="font-size:11.5px;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:6px 11px;color:var(--txt-2)">${s[0]} <b style="color:var(--accent-2);margin-left:3px">${s[1]}</b></span>`).join('');
+  o_topRisks.innerHTML=[
+    ['Fire-exit blocked by stock','Woodpeckers','high'],
+    ['CCTV offline at till 2','Labone Men','high'],
+    ['Repeated cash variance','Dzorwulu Men','critical'],
+  ].map(r=>`<div class="alert" style="padding:9px 0;border-bottom:1px solid var(--line-soft)"><div class="ai" style="background:rgba(248,113,113,.12);width:26px;height:26px">▲</div>
+    <div class="ab"><b>${r[0]}</b><p>${r[1]} · <span style="color:#f87171;text-transform:uppercase;font-size:10px">${r[2]}</span></p></div></div>`).join('');
+
+  o_maintKpis.innerHTML=[['Maintenance Spend','₵ 184k','#e8edf7'],['Open / Unspent','₵ 62k','#e8c75a'],['Overdue','3','#f87171']].map(k=>`<div class="stat"><div class="l">${k[0]}</div><div class="v" style="color:${k[2]}">${k[1]}</div></div>`).join('');
+  const OP={high:['#f87171','rgba(248,113,113,.12)'],medium:['#e8c75a','rgba(232,199,90,.12)'],low:['#5b9dff','rgba(91,157,255,.12)']};
+  o_actions.innerHTML=[
+    ['Repair A/C unit — Labone Men','high','Facilities','Labone Men','In Progress'],
+    ['Replace till 2 CCTV — Labone','high','IT','Labone Men','Open'],
+    ['Re-light window display — Woodpeckers','medium','VM Team','Woodpeckers','Open'],
+    ['Fix fitting-room door — Dzorwulu','medium','Facilities','Dzorwulu Men','In Progress'],
+    ['Restock cleaning supplies — Tema','low','Ops','BW Labone','Done'],
+  ].map(a=>`<tr><td><b>${a[0]}</b></td><td><span class="prio" style="color:${OP[a[1]][0]};background:${OP[a[1]][1]};text-transform:capitalize">${a[1]}</span></td><td>${a[2]}</td><td>${a[3]}</td><td>${a[4]}</td></tr>`).join('');
+
+  new Chart(o_maintCat,{type:'bar',data:{labels:['Electrical','AC / HVAC','Plumbing','Fixtures','IT / Systems','Painting'],datasets:[{data:[8,6,4,5,3,2],backgroundColor:C.gold2,borderRadius:4,barThickness:14}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT}},scales:{x:{grid:{color:C.grid},border:{display:false}},y:{grid:{display:false},border:{display:false},ticks:{font:{size:10}}}}}});
+  o_assignee.innerHTML=[['Facilities Team',6,14,'₵ 28k'],['IT Support',3,8,'₵ 16k'],['VM Team',4,9,'₵ 11k'],['External Contractor',2,5,'₵ 7k']]
+    .map(a=>`<tr><td><b>${a[0]}</b></td><td>${a[1]}</td><td>${a[2]}</td><td>${a[3]}</td></tr>`).join('');
+
+  o_cx.innerHTML=[['Avg Rating','4.5 / 5'],['NPS','62'],['Recommend','88%']].map(c=>`<div class="stat"><div class="l">${c[0]}</div><div class="v">${c[1]}</div></div>`).join('');
+  new Chart(o_vmBreak,{type:'bar',data:{labels:['Window','Mannequin','Signage','Lighting','Fixtures'],datasets:[{data:[86,90,82,79,88],backgroundColor:C.teal,borderRadius:4,barThickness:13}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' '+c.raw+'%'}}},scales:hPct}});
+  o_people.innerHTML=[['People Health','88%'],['Attendance','94%'],['Punctuality','90%'],['Training','76%'],['Absences','8'],['Headcount','96']].map(p=>`<div class="stat"><div class="l">${p[0]}</div><div class="v" style="font-size:16px">${p[1]}</div></div>`).join('');
+
+  new Chart(o_sopArea,{type:'bar',data:{labels:['Opening','Closing','Cash Handling','Stock Receiving','Customer Service'],datasets:[{data:[88,80,76,84,90],backgroundColor:C.gold2,borderRadius:4,barThickness:14}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' '+c.raw+'%'}}},scales:hPct}});
+  o_dev.innerHTML=[
+    ['Cash Handling','Dzorwulu Men','Float not reconciled at close','Re-train + daily spot check'],
+    ['Stock Receiving','Woodpeckers','GRN not signed off','Enforce dual sign-off'],
+    ['Closing','Labone Men','Alarm not set on 2 nights','Manager checklist added'],
+  ].map(d=>`<div class="ins" style="margin-bottom:9px;padding:11px"><div style="display:flex;justify-content:space-between"><b style="color:var(--accent-2);font-size:11.5px">${d[0]}</b><span style="color:var(--txt-3);font-size:11px">${d[1]}</span></div>
+    <div style="font-size:12px;color:var(--txt);margin-top:5px">${d[2]}</div><div style="font-size:11.5px;color:var(--txt-3);margin-top:3px">→ ${d[3]}</div></div>`).join('');
+
+  const CST={Open:['#f87171','rgba(248,113,113,.12)'],'In Progress':['#e8c75a','rgba(232,199,90,.12)'],Closed:['#34d399','rgba(52,211,153,.12)']};
+  o_corrective.innerHTML=[
+    ['VM Audit','Re-merchandise window to brand guide','Woodpeckers','In Progress'],
+    ['Incident','Repair CCTV at till 2','Labone Men','Open'],
+    ['SOP','Daily cash reconciliation spot-check','Dzorwulu Men','In Progress'],
+    ['Store Standards','Deep-clean stockroom','BW Dzorwulu','Closed'],
+    ['Incident','Clear blocked fire exit','Woodpeckers','Closed'],
+  ].map(c=>`<tr><td style="color:var(--accent-2)">${c[0]}</td><td>${c[1]}</td><td style="color:var(--txt-3)">${c[2]}</td><td><span class="prio" style="color:${CST[c[3]][0]};background:${CST[c[3]][1]}">${c[3]}</span></td></tr>`).join('');
+}
+
+/* ===== INVENTORY (lazy init) ===== */
+let inventoryReady=false;
+function initInventory(){
+  if(inventoryReady)return; inventoryReady=true;
+  const gK={x:{grid:{display:false},border:{display:false}},y:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>'₵'+v+'k'}}};
+
+  new Chart(i_goods,{type:'line',data:{labels:['Jan','Feb','Mar','Apr','May','Jun'],datasets:[{data:[1200,980,1450,1320,1600,1480],borderColor:C.gold2,borderWidth:2.5,tension:.4,pointRadius:3,pointBackgroundColor:C.gold2,fill:true,
+    backgroundColor:c=>{const g=c.chart.ctx.createLinearGradient(0,0,0,210);g.addColorStop(0,'rgba(232,199,90,.25)');g.addColorStop(1,'rgba(232,199,90,0)');return g;}}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' ₵'+c.raw+'k'}}},scales:gK}});
+
+  new Chart(i_brand,{type:'doughnut',data:{labels:['Boulevard Men','Boulevard Women','D\'Angelo','Woodpeckers','Carbon Shoes'],datasets:[{data:[34,26,18,13,9],backgroundColor:[C.gold2,C.violet,C.teal,C.info,C.pink],borderColor:'#0e111a',borderWidth:3}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'right',labels:{boxWidth:9,boxHeight:9,padding:6,font:{size:10}}},tooltip:{...TT,callbacks:{label:c=>' '+c.label+': '+c.raw+'%'}}}}});
+
+  new Chart(i_acc,{type:'doughnut',data:{labels:['Exact','±1–2%','±3–5%','>5% off'],datasets:[{data:[74,16,7,3],backgroundColor:[C.pos,C.gold2,C.amber,C.neg],borderColor:'#0e111a',borderWidth:3}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'right',labels:{boxWidth:9,boxHeight:9,padding:6,font:{size:10}}},tooltip:{...TT,callbacks:{label:c=>' '+c.label+': '+c.raw+'%'}}}}});
+
+  i_move.innerHTML=[['Counted On-Hand','₵ 9.1M','#e8edf7'],['Goods Received','₵ 1.48M','#34d399'],['Transferred','₵ 320k','#5b9dff'],['Dead Stock','₵ 564k','#f87171'],['Replen. Reqs','28','#e8edf7']]
+    .map(t=>`<div class="stat"><div class="l">${t[0]}</div><div class="v" style="color:${t[2]};font-size:16px">${t[1]}</div></div>`).join('');
+
+  new Chart(i_supplier,{type:'bar',data:{labels:['Milano Tailoring','Istanbul Textiles','Accra Leatherworks','Carbon Footwear','Lagos Fabrics'],datasets:[{data:[480,360,240,210,150],backgroundColor:C.gold2,borderRadius:4,barThickness:14}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' ₵'+c.raw+'k'}}},scales:{x:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>'₵'+v+'k'}},y:{grid:{display:false},border:{display:false},ticks:{font:{size:9.5}}}}}});
+
+  const URG={critical:['#f87171','rgba(248,113,113,.12)'],high:['#e8c75a','rgba(232,199,90,.12)'],normal:['#5b9dff','rgba(91,157,255,.12)']};
+  i_replen.innerHTML=[
+    ['Italian Wool Suit — 40R',8,40,'critical'],['Egyptian Cotton Shirt — L',14,60,'high'],['Oxford Brogue — 9UK',11,36,'high'],
+    ['Swiss Automatic Watch',6,20,'critical'],['Selvedge Denim — 32',22,40,'normal'],
+  ].map(r=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td><td><span class="prio" style="color:${URG[r[3]][0]};background:${URG[r[3]][1]};text-transform:capitalize">${r[3]}</span></td></tr>`).join('');
+
+  new Chart(i_dead,{type:'bar',data:{labels:['Markdown','Bundle','Transfer','Return to Supplier','Write-off'],datasets:[{data:[210,140,96,72,46],backgroundColor:C.neg,borderRadius:4,barThickness:15}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' ₵'+c.raw+'k'}}},scales:{x:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>'₵'+v+'k'}},y:{grid:{display:false},border:{display:false},ticks:{font:{size:10}}}}}});
+  i_deadItems.innerHTML=[['Patterned Blazer','Markdown 30%','₵ 84k'],['Leather Sandal','Bundle','₵ 56k'],['Wide-leg Chino','Transfer','₵ 41k'],['Novelty Tie','Write-off','₵ 22k']]
+    .map(d=>`<tr><td><b>${d[0]}</b></td><td>${d[1]}</td><td>${d[2]}</td></tr>`).join('');
+
+  new Chart(i_cond,{type:'doughnut',data:{labels:['Good','Minor Damage','Rejected'],datasets:[{data:[86,11,3],backgroundColor:[C.pos,C.amber,C.neg],borderColor:'#0e111a',borderWidth:3}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'bottom',labels:{boxWidth:8,boxHeight:8,padding:7,font:{size:9.5}}},tooltip:{...TT,callbacks:{label:c=>' '+c.label+': '+c.raw+'%'}}}}});
+  i_flag.innerHTML=[
+    ['Istanbul Textiles','Short','3 cartons missing vs PO','22 Jun'],
+    ['Carbon Footwear','Damaged','12 pairs water-damaged','20 Jun'],
+    ['Lagos Fabrics','Short','Wrong colourway on 1 lot','18 Jun'],
+  ].map(r=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td style="color:var(--txt-2)">${r[2]}</td><td>${r[3]}</td></tr>`).join('');
+
+  i_transfers.innerHTML=[
+    ['24 Jun','D\'Angelo Palace → East Legon Men','Italian Wool Suit — 42R','6'],
+    ['23 Jun','Dzorwulu Men → Labone Men','Oxford Brogue — 9UK','12'],
+    ['22 Jun','BW Dzorwulu → BW Labone','Leather Bag','8'],
+    ['21 Jun','Woodpeckers → D\'Angelo Palace','Swiss Watch','4'],
+    ['20 Jun','Labone Men → Dzorwulu Men','Cotton Shirt — L','20'],
+  ].map(t=>`<tr><td>${t[0]}</td><td>${t[1]}</td><td>${t[2]}</td><td>${t[3]}</td></tr>`).join('');
+}
+
+/* ===== BRAND HEALTH (lazy init) ===== */
+let brandReady=false;
+function initBrand(){
+  if(brandReady)return; brandReady=true;
+
+  new Chart(b_gauge,{type:'doughnut',data:{labels:['Health','Gap'],datasets:[{data:[82,18],backgroundColor:[C.gold2,'#1b2233'],borderColor:'#0e111a',borderWidth:0,circumference:360}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'78%',plugins:{legend:{display:false},tooltip:{enabled:false}}}});
+
+  const port=[['Boulevard Men',86,'#34d399','Healthy'],['Boulevard Women',80,'#34d399','Healthy'],['D\'Angelo',78,'#e8c75a','Watch'],['Woodpeckers',72,'#e8c75a','Watch'],['Carbon Shoes',68,'#e8c75a','Watch']];
+  b_portfolio.innerHTML=port.map(p=>`<div style="display:flex;align-items:center;gap:12px;margin-bottom:13px">
+    <span style="font-size:12.5px;width:130px;flex-shrink:0">${p[0]}</span>
+    <div style="flex:1;height:6px;background:var(--panel-2);border-radius:4px;overflow:hidden"><i style="display:block;height:100%;width:${p[1]}%;background:${p[2]}"></i></div>
+    <b style="font-size:13px;width:26px;text-align:right">${p[1]}</b>
+    <span class="prio" style="color:${p[2]};background:${p[2]}22;width:58px;text-align:center">${p[3]}</span></div>`).join('');
+
+  new Chart(b_equity,{type:'bar',data:{labels:['Awareness','Consideration','Preference','Loyalty','Advocacy'],datasets:[{data:[88,74,66,58,49],backgroundColor:C.gold2,borderRadius:5,barPercentage:.66}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' '+c.raw+'%'}}},scales:{x:{grid:{display:false},border:{display:false}},y:{grid:{color:C.grid},border:{display:false},max:100,ticks:{callback:v=>v+'%'}}}}});
+
+  new Chart(b_sentiment,{type:'doughnut',data:{labels:['Positive','Neutral','Negative'],datasets:[{data:[72,20,8],backgroundColor:[C.pos,'#5d6781',C.neg],borderColor:'#0e111a',borderWidth:3}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'bottom',labels:{boxWidth:8,boxHeight:8,padding:7,font:{size:9.5}}},tooltip:{...TT,callbacks:{label:c=>' '+c.label+': '+c.raw+'%'}}}}});
+
+  new Chart(b_trend,{type:'line',data:{labels:['Jan','Feb','Mar','Apr','May','Jun'],datasets:[{data:[63,65,64,68,70,72],borderColor:C.pos,borderWidth:2.5,tension:.4,pointRadius:3,pointBackgroundColor:C.pos,fill:true,
+    backgroundColor:c=>{const g=c.chart.ctx.createLinearGradient(0,0,0,210);g.addColorStop(0,'rgba(52,211,153,.25)');g.addColorStop(1,'rgba(52,211,153,0)');return g;}}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' '+c.raw+'%'}}},scales:{x:{grid:{display:false},border:{display:false}},y:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>v+'%'}}}}});
+
+  new Chart(b_share,{type:'bar',data:{labels:['StateStreet','Rival A','Rival B','Rival C','Others'],datasets:[{data:[38,24,18,12,8],backgroundColor:[C.gold2,'#3a4459','#3a4459','#3a4459','#3a4459'],borderRadius:4,barThickness:15}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:c=>' '+c.raw+'%'}}},scales:{x:{grid:{color:C.grid},border:{display:false},ticks:{callback:v=>v+'%'}},y:{grid:{display:false},border:{display:false},ticks:{font:{size:10}}}}}});
+
+  b_digital.innerHTML=[['Google Rating','4.6★','842 reviews'],['Trustpilot','4.4★',''],['Response Rate','88%',''],['IG Followers','84,200',''],['New / Neg Reviews','36 / 4','']]
+    .map(d=>`<div class="stat"><div class="l">${d[0]}</div><div class="v" style="font-size:18px">${d[1]}</div>${d[2]?`<div style="font-size:10px;color:var(--txt-3);margin-top:2px">${d[2]}</div>`:''}</div>`).join('');
+
+  b_risks.innerHTML=[
+    ['Negative reviews on delivery times','Customer Voice'],['Competitor aggressive pricing on suits','Market'],['Stock gaps in popular formal sizes','Availability'],
+  ].map(r=>`<div class="alert" style="padding:9px 0;border-bottom:1px solid var(--line-soft)"><div class="ai" style="background:rgba(248,113,113,.12);width:26px;height:26px">▲</div>
+    <div class="ab"><b>${r[0]}</b><p>${r[1]}</p></div></div>`).join('');
+  b_opps.innerHTML=[
+    ['High demand for made-to-measure suits','Revenue'],['Strong IG engagement on Watches','Channel'],['Referral rate climbing month-on-month','Acquisition'],
+  ].map(o=>`<div class="alert" style="padding:9px 0;border-bottom:1px solid var(--line-soft)"><div class="ai" style="background:rgba(52,211,153,.12);width:26px;height:26px">▲</div>
+    <div class="ab"><b>${o[0]}</b><p>${o[1]}</p></div></div>`).join('');
+
+  const BP={High:['#f87171','rgba(248,113,113,.12)'],Medium:['#e8c75a','rgba(232,199,90,.12)'],Low:['#5b9dff','rgba(91,157,255,.12)']};
+  b_ceo.innerHTML=[
+    ['High','Delivery-time complaints denting NPS','NPS','Operations','In Progress'],
+    ['Medium','Carbon Shoes momentum below plan','Equity','Brand','Open'],
+    ['Medium','Negative reviews unanswered > 48h','Reputation','Marketing','Monitoring'],
+    ['Low','Trustpilot profile not claimed','Reputation','Marketing','Planned'],
+  ].map(c=>`<tr><td><span class="prio" style="color:${BP[c[0]][0]};background:${BP[c[0]][1]}">${c[0]}</span></td><td>${c[1]}</td><td>${c[2]}</td><td>${c[3]}</td><td>${c[4]}</td></tr>`).join('');
+}
+
+/* view switching */
+const lazy={finance:initFinance,commercial:initCommercial,marketing:initMarketing,operations:initOperations,inventory:initInventory,brand:initBrand};
+const titles={overview:['Executive Command Center','All brands · All stores · Month-to-date · updated 2m ago'],
+  finance:['Finance','P&L, margin, cashflow & ratios across the group'],
+  commercial:['Commercial','Store & category sales, sell-through, weekly reviews'],
+  marketing:['Marketing','Leads, campaigns & action tracker'],
+  operations:['Operations','Store audits, people health & priority actions'],
+  inventory:['Inventory','Stock value, accuracy, ageing & replenishment'],
+  brand:['Brand Health','Sentiment, health index & CEO attention items']};
+document.querySelectorAll('#nav button').forEach(b=>b.addEventListener('click',()=>{
+  const v=b.dataset.view; if(!v)return;
+  document.querySelectorAll('#nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.getElementById('viewTitle').innerHTML=titles[v][0]+(v==='overview'?' <span class="live"><span class="dot"></span>LIVE</span>':'');
+  document.getElementById('viewSub').textContent=titles[v][1];
+  if(lazy[v]) lazy[v]();
+  window.scrollTo({top:0,behavior:'smooth'});
+}));
+document.querySelectorAll('#range button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#range button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  document.getElementById('dateRange').style.display = b.dataset.custom ? 'inline-flex' : 'none';
+}));
+</script>
+</body>
+</html>

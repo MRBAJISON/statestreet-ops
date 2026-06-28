@@ -103,6 +103,7 @@ function groupAvg(items: P[], key: string, valKey: string) {
 function financeMetrics(rows: Entry[]) {
   const labels = Array.from({ length: 31 }, (_, i) => String(i + 1));
   const daily = new Array(31).fill(0);
+  const dailyGP = new Array(31).fill(0); // daily gross profit (gross − cogs) — drives the margin trend
   const catMap = new Map<string, number>();
   // Sell-through per category, derived from the stores' Daily Sales:
   // units sold vs opening stock. Accumulated here, computed in the return.
@@ -132,7 +133,7 @@ function financeMetrics(rows: Entry[]) {
     }
     const d = p.date ? new Date(String(p.date)) : null;
     const day = d && !isNaN(d.getTime()) ? d.getDate() : 0;
-    if (day >= 1 && day <= 31) daily[day - 1] += gross;
+    if (day >= 1 && day <= 31) { daily[day - 1] += gross; dailyGP[day - 1] += gross - num(p.cogs); }
   }
 
   // Debtors = credit sales captured by the stores (Daily Sales) + any debtors logged
@@ -280,6 +281,7 @@ function financeMetrics(rows: Entry[]) {
     cogs: cogsTotal,
     revenueByCategory: [...catMap].map(([name, value]) => ({ name, value })),
     daily,
+    dailyGP,
     labels,
     transactions,
     footfall,
