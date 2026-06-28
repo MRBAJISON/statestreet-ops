@@ -257,7 +257,12 @@
         <option>Boulevard Women Labone</option><option>Boulevard Women Dzorwulu</option><option>D'Angelo Palace</option><option>Woodpeckers</option>
       </select>
     </div>
-    <div class="seg" id="range"><button>D</button><button>W</button><button class="on">M</button><button>Q</button><button>Y</button></div>
+    <div class="seg" id="range"><button>D</button><button>W</button><button class="on">M</button><button>Q</button><button>Y</button><button data-custom="1">Custom</button></div>
+    <span id="dateRange" style="display:none;align-items:center;gap:6px">
+      <input type="date" class="ctl" id="dateFrom" style="padding:7px 10px;color-scheme:dark" aria-label="Start date">
+      <span style="color:var(--txt-3);font-size:12px">to</span>
+      <input type="date" class="ctl" id="dateTo" style="padding:7px 10px;color-scheme:dark" aria-label="End date">
+    </span>
     <button class="iconbtn"><span class="badge">5</span>
       <svg viewBox="0 0 24 24" width="19" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
     </button>
@@ -1320,7 +1325,10 @@ document.querySelectorAll('#nav button').forEach(b=>b.addEventListener('click',(
   if(lazy[v]) lazy[v]();
   window.scrollTo({top:0,behavior:'smooth'});
 }));
-document.querySelectorAll('#range button').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('#range button').forEach(x=>x.classList.remove('on'));b.classList.add('on');}));
+document.querySelectorAll('#range button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#range button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  document.getElementById('dateRange').style.display = b.dataset.custom ? 'inline-flex' : 'none';
+}));
 </script>
 </body>
 </html>
