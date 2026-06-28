@@ -2,13 +2,13 @@
 
 import type { Period } from '@/lib/api';
 
+// Standard periods live in the dropdown. "Custom Date" is a separate tab (below).
 const PERIOD_OPTIONS: { value: Period; label: string }[] = [
   { value: 'day', label: 'Date' },
   { value: 'week', label: 'Week' },
   { value: 'mtd', label: 'Month' },
   { value: 'ytd', label: 'Year' },
   { value: 'all', label: 'All time' },
-  { value: 'custom', label: 'Custom Date' },
 ];
 
 interface StoreOption {
@@ -30,8 +30,11 @@ interface Props {
 const selectClass =
   'bg-[var(--c-card2)] border border-[var(--c-border)] text-xs text-[var(--c-fg)] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#c8a951]';
 
-// Filter bar: period dropdown + calendar date picker + optional store dropdown.
+const tabBase = 'text-xs rounded-lg px-3 py-1.5 border transition-colors whitespace-nowrap';
+
+// Filter bar: period dropdown + a Custom Date tab + the matching date picker(s) + optional store dropdown.
 export default function PeriodTabs({ value, date, onChange, onDateChange, store, stores, onStoreChange }: Props) {
+  const isCustom = value === 'custom';
   return (
     <div className="flex items-center gap-2 flex-wrap">
       {onStoreChange && stores && (
@@ -45,7 +48,17 @@ export default function PeriodTabs({ value, date, onChange, onDateChange, store,
         </select>
       )}
 
-      <select value={value} onChange={(e) => onChange(e.target.value as Period)} className={selectClass} aria-label="Period">
+      {/* Standard periods. Disabled (dimmed) while the Custom Date tab is active. */}
+      <select
+        value={isCustom ? '' : value}
+        onChange={(e) => onChange(e.target.value as Period)}
+        disabled={isCustom}
+        className={`${selectClass} ${isCustom ? 'opacity-50' : ''}`}
+        aria-label="Period"
+      >
+        <option value="" disabled hidden>
+          Period
+        </option>
         {PERIOD_OPTIONS.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
@@ -53,8 +66,22 @@ export default function PeriodTabs({ value, date, onChange, onDateChange, store,
         ))}
       </select>
 
+      {/* Custom Date tab: toggles range mode. When active, its start/end range replaces the single anchor date. */}
+      <button
+        type="button"
+        onClick={() => { onDateChange(''); onChange(isCustom ? 'mtd' : 'custom'); }}
+        aria-pressed={isCustom}
+        className={`${tabBase} ${
+          isCustom
+            ? 'bg-[#c8a951] border-[#c8a951] text-black font-semibold'
+            : 'bg-[var(--c-card2)] border-[var(--c-border)] text-[var(--c-fg)] hover:border-[#c8a951]'
+        }`}
+      >
+        Custom Date
+      </button>
+
       {/* Custom range: two date pickers, encoded as "from~to" through the date prop. */}
-      {value === 'custom' ? (
+      {isCustom ? (
         (() => {
           const [from = '', to = ''] = (date || '').split('~');
           return (
