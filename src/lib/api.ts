@@ -86,7 +86,7 @@ export function useEntries(department: string, limit = 8) {
   return { entries, loading, refresh };
 }
 
-export type Period = 'day' | 'week' | 'mtd' | 'ytd' | 'all';
+export type Period = 'day' | 'week' | 'mtd' | 'ytd' | 'all' | 'custom';
 
 // Live metrics hook: fetches a department's aggregated metrics for a period (+ optional anchor date).
 export function useMetrics<T = Record<string, unknown>>(

@@ -9,7 +9,7 @@ type P = Record<string, unknown>;
 const payloads = (rows: Entry[], type: string): P[] =>
   rows.filter((r) => r.formType === type).map((r) => r.payload as P);
 
-export type Period = 'day' | 'week' | 'mtd' | 'ytd' | 'all';
+export type Period = 'day' | 'week' | 'mtd' | 'ytd' | 'all' | 'custom';
 
 // Best-effort date for an entry: a date field in the payload, else its createdAt.
 function entryDate(r: Entry): Date {
@@ -35,6 +35,21 @@ function startOfWeek(d: Date): Date {
 //  mtd  -> the anchor's month   ytd -> the anchor's year   all -> everything
 export function filterByPeriod(rows: Entry[], period: Period, anchorISO?: string): Entry[] {
   if (period === 'all') return rows;
+  // Custom range: anchorISO is "from~to" (either side optional).
+  if (period === 'custom') {
+    const [f, t] = String(anchorISO ?? '').split('~');
+    const from = f ? new Date(f) : null;
+    const to = t ? new Date(t) : null;
+    if (from) from.setHours(0, 0, 0, 0);
+    if (to) to.setHours(23, 59, 59, 999);
+    if ((from && isNaN(from.getTime())) || (to && isNaN(to.getTime())) || (!from && !to)) return rows;
+    return rows.filter((r) => {
+      const d = entryDate(r);
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
+    });
+  }
   const anchor = anchorISO ? new Date(anchorISO) : new Date();
   if (isNaN(anchor.getTime())) return rows;
   if (period === 'day') return rows.filter((r) => sameDay(entryDate(r), anchor));

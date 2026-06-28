@@ -17,7 +17,7 @@ export async function GET(
     const { department } = await params;
     const sp = req.nextUrl.searchParams;
     const p = sp.get('period');
-    const period: Period = (['day', 'week', 'mtd', 'ytd', 'all'] as const).includes(p as Period)
+    const period: Period = (['day', 'week', 'mtd', 'ytd', 'all', 'custom'] as const).includes(p as Period)
       ? (p as Period)
       : 'mtd';
     const date = sp.get('date') || undefined;

@@ -8,6 +8,7 @@ const PERIOD_OPTIONS: { value: Period; label: string }[] = [
   { value: 'mtd', label: 'Month' },
   { value: 'ytd', label: 'Year' },
   { value: 'all', label: 'All time' },
+  { value: 'custom', label: 'Custom Date' },
 ];
 
 interface StoreOption {
@@ -52,7 +53,19 @@ export default function PeriodTabs({ value, date, onChange, onDateChange, store,
         ))}
       </select>
 
-      {value !== 'all' && (
+      {/* Custom range: two date pickers, encoded as "from~to" through the date prop. */}
+      {value === 'custom' ? (
+        (() => {
+          const [from = '', to = ''] = (date || '').split('~');
+          return (
+            <span className="flex items-center gap-1">
+              <input type="date" value={from} onChange={(e) => onDateChange(`${e.target.value}~${to}`)} className={selectClass} aria-label="Start date" />
+              <span className="text-gray-500 text-xs">to</span>
+              <input type="date" value={to} onChange={(e) => onDateChange(`${from}~${e.target.value}`)} className={selectClass} aria-label="End date" />
+            </span>
+          );
+        })()
+      ) : value !== 'all' && (
         <input
           type="date"
           value={date}
