@@ -5,6 +5,7 @@ import { useEntries, updateEntry, postEntry, type EntryRow } from '@/lib/api';
 import { useOrg } from '@/components/providers/OrgProvider';
 import { categoriesForStore } from '@/lib/org';
 import { Spinner } from '@/components/ui/BrandedLoader';
+import { ShowMoreRows } from '@/components/ui/ShowMore';
 
 const fmtGHS = (n: number) => `GHS ${Math.round(n).toLocaleString()}`;
 const num = (v: unknown) => Number(String(v ?? '').replace(/[,\s]/g, '')) || 0;
@@ -119,7 +120,8 @@ export default function FinanceRevenueReview() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((e) => {
+                  <ShowMoreRows items={rows} limit={7} colSpan={12}>
+                  {(e) => {
                     const net = cur(e, 'grossRevenue') - cur(e, 'discounts');
                     const up = cur(e, 'itemsSold') ? cur(e, 'grossRevenue') / cur(e, 'itemsSold') : 0;
                     return (
@@ -140,7 +142,8 @@ export default function FinanceRevenueReview() {
                         </td>
                       </tr>
                     );
-                  })}
+                  }}
+                  </ShowMoreRows>
                 </tbody>
                 <tfoot>
                   <tr className="border-t border-[var(--c-border)]">

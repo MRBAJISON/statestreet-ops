@@ -7,6 +7,7 @@ import Section from '@/components/ui/Section';
 import ProgressBar from '@/components/ui/ProgressBar';
 import EmptyState from '@/components/ui/EmptyState';
 import RecentEntries from '@/components/ui/RecentEntries';
+import { ShowMoreRows, ShowMoreGrid } from '@/components/ui/ShowMore';
 import StoreLedger from '@/components/finance/StoreLedger';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { SimpleLineChart, SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
@@ -186,15 +187,15 @@ export default function FinancePage() {
                     centerLabel="Total"
                     centerValue={fmtGHS(revenueMtd)}
                   />
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
-                    {revenueByCategory.map((b, i) => (
+                  <ShowMoreGrid items={revenueByCategory} limit={7} wrapClass="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
+                    {(b, i) => (
                       <div key={b.name} className="flex items-center gap-1.5 text-[0.65rem]">
                         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: ['#c8a951', '#22c55e', '#3b82f6', '#ef4444', '#eab308', '#8b5cf6'][i % 6] }} />
                         <span className="text-gray-400 truncate">{b.name}</span>
                         <span className="text-[var(--c-fg)] ml-auto">{fmtGHS(b.value)}</span>
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </ShowMoreGrid>
                 </>
               ) : (
                 <EmptyState height={200} />
@@ -327,7 +328,8 @@ export default function FinancePage() {
                   <div className="text-[0.6rem] text-gray-600 mt-1">Budget: {fmtGHS(budgetTotal)}</div>
                 )}
               </div>
-              {expenses.map((c) => {
+              <ShowMoreGrid items={expenses} limit={7} wrapClass="space-y-3">
+                {(c) => {
                 const share = expensesTotal ? Math.round((c.actual / expensesTotal) * 100) : 0;
                 return (
                   <div key={c.name} className="flex items-center gap-2 text-xs">
@@ -338,7 +340,8 @@ export default function FinancePage() {
                     <span className="text-[0.65rem] min-w-[2rem] text-right text-gray-300">{share}%</span>
                   </div>
                 );
-              })}
+              }}
+              </ShowMoreGrid>
             </div>
             <div className="lg:col-span-2">
               <div className="text-xs text-gray-400 mb-2">Spend by Category</div>
@@ -366,7 +369,8 @@ export default function FinancePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {budgetVsActual.map((b) => (
+                    <ShowMoreRows items={budgetVsActual} limit={7} colSpan={5}>
+                      {(b) => (
                       <tr key={b.item} className="border-b border-[var(--c-hover)]">
                         <td className="py-2 pr-3">{b.item}</td>
                         <td className="py-2 px-3 text-right">{fmtGHS(b.budget)}</td>
@@ -374,7 +378,8 @@ export default function FinancePage() {
                         <td className={`py-2 px-3 text-right ${b.remaining < 0 ? 'text-red-400' : 'text-green-400'}`}>{fmtGHS(b.remaining)}</td>
                         <td className="py-2 pl-3 text-right">{b.over ? <span className="text-red-400">Over</span> : b.budget ? <span className="text-green-400">On track</span> : '—'}</td>
                       </tr>
-                    ))}
+                      )}
+                    </ShowMoreRows>
                   </tbody>
                 </table>
               </div>
@@ -384,16 +389,16 @@ export default function FinancePage() {
             {overspendLog.length > 0 && (
               <div className="mt-4">
                 <div className="text-xs text-gray-400 mb-2">Overspend Log</div>
-                <div className="space-y-2">
-                  {overspendLog.map((o, i) => (
+                <ShowMoreGrid items={overspendLog} limit={7} wrapClass="space-y-2">
+                  {(o, i) => (
                     <div key={i} className="flex items-start gap-2 text-xs p-2.5 rounded-lg border border-red-500/20 bg-red-500/5">
                       <span className="text-[#c8a951] whitespace-nowrap">{o.item}</span>
                       <span className="text-red-400 whitespace-nowrap">{fmtGHS(o.amount)}</span>
                       <span className="text-gray-300 flex-1">{o.reason}</span>
                       <span className="text-gray-600 whitespace-nowrap">{o.date}</span>
                     </div>
-                  ))}
-                </div>
+                  )}
+                </ShowMoreGrid>
               </div>
             )}
           </div>
@@ -493,7 +498,8 @@ export default function FinancePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(m?.dailySalesByStore ?? []).map((s) => (
+                    <ShowMoreRows items={m?.dailySalesByStore ?? []} limit={7} colSpan={5}>
+                      {(s) => (
                       <tr key={s.name} className="border-b border-[var(--c-hover)]">
                         <td className="py-2 pr-3">{s.name}</td>
                         <td className="py-2 px-3 text-right">{s.count}</td>
@@ -501,7 +507,8 @@ export default function FinancePage() {
                         <td className="py-2 px-3 text-right">{s.tx || '—'}</td>
                         <td className="py-2 text-right font-semibold text-[#c8a951]">{fmtGHS(s.gross)}</td>
                       </tr>
-                    ))}
+                      )}
+                    </ShowMoreRows>
                   </tbody>
                 </table>
               ) : (

@@ -5,6 +5,7 @@ import KPICard from '@/components/ui/KPICard';
 import Section from '@/components/ui/Section';
 import EmptyState from '@/components/ui/EmptyState';
 import RecentEntries from '@/components/ui/RecentEntries';
+import { ShowMoreRows, ShowMoreGrid } from '@/components/ui/ShowMore';
 import { SimpleBarChart, SimpleDonutChart } from '@/components/charts/Charts';
 import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
@@ -145,7 +146,8 @@ export default function OperationsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {storeScores.map((s) => (
+                  <ShowMoreRows items={storeScores} limit={7} colSpan={7}>
+                    {(s) => (
                     <tr key={s.store} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3">{s.store}</td>
                       <td className="py-2 px-3 text-right">{s.ops || '—'}</td>
@@ -155,7 +157,8 @@ export default function OperationsPage() {
                       <td className="py-2 px-3 text-right">{s.clean || '—'}</td>
                       <td className="py-2 px-3 text-right">{s.safety || '—'}</td>
                     </tr>
-                  ))}
+                    )}
+                  </ShowMoreRows>
                 </tbody>
               </table>
             </div>
@@ -165,15 +168,15 @@ export default function OperationsPage() {
           {keyIssues.length > 0 && (
             <div className="mt-4">
               <div className="text-xs text-gray-400 mb-2">Key Issues Raised</div>
-              <div className="space-y-2">
-                {keyIssues.map((k, i) => (
+              <ShowMoreGrid items={keyIssues} limit={7} wrapClass="space-y-2">
+                {(k, i) => (
                   <div key={i} className="flex items-start gap-2 text-xs p-2.5 rounded-lg border border-[var(--c-border)] bg-[var(--c-card2)]">
                     <span className="text-gray-300 flex-1">{k.issues}</span>
                     <span className="text-gray-500 whitespace-nowrap">{k.store}</span>
                     <span className="text-gray-600 whitespace-nowrap">{k.date}</span>
                   </div>
-                ))}
-              </div>
+                )}
+              </ShowMoreGrid>
             </div>
           )}
         </Section>
@@ -182,40 +185,40 @@ export default function OperationsPage() {
           {incidentTypes.length > 0 && (
             <>
               <div className="text-xs text-gray-400 mb-2">Incidents by Type</div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                {incidentTypes.map((t) => (
+              <ShowMoreGrid items={incidentTypes} limit={7} wrapClass="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                {(t) => (
                   <div key={t.name} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                     <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">{t.name}</div>
                     <div className="text-lg font-bold text-[#c8a951]">{t.value}</div>
                   </div>
-                ))}
-              </div>
+                )}
+              </ShowMoreGrid>
             </>
           )}
           {incidentsByStore.length > 0 && (
             <div className="mb-4">
               <div className="text-xs text-gray-400 mb-2">Incidents by Store</div>
-              <div className="flex flex-wrap gap-2">
-                {incidentsByStore.map((s) => (
+              <ShowMoreGrid items={incidentsByStore} limit={7} wrapClass="flex flex-wrap gap-2">
+                {(s) => (
                   <span key={s.name} className="text-xs bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg px-3 py-1.5">
                     {s.name} <span className="text-[#c8a951] font-semibold ml-1">{s.value}</span>
                   </span>
-                ))}
-              </div>
+                )}
+              </ShowMoreGrid>
             </div>
           )}
           <div className="text-xs text-gray-400 mb-2">Top Risks (High / Critical incidents)</div>
           {topRisks.length ? (
-            <div className="space-y-2">
-              {topRisks.map((r, i) => (
+            <ShowMoreGrid items={topRisks} limit={7} wrapClass="space-y-2">
+              {(r, i) => (
                 <div key={i} className="flex items-start gap-2 text-xs p-2.5 rounded-lg border border-red-500/20 bg-red-500/5">
                   <span className="text-red-400 mt-0.5">▲</span>
                   <span className="text-gray-300 flex-1">{r.description}</span>
                   <span className="text-gray-500">{r.store}</span>
                   <span className="text-red-400 uppercase text-[0.6rem]">{r.severity}</span>
                 </div>
-              ))}
-            </div>
+              )}
+            </ShowMoreGrid>
           ) : (
             <EmptyState message="No high-severity incidents" hint="High/critical incidents from the Incident Report form appear here." height={120} />
           )}
@@ -240,7 +243,8 @@ export default function OperationsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {priorityActions.map((a, i) => (
+                  <ShowMoreRows items={priorityActions} limit={7} colSpan={5}>
+                    {(a, i) => (
                     <tr key={i} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3">{a.description}</td>
                       <td className="py-2 px-3 capitalize">{a.priority || '—'}</td>
@@ -248,7 +252,8 @@ export default function OperationsPage() {
                       <td className="py-2 px-3">{a.store}</td>
                       <td className="py-2 pl-3 capitalize">{a.status || '—'}</td>
                     </tr>
-                  ))}
+                    )}
+                  </ShowMoreRows>
                 </tbody>
               </table>
             </div>
@@ -287,14 +292,16 @@ export default function OperationsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {maintenanceByAssignee.map((a) => (
+                        <ShowMoreRows items={maintenanceByAssignee} limit={7} colSpan={4}>
+                          {(a) => (
                           <tr key={a.name} className="border-b border-[var(--c-hover)]">
                             <td className="py-2 pr-3">{a.name}</td>
                             <td className="py-2 px-3 text-right">{a.open || '—'}</td>
                             <td className="py-2 px-3 text-right">{a.count || '—'}</td>
                             <td className="py-2 pl-3 text-right">{fmtGHS(a.openCost)}</td>
                           </tr>
-                        ))}
+                          )}
+                        </ShowMoreRows>
                       </tbody>
                     </table>
                   </div>
@@ -383,8 +390,8 @@ export default function OperationsPage() {
             <div>
               <div className="text-xs text-gray-400 mb-2">Deviations Found</div>
               {sopDeviations.length ? (
-                <div className="space-y-2">
-                  {sopDeviations.map((d, i) => (
+                <ShowMoreGrid items={sopDeviations} limit={7} wrapClass="space-y-2">
+                  {(d, i) => (
                     <div key={i} className="text-xs p-2.5 rounded-lg border border-[var(--c-border)] bg-[var(--c-card2)]">
                       <div className="flex justify-between gap-2 mb-1">
                         <span className="text-[#c8a951]">{d.area}</span>
@@ -393,8 +400,8 @@ export default function OperationsPage() {
                       <div className="text-gray-300">{d.deviations}</div>
                       {d.corrective && <div className="text-gray-500 mt-1">→ {d.corrective}</div>}
                     </div>
-                  ))}
-                </div>
+                  )}
+                </ShowMoreGrid>
               ) : (
                 <EmptyState message="No deviations logged" height={160} />
               )}
@@ -415,14 +422,16 @@ export default function OperationsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {correctiveRegister.map((c, i) => (
+                  <ShowMoreRows items={correctiveRegister} limit={7} colSpan={4}>
+                    {(c, i) => (
                     <tr key={i} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3 text-[#c8a951] whitespace-nowrap">{c.source}</td>
                       <td className="py-2 pr-3 text-gray-300">{c.text}</td>
                       <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{c.store}</td>
                       <td className="py-2 pl-3 capitalize">{c.status || '—'}</td>
                     </tr>
-                  ))}
+                    )}
+                  </ShowMoreRows>
                 </tbody>
               </table>
             </div>

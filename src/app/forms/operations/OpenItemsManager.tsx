@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useEntries, updateEntry, type EntryRow } from '@/lib/api';
 import { STORE_LABELS, labelFor } from '@/lib/config';
+import { ShowMoreRows } from '@/components/ui/ShowMore';
 
 const INCIDENT_STATUS = [
   { label: 'Open', value: 'open' }, { label: 'Investigating', value: 'investigating' },
@@ -53,7 +54,8 @@ export default function OpenItemsManager() {
             </tr>
           </thead>
           <tbody>
-            {items.map((e) => {
+            <ShowMoreRows items={items} limit={7} colSpan={5}>
+              {(e) => {
               const p = e.payload;
               const opts = e.formType === 'incident' ? INCIDENT_STATUS : MAINT_STATUS;
               const status = String(p.status || 'open');
@@ -75,7 +77,8 @@ export default function OpenItemsManager() {
                   </td>
                 </tr>
               );
-            })}
+            }}
+            </ShowMoreRows>
           </tbody>
         </table>
       </div>

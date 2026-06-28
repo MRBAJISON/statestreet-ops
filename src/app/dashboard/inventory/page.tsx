@@ -12,6 +12,7 @@ import { useMetrics, useEntries, type Period } from '@/lib/api';
 import BrandedLoader from '@/components/ui/BrandedLoader';
 import { STORE_LABELS, labelFor } from '@/lib/config';
 import { useOrg } from '@/components/providers/OrgProvider';
+import { ShowMoreRows } from '@/components/ui/ShowMore';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -204,14 +205,16 @@ export default function InventoryPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {replenishments.map((r, i) => (
+                      <ShowMoreRows items={replenishments} limit={7} colSpan={4}>
+                        {(r, i) => (
                         <tr key={i} className="border-b border-[var(--c-hover)]">
                           <td className="py-2 pr-3 truncate max-w-[10rem]">{r.description || r.sku}</td>
                           <td className="py-2 px-2 text-right">{r.currentStock}</td>
                           <td className="py-2 px-2 text-right">{r.reorderQty}</td>
                           <td className="py-2 pl-2 capitalize">{r.urgency || '—'}</td>
                         </tr>
-                      ))}
+                        )}
+                      </ShowMoreRows>
                     </tbody>
                   </table>
                 </div>

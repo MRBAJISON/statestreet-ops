@@ -10,6 +10,7 @@ import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, useEntries, type Period } from '@/lib/api';
 import BrandedLoader from '@/components/ui/BrandedLoader';
+import { ShowMoreRows, ShowMoreGrid } from '@/components/ui/ShowMore';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -211,7 +212,8 @@ export default function MarketingPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {campaigns.map((c, i) => (
+                  <ShowMoreRows items={campaigns} limit={7} colSpan={8}>
+                    {(c, i) => (
                     <tr key={i} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3">{c.name}</td>
                       <td className="py-2 px-2 capitalize">{c.platform || '—'}</td>
@@ -222,7 +224,8 @@ export default function MarketingPage() {
                       <td className="py-2 px-2 text-right text-[#c8a951]">{c.roas ? `${c.roas}x` : '—'}</td>
                       <td className="py-2 pl-2 capitalize">{c.status || '—'}</td>
                     </tr>
-                  ))}
+                    )}
+                  </ShowMoreRows>
                 </tbody>
               </table>
             </div>
@@ -232,15 +235,15 @@ export default function MarketingPage() {
           {campaignByBrand.length > 0 && (
             <div className="mt-4">
               <div className="text-xs text-gray-400 mb-2">Campaign ROI by Brand</div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-                {campaignByBrand.map((b) => (
+              <ShowMoreGrid items={campaignByBrand} limit={7} wrapClass="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                {(b) => (
                   <div key={b.brand} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                     <div className="text-[0.65rem] text-gray-500 truncate">{b.brand}</div>
                     <div className="text-base font-bold text-[#c8a951]">{b.roas ? `${b.roas}x` : '—'}</div>
                     <div className="text-[0.6rem] text-gray-600">{fmtGHS(b.revenue)} rev</div>
                   </div>
-                ))}
-              </div>
+                )}
+              </ShowMoreGrid>
             </div>
           )}
         </Section>
@@ -260,7 +263,8 @@ export default function MarketingPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {socialByChannel.map((s) => (
+                  <ShowMoreRows items={socialByChannel} limit={7} colSpan={6}>
+                    {(s) => (
                     <tr key={s.platform} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3 capitalize text-[#c8a951]">{s.platform}</td>
                       <td className="py-2 px-2 text-right">{numOrDash(s.followers)}</td>
@@ -269,7 +273,8 @@ export default function MarketingPage() {
                       <td className="py-2 px-2 text-right">{numOrDash(s.engagement)}</td>
                       <td className="py-2 pl-2 text-right">{numOrDash(s.clicks)}</td>
                     </tr>
-                  ))}
+                    )}
+                  </ShowMoreRows>
                 </tbody>
               </table>
             </div>
@@ -352,7 +357,8 @@ export default function MarketingPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {actions.map((a, i) => (
+                  <ShowMoreRows items={actions} limit={7} colSpan={5}>
+                    {(a, i) => (
                     <tr key={i} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3">{a.task}</td>
                       <td className="py-2 px-3">{a.owner || '—'}</td>
@@ -360,7 +366,8 @@ export default function MarketingPage() {
                       <td className="py-2 px-3 whitespace-nowrap">{a.deadline || '—'}</td>
                       <td className="py-2 pl-3 capitalize">{a.status || '—'}</td>
                     </tr>
-                  ))}
+                    )}
+                  </ShowMoreRows>
                 </tbody>
               </table>
             </div>

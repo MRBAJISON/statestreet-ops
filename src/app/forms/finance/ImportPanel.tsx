@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Spinner } from '@/components/ui/BrandedLoader';
+import { ShowMoreRows } from '@/components/ui/ShowMore';
 
 const fmt = (n: number) => `GHS ${Math.round(n).toLocaleString()}`;
 
@@ -237,7 +238,8 @@ export default function ImportPanel() {
                 </tr>
               </thead>
               <tbody>
-                {history.map((h) => (
+                <ShowMoreRows items={history} limit={7} colSpan={5}>
+                {(h) => (
                   <tr key={h.id} className="border-b border-[var(--c-hover)]">
                     <td className="py-1 pr-2 whitespace-nowrap">{String(h.payload.uploadedAt ?? '').slice(0, 10) || '—'}</td>
                     <td className="py-1 pr-2 truncate max-w-[12rem]">{h.payload.filename || '—'}</td>
@@ -248,7 +250,8 @@ export default function ImportPanel() {
                         className="text-[0.7rem] text-gray-400 hover:text-red-400 disabled:opacity-50">Undo</button>
                     </td>
                   </tr>
-                ))}
+                )}
+                </ShowMoreRows>
               </tbody>
             </table>
           </div>

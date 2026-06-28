@@ -5,6 +5,7 @@ import { useOrg } from '@/components/providers/OrgProvider';
 import { categoriesForStore } from '@/lib/org';
 import { postEntry, updateEntry } from '@/lib/api';
 import { Spinner } from '@/components/ui/BrandedLoader';
+import { ShowMoreRows } from '@/components/ui/ShowMore';
 
 export interface DailySale { date: string; category: string; grossRevenue: number; itemsSold: number; store?: string }
 export interface WeekTarget { weekEnd: string; target: number; store?: string }
@@ -289,7 +290,8 @@ export default function WeeklyReview({ assignedStore = '', managerName = '', dai
               {catOptions.length === 0 && (
                 <tr><td colSpan={section.cols.length + 1} className="p-3 text-gray-500">No categories for this store. Map Brand → Stores and Brand → Categories in Settings.</td></tr>
               )}
-              {catOptions.map((opt) => {
+              <ShowMoreRows items={catOptions} limit={7} colSpan={section.cols.length + 1}>
+                {(opt) => {
                 const cat = opt.value;
                 return (
                 <tr key={cat} className="border-t border-[var(--c-hover)]">
@@ -308,7 +310,8 @@ export default function WeeklyReview({ assignedStore = '', managerName = '', dai
                     </td>
                   ))}
                 </tr>
-              ); })}
+              ); }}
+              </ShowMoreRows>
             </tbody>
           </table>
         </div>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Modal, { ConfirmModal } from '@/components/ui/Modal';
 import { labelFor, STORE_LABELS } from '@/lib/config';
 import { useOrg } from '@/components/providers/OrgProvider';
+import { ShowMoreRows } from '@/components/ui/ShowMore';
 
 interface User {
   id: number;
@@ -174,7 +175,8 @@ export default function UserAdmin() {
                 </tr>
               </thead>
               <tbody>
-                {users.map((u) => (
+                <ShowMoreRows items={users} limit={7} colSpan={6}>
+                  {(u) => (
                   <tr key={u.id} className="border-b border-[var(--c-hover)]">
                     <td className="py-2 pr-3">{u.name}</td>
                     <td className="py-2 pr-3 text-gray-400">{u.email}</td>
@@ -211,7 +213,8 @@ export default function UserAdmin() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  )}
+                </ShowMoreRows>
               </tbody>
             </table>
           </div>

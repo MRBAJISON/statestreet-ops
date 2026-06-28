@@ -13,6 +13,7 @@ import { useMetrics, type Period } from '@/lib/api';
 import { TARGETS, ragStatus } from '@/lib/targets';
 import { useOrg } from '@/components/providers/OrgProvider';
 import { toLabelMap, brandOfStore } from '@/lib/org';
+import { ShowMoreRows, ShowMoreGrid } from '@/components/ui/ShowMore';
 
 const fmtGHS = (n: number) =>
   n >= 1_000_000
@@ -158,14 +159,16 @@ export default function CommercialPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((s) => (
+              <ShowMoreRows items={rows} limit={7} colSpan={4}>
+                {(s) => (
                 <tr key={s.sku + s.name} className="border-b border-[var(--c-hover)]">
                   <td className="py-2 pr-3 truncate max-w-[10rem]">{s.name || s.sku}</td>
                   <td className="py-2 px-2 text-right">{fmtGHS(s.salesValue)}</td>
                   <td className="py-2 px-2 text-right">{s.unitsSold || '—'}</td>
                   <td className="py-2 pl-2 text-right">{s.daysInStock || '—'}</td>
                 </tr>
-              ))}
+                )}
+              </ShowMoreRows>
             </tbody>
           </table>
         </div>
@@ -240,14 +243,14 @@ export default function CommercialPage() {
             <div>
               <div className="text-xs text-gray-400 mb-2">Brand Share of Sales</div>
               {brandPerformance.length ? (
-                <div className="grid grid-cols-1 gap-2">
-                  {brandPerformance.map((b) => (
+                <ShowMoreGrid items={brandPerformance} limit={7} wrapClass="grid grid-cols-1 gap-2">
+                  {(b) => (
                     <div key={b.name} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3 flex justify-between items-center">
                       <span className="text-xs text-gray-400">{b.name}</span>
                       <span className="text-sm font-bold text-[#c8a951]">{fmtGHS(b.value)} <span className="text-gray-500 font-normal">· {brandTotal ? Math.round((b.value / brandTotal) * 100) : 0}%</span></span>
                     </div>
-                  ))}
-                </div>
+                  )}
+                </ShowMoreGrid>
               ) : (
                 <EmptyState height={240} />
               )}
@@ -266,14 +269,14 @@ export default function CommercialPage() {
             </div>
             <div className="lg:col-span-2">
               {sellThroughCat.length ? (
-                <div className="grid grid-cols-2 gap-2">
-                  {sellThroughCat.map((c) => (
+                <ShowMoreGrid items={sellThroughCat} limit={7} wrapClass="grid grid-cols-2 gap-2">
+                  {(c) => (
                     <div key={c.name} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3 flex justify-between items-center">
                       <span className="text-xs text-gray-400 capitalize">{c.name}</span>
                       <span className="text-sm font-bold text-[#c8a951]">{c.value}%</span>
                     </div>
-                  ))}
-                </div>
+                  )}
+                </ShowMoreGrid>
               ) : (
                 <EmptyState height={200} />
               )}
@@ -304,7 +307,8 @@ export default function CommercialPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {skuInsights.map((s, i) => {
+                    <ShowMoreRows items={skuInsights} limit={7} colSpan={6}>
+                      {(s, i) => {
                       const tone = s.performance === 'strong' ? 'text-green-400' : s.performance === 'underperforming' ? 'text-red-400' : 'text-[#c8a951]';
                       return (
                         <tr key={i} className="border-b border-[var(--c-hover)]">
@@ -316,7 +320,8 @@ export default function CommercialPage() {
                           <td className="py-2 text-gray-300 max-w-[20rem] truncate" title={s.insight}>{s.insight || '—'}</td>
                         </tr>
                       );
-                    })}
+                      }}
+                    </ShowMoreRows>
                   </tbody>
                 </table>
               </div>
@@ -341,7 +346,8 @@ export default function CommercialPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {accountability.map((a, i) => (
+                  <ShowMoreRows items={accountability} limit={7} colSpan={6}>
+                    {(a, i) => (
                     <tr key={i} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3">{a.member}</td>
                       <td className="py-2 px-3 capitalize">{a.role || '—'}</td>
@@ -350,7 +356,8 @@ export default function CommercialPage() {
                       <td className="py-2 px-3">{a.actual || '—'}</td>
                       <td className="py-2 pl-3 capitalize">{a.status || '—'}</td>
                     </tr>
-                  ))}
+                    )}
+                  </ShowMoreRows>
                 </tbody>
               </table>
             </div>
@@ -435,7 +442,8 @@ export default function CommercialPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[...wrReviews].sort((a, b) => (a.weekEnd < b.weekEnd ? 1 : -1)).map((r) => (
+                  <ShowMoreRows items={[...wrReviews].sort((a, b) => (a.weekEnd < b.weekEnd ? 1 : -1))} limit={7} colSpan={7}>
+                    {(r) => (
                     <tr key={r.id} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3 whitespace-nowrap">{r.weekEnd || '—'}</td>
                       <td className="py-2 pr-3">{r.store || '—'}</td>
@@ -445,7 +453,8 @@ export default function CommercialPage() {
                       <td className="py-2 px-3 text-right font-semibold text-[#c8a951]">{r.achievement ? `${r.achievement}%` : '—'}</td>
                       <td className="py-2 whitespace-nowrap text-gray-500">{String(r.submittedAt || '').slice(0, 10) || '—'}</td>
                     </tr>
-                  ))}
+                    )}
+                  </ShowMoreRows>
                 </tbody>
               </table>
             </div>
@@ -470,7 +479,8 @@ export default function CommercialPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {categoryTargets.map((c) => {
+                  <ShowMoreRows items={categoryTargets} limit={7} colSpan={7}>
+                    {(c) => {
                     const achCls = (a: number) => (!a ? 'text-gray-500' : a >= 100 ? 'text-green-400' : a >= 80 ? 'text-[#c8a951]' : 'text-red-400');
                     return (
                       <tr key={c.name} className="border-b border-[var(--c-hover)]">
@@ -483,7 +493,8 @@ export default function CommercialPage() {
                         <td className={`py-2 text-right font-semibold ${achCls(c.unitAch)}`}>{c.unitAch ? `${c.unitAch}%` : '—'}</td>
                       </tr>
                     );
-                  })}
+                    }}
+                  </ShowMoreRows>
                 </tbody>
               </table>
             </div>
@@ -494,8 +505,8 @@ export default function CommercialPage() {
 
         <Section title="Manager Voices" subtitle="Latest strategic answers per store">
           {managerVoices.length ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {managerVoices.map((v) => (
+            <ShowMoreGrid items={managerVoices} limit={7} wrapClass="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {(v) => (
                 <div key={`${v.store}-${v.weekEnd}`} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
                   <div className="flex items-baseline justify-between mb-2">
                     <span className="text-sm font-semibold">{v.store}</span>
@@ -510,8 +521,8 @@ export default function CommercialPage() {
                     ))}
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </ShowMoreGrid>
           ) : (
             <EmptyState message="No manager input yet" hint="The Manager Questions in Section 1 of the Weekly Review feed this." height={160} />
           )}
@@ -565,7 +576,8 @@ export default function CommercialPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {leads.map((l, i) => (
+                      <ShowMoreRows items={leads} limit={7} colSpan={8}>
+                        {(l, i) => (
                         <tr key={i} className="border-b border-[var(--c-hover)]">
                           <td className="py-2 pr-3 whitespace-nowrap">{l.date || '—'}</td>
                           <td className="py-2 pr-3">{l.name || '—'}</td>
@@ -576,7 +588,8 @@ export default function CommercialPage() {
                           <td className="py-2 pr-3">{l.store}</td>
                           <td className="py-2">{l.staff || '—'}</td>
                         </tr>
-                      ))}
+                        )}
+                      </ShowMoreRows>
                     </tbody>
                   </table>
                 </div>

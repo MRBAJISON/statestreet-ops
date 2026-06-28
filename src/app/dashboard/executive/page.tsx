@@ -380,7 +380,8 @@ export default function ExecutiveCommandCenter() {
                   </tr>
                 </thead>
                 <tbody>
-                  {ceoAttention.map((c, i) => (
+                  <ShowMoreRows items={ceoAttention} limit={7} colSpan={5}>
+                    {(c, i) => (
                     <tr key={i} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3 capitalize">{c.priority || '—'}</td>
                       <td className="py-2 px-3">{c.issue}</td>
@@ -388,7 +389,8 @@ export default function ExecutiveCommandCenter() {
                       <td className="py-2 px-3">{c.owner || '—'}</td>
                       <td className="py-2 pl-3 capitalize">{c.status || '—'}</td>
                     </tr>
-                  ))}
+                    )}
+                  </ShowMoreRows>
                 </tbody>
               </table>
             </div>
@@ -440,7 +442,8 @@ export default function ExecutiveCommandCenter() {
                   </tr>
                 </thead>
                 <tbody>
-                  {actionTracker.map((a, i) => (
+                  <ShowMoreRows items={actionTracker} limit={7} colSpan={5}>
+                    {(a, i) => (
                     <tr key={i} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3 text-[#c8a951]">{a.dept}</td>
                       <td className="py-2 px-3">{a.task}</td>
@@ -448,7 +451,8 @@ export default function ExecutiveCommandCenter() {
                       <td className="py-2 px-3 capitalize">{a.priority || '—'}</td>
                       <td className="py-2 pl-3 capitalize">{a.status || '—'}</td>
                     </tr>
-                  ))}
+                    )}
+                  </ShowMoreRows>
                 </tbody>
               </table>
             </div>

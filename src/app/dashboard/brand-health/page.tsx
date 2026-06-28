@@ -13,6 +13,7 @@ import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, type Period } from '@/lib/api';
 import BrandedLoader from '@/components/ui/BrandedLoader';
+import { ShowMoreRows, ShowMoreGrid } from '@/components/ui/ShowMore';
 
 interface BrandLive {
   sentiment: { positive: number; neutral: number; negative: number };
@@ -88,8 +89,8 @@ export default function BrandHealthPage() {
             <div className="lg:col-span-2">
               <div className="text-xs text-gray-400 mb-2">Portfolio Health</div>
               {portfolio.length ? (
-                <div className="space-y-2">
-                  {portfolio.map((b) => (
+                <ShowMoreGrid items={portfolio} limit={7} wrapClass="space-y-2">
+                  {(b) => (
                     <div key={b.brand} className="flex items-center gap-3">
                       <span className="text-xs font-medium truncate flex-1">{b.brand}</span>
                       <div className="flex-1">
@@ -98,8 +99,8 @@ export default function BrandHealthPage() {
                       <span className="text-sm font-bold min-w-[2rem] text-right">{b.score}</span>
                       <StatusBadge status={b.status} />
                     </div>
-                  ))}
-                </div>
+                  )}
+                </ShowMoreGrid>
               ) : (
                 <EmptyState height={180} />
               )}
@@ -193,15 +194,15 @@ export default function BrandHealthPage() {
             <div>
               <div className="text-xs text-gray-400 mb-2">Risks</div>
               {risks.length ? (
-                <div className="space-y-2">
-                  {risks.map((r, i) => (
+                <ShowMoreGrid items={risks} limit={7} wrapClass="space-y-2">
+                  {(r, i) => (
                     <div key={i} className="flex items-start gap-2 text-xs p-2.5 rounded-lg border border-red-500/20 bg-red-500/5">
                       <span className="text-red-400 mt-0.5">▲</span>
                       <span className="text-gray-300 flex-1">{r.text}</span>
                       {r.tag && <span className="text-gray-500 text-[0.6rem]">{r.tag}</span>}
                     </div>
-                  ))}
-                </div>
+                  )}
+                </ShowMoreGrid>
               ) : (
                 <EmptyState message="No risks flagged" hint="Customer Voice (frustrations) & competitor threats appear here." height={120} />
               )}
@@ -209,15 +210,15 @@ export default function BrandHealthPage() {
             <div>
               <div className="text-xs text-gray-400 mb-2">Opportunities</div>
               {opportunities.length ? (
-                <div className="space-y-2">
-                  {opportunities.map((o, i) => (
+                <ShowMoreGrid items={opportunities} limit={7} wrapClass="space-y-2">
+                  {(o, i) => (
                     <div key={i} className="flex items-start gap-2 text-xs p-2.5 rounded-lg border border-green-500/20 bg-green-500/5">
                       <span className="text-green-400 mt-0.5">▲</span>
                       <span className="text-gray-300 flex-1">{o.text}</span>
                       {o.tag && <span className="text-gray-500 text-[0.6rem]">{o.tag}</span>}
                     </div>
-                  ))}
-                </div>
+                  )}
+                </ShowMoreGrid>
               ) : (
                 <EmptyState message="No opportunities flagged" hint="Customer Voice (compliments/requests) appear here." height={120} />
               )}
@@ -239,7 +240,8 @@ export default function BrandHealthPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {ceoAttention.map((c, i) => (
+                  <ShowMoreRows items={ceoAttention} limit={7} colSpan={5}>
+                    {(c, i) => (
                     <tr key={i} className="border-b border-[var(--c-hover)]">
                       <td className="py-2 pr-3 capitalize">{c.priority || '—'}</td>
                       <td className="py-2 px-3">{c.issue}</td>
@@ -247,7 +249,8 @@ export default function BrandHealthPage() {
                       <td className="py-2 px-3">{c.owner || '—'}</td>
                       <td className="py-2 pl-3 capitalize">{c.status || '—'}</td>
                     </tr>
-                  ))}
+                    )}
+                  </ShowMoreRows>
                 </tbody>
               </table>
             </div>
