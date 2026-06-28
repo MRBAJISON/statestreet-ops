@@ -2,13 +2,16 @@
 
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, ComposedChart, ReferenceLine } from 'recharts';
 
-const COLORS = ['#c8a951', '#22c55e', '#3b82f6', '#ef4444', '#eab308', '#8b5cf6', '#f97316', '#06b6d4'];
+const COLORS = ['#e8c75a', '#a78bfa', '#2dd4bf', '#5b9dff', '#f472b6', '#34d399', '#f59e0b', '#fb7185'];
 
 const tooltipStyle = {
-  contentStyle: { backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px', fontSize: '0.75rem' },
-  itemStyle: { color: '#fff' },
-  labelStyle: { color: '#9ca3af' },
+  contentStyle: { background: '#0c0e14', border: '1px solid #222a3d', borderRadius: '10px', fontSize: '0.75rem', boxShadow: '0 12px 30px -12px rgba(0,0,0,.7)', padding: '8px 11px' },
+  itemStyle: { color: '#e8edf7' },
+  labelStyle: { color: '#9aa6be', marginBottom: '2px' },
+  cursor: { stroke: '#222a3d', fill: 'rgba(255,255,255,0.03)' },
 };
+
+const GRID = '#1b2233';
 
 interface SimpleLineChartProps {
   data: { name: string; value: number; value2?: number }[];
@@ -29,7 +32,7 @@ export function SimpleLineChart({ data, height = 200, color = '#c8a951', color2,
   return (
     <ResponsiveContainer width="100%" height={height}>
       <Chart data={data}>
-        {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />}
+        {showGrid && <CartesianGrid strokeDasharray="3 3" stroke={GRID} />}
         {showAxis && <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />}
         {showAxis && <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => { const n = Number(v); return prefix + (n >= 1000000 ? (n / 1000000).toFixed(1) + 'M' : n >= 1000 ? (n / 1000).toFixed(0) + 'K' : n); }} />}
         <Tooltip {...tooltipStyle} formatter={(v) => prefix + Number(v).toLocaleString()} />
@@ -67,7 +70,7 @@ export function SimpleBarChart({ data, height = 200, color = '#c8a951', color2, 
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} layout={layout}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
+        <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
         {horizontal ? (
           <>
             <XAxis type="number" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => { const n = Number(v); return prefix + (n >= 1000 ? (n / 1000).toFixed(0) + 'K' : n); }} />
@@ -162,7 +165,7 @@ export function CandlestickChart({ data, height = 280, suffix = '%', target }: {
   return (
     <ResponsiveContainer width="100%" height={height}>
       <ComposedChart data={data} margin={{ top: 10, right: 8, bottom: 0, left: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
+        <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
         <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />
         <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}${suffix}`} domain={['dataMin - 5', 'dataMax + 5']} />
         <Tooltip
