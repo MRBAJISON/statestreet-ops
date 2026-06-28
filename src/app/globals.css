@@ -51,6 +51,15 @@
 [data-theme="light"] .hover\:text-gray-300:hover,
 [data-theme="light"] .hover\:text-gray-300:hover span { color: #374151; }
 
+/* Readability bump: the dashboards were built with very small type. Nudge the
+   smallest utilities up a notch across the whole app (both themes). Unlayered
+   rules override the layered Tailwind utilities, so these win without !important.
+   Bumps are deliberately small (~1px) so dense tables/grids don't reflow. */
+.text-xs { font-size: 0.8125rem; line-height: 1.15rem; }
+.text-\[0\.6rem\],
+.text-\[0\.65rem\] { font-size: 0.72rem; line-height: 1rem; }
+.text-\[0\.7rem\] { font-size: 0.78rem; line-height: 1.05rem; }
+
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--c-border2) var(--c-card);
