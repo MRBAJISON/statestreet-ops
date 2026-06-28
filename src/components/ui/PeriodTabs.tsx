@@ -2,9 +2,9 @@
 
 import type { Period } from '@/lib/api';
 
-// Standard periods live in the dropdown. "Custom Date" is a separate tab (below).
+// Relative periods live in the dropdown. Picking a specific day or range is done
+// via the "Custom Date" tab (below) — it replaces the old single-date picker.
 const PERIOD_OPTIONS: { value: Period; label: string }[] = [
-  { value: 'day', label: 'Date' },
   { value: 'week', label: 'Week' },
   { value: 'mtd', label: 'Month' },
   { value: 'ytd', label: 'Year' },
@@ -80,27 +80,18 @@ export default function PeriodTabs({ value, date, onChange, onDateChange, store,
         Custom Date
       </button>
 
-      {/* Custom range: two date pickers, encoded as "from~to" through the date prop. */}
-      {isCustom ? (
-        (() => {
-          const [from = '', to = ''] = (date || '').split('~');
-          return (
-            <span className="flex items-center gap-1">
-              <input type="date" value={from} onChange={(e) => onDateChange(`${e.target.value}~${to}`)} className={selectClass} aria-label="Start date" />
-              <span className="text-gray-500 text-xs">to</span>
-              <input type="date" value={to} onChange={(e) => onDateChange(`${from}~${e.target.value}`)} className={selectClass} aria-label="End date" />
-            </span>
-          );
-        })()
-      ) : value !== 'all' && (
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => onDateChange(e.target.value)}
-          className={selectClass}
-          aria-label="Anchor date"
-        />
-      )}
+      {/* Custom Date range: start + end pickers, encoded as "from~to" through the date prop.
+          Shown only when the Custom Date tab is active — there is no single-date picker. */}
+      {isCustom && (() => {
+        const [from = '', to = ''] = (date || '').split('~');
+        return (
+          <span className="flex items-center gap-1">
+            <input type="date" value={from} onChange={(e) => onDateChange(`${e.target.value}~${to}`)} className={selectClass} aria-label="Start date" />
+            <span className="text-gray-500 text-xs">to</span>
+            <input type="date" value={to} onChange={(e) => onDateChange(`${from}~${e.target.value}`)} className={selectClass} aria-label="End date" />
+          </span>
+        );
+      })()}
     </div>
   );
 }
