@@ -29,6 +29,9 @@
   --c-border: #2a2a2a;
   --c-border2: #333333;
   --c-fg: #ffffff;
+  /* Command-center panel treatment: subtle top-lit gradient + soft elevation. */
+  --grad-panel: linear-gradient(180deg, #14151b, #0d0d10);
+  --shadow-panel: 0 1px 0 rgba(255,255,255,.03), 0 16px 34px -18px rgba(0,0,0,.75);
 }
 
 [data-theme="light"] {
@@ -39,6 +42,16 @@
   --c-border: #e4e4e2;
   --c-border2: #d6d6d3;
   --c-fg: #18181b;
+  --grad-panel: linear-gradient(180deg, #ffffff, #fafafa);
+  --shadow-panel: 0 1px 2px rgba(0,0,0,.04), 0 12px 26px -18px rgba(0,0,0,.18);
+}
+
+/* Reusable command-center panel surface — add `panel-surface` to any card for the
+   gradient + elevation. Theme-aware via the tokens above; only affects elements
+   that opt in, so it's safe app-wide. Reversible by removing this rule. */
+.panel-surface {
+  background-image: var(--grad-panel);
+  box-shadow: var(--shadow-panel);
 }
 
 /* The UI was built dark-first with light Tailwind grays for muted text, which are

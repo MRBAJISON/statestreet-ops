@@ -3,10 +3,10 @@
 import Link from 'next/link';
 import DashboardHeader from '@/components/layout/DashboardHeader';
 import KPICard from '@/components/ui/KPICard';
-import Section from '@/components/ui/Section';
+import { Bento, Panel } from '@/components/ui/Bento';
 import EmptyState from '@/components/ui/EmptyState';
 import { ShowMoreRows, ShowMoreGrid } from '@/components/ui/ShowMore';
-import { SimpleDonutChart, SimpleBarChart } from '@/components/charts/Charts';
+import { SimpleDonutChart, SimpleBarChart, SimpleLineChart } from '@/components/charts/Charts';
 import { useState } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, useEntries, type Period } from '@/lib/api';
@@ -27,7 +27,11 @@ const dash = (n: number, f: (x: number) => string) => (n ? f(n) : '—');
 const pct = (n: number) => (n ? `${n}%` : '—');
 const money = (n: number) => `GHS ${Math.round(n).toLocaleString()}`;
 
-const cardCls = 'bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3 flex flex-col';
+// Command-center chart palette (gold / violet / teal / blue / pink …). Gated to this
+// page so other dashboards keep their current colors until they're converted.
+const CC = ['#e8c75a', '#a78bfa', '#2dd4bf', '#5b9dff', '#f472b6', '#34d399', '#f59e0b', '#fb7185'];
+
+const cardCls = 'panel-surface bg-[var(--c-card)] border border-[var(--c-border)] rounded-xl p-3 flex flex-col';
 const headCls = 'flex items-center gap-2 mb-1.5';
 const iconCls = 'text-base leading-none';
 const labelCls = 'text-[0.6rem] text-gray-500 uppercase tracking-wider leading-tight';
@@ -80,7 +84,7 @@ export default function ExecutiveCommandCenter() {
   const [store, setStore] = useState('');
   const { org } = useOrg();
   const retailStoreCount = org.stores.filter((s) => s.value !== 'head-office').length;
-  const finQ = useMetrics<{ revenueMtd: number; netProfit: number; grossProfit: number; operatingProfit: number; grossMargin: number; cashNet: number; netMargin: number; roce: number; roi: number; revenueByCategory: { name: string; value: number }[] }>('finance', period, anchor, store);
+  const finQ = useMetrics<{ revenueMtd: number; netProfit: number; grossProfit: number; operatingProfit: number; grossMargin: number; cashNet: number; netMargin: number; roce: number; roi: number; revenueByCategory: { name: string; value: number }[]; daily: number[]; labels: string[]; paymentsByMode: { name: string; value: number }[] }>('finance', period, anchor, store);
   const fin = finQ.data;
   const com = useMetrics<{ groupSales: number; convRate: number; sellThrough: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null; insights: { best: string[]; concern: string[]; risk: string[] } }[] }; managerVoices?: { store: string; manager: string; weekEnd: string; answers: { q: string; a: string }[] }[] }>('commercial', period, anchor, store).data;
   const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[]; priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[]; peopleHealth: { score: number; attendance: number; punctuality: number; training: number; absences: number; count: number }; staffing: { total: number; onDuty: number; absent: number } }>('operations', period, anchor, store).data;
@@ -109,6 +113,13 @@ export default function ExecutiveCommandCenter() {
   const salesByStore = com?.salesByStore ?? [];
   const categorySales = com?.categorySales ?? [];
   const sellThroughByCategory = com?.sellThroughByCategory ?? [];
+  // Daily revenue trend + payment mix come straight from the finance metrics the
+  // page already fetches (no new data layer — just reading more of the response).
+  const daily = fin?.daily ?? [];
+  const labels = fin?.labels ?? [];
+  const dailyData = daily.map((v, i) => ({ name: labels[i] ?? String(i + 1), value: v }));
+  const hasDaily = daily.some((v) => v > 0);
+  const paymentsByMode = fin?.paymentsByMode ?? [];
 
   // Merge commercial sales + operations audit scores into one store-performance view
   const storeMap = new Map<string, { sales: number; ops: number; vm: number }>();
@@ -206,146 +217,137 @@ export default function ExecutiveCommandCenter() {
         </div>
       </div>
 
-      <div className="px-6 pb-8 space-y-6">
-        {/* Group analytics */}
-        <Section number={1} title="Group Performance" subtitle="Live">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div>
-              <div className="text-sm text-gray-400 mb-2">Group Revenue by Category</div>
-              {revenueByCategory.length ? (
-                <>
-                  <SimpleDonutChart data={revenueByCategory} height={230} innerRadius={60} outerRadius={85} centerLabel="Total" centerValue={fmtGHS(fin?.revenueMtd ?? 0)} />
-                  <ShowMoreGrid items={revenueByCategory} limit={7} wrapClass="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
-                    {(b, i) => (
-                      <div key={b.name} className="flex items-center gap-1.5 text-xs">
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: ['#c8a951', '#22c55e', '#3b82f6', '#ef4444', '#eab308', '#8b5cf6'][i % 6] }} />
-                        <span className="text-gray-400 truncate">{b.name}</span>
-                        <span className="text-[var(--c-fg)] ml-auto">{fmtGHS(b.value)}</span>
-                      </div>
-                    )}
-                  </ShowMoreGrid>
-                </>
-              ) : (
-                <EmptyState message="No revenue yet" hint="Add revenue entries in the Finance form." height={200} />
-              )}
-            </div>
-            <div className="lg:col-span-2">
-              <div className="text-sm text-gray-400 mb-2">Sales by Store</div>
-              {salesByStore.length ? (
-                <div className="lg:pl-8">
-                  <SimpleBarChart data={salesByStore} height={220} color="#c8a951" prefix="GHS " />
-                </div>
-              ) : (
-                <EmptyState message="No store sales yet" hint="Add Daily Store Sales in the Commercial form." height={220} />
-              )}
-            </div>
-          </div>
-        </Section>
+      <div className="px-6 pb-8">
+        <Bento>
+          {/* Revenue trend + revenue by category */}
+          <Panel span={8} number={1} title="Group Revenue & Margin Trend" meta="Daily net revenue · recent">
+            {hasDaily ? (
+              <SimpleLineChart data={dailyData} height={230} color="#e8c75a" area prefix="GHS " />
+            ) : (
+              <EmptyState message="No daily revenue yet" hint="Add revenue entries in the Finance form." height={230} />
+            )}
+          </Panel>
+          <Panel span={4} title="Revenue by Category" meta="Share of group revenue">
+            {revenueByCategory.length ? (
+              <>
+                <SimpleDonutChart data={revenueByCategory} height={210} innerRadius={58} outerRadius={82} centerLabel="Total" centerValue={fmtGHS(fin?.revenueMtd ?? 0)} colors={CC} />
+                <ShowMoreGrid items={revenueByCategory} limit={7} wrapClass="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
+                  {(b, i) => (
+                    <div key={b.name} className="flex items-center gap-1.5 text-xs">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: CC[i % CC.length] }} />
+                      <span className="text-gray-400 truncate">{b.name}</span>
+                      <span className="text-[var(--c-fg)] ml-auto">{fmtGHS(b.value)}</span>
+                    </div>
+                  )}
+                </ShowMoreGrid>
+              </>
+            ) : (
+              <EmptyState message="No revenue yet" hint="Add revenue entries in the Finance form." height={200} />
+            )}
+          </Panel>
 
-        {/* Store performance */}
-        <Section number={2} title="Store Performance &amp; People Health">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2">
-              <div className="text-sm text-gray-400 mb-2">Store Performance</div>
-              {storePerformance.length ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-[var(--c-border)] text-gray-500">
-                        <th className="text-left py-2 pr-1.5 font-medium">Store</th>
-                        <th className="text-right py-2 px-1.5 font-medium">Sales</th>
-                        <th className="text-right py-2 px-1.5 font-medium">Ops</th>
-                        <th className="text-right py-2 pl-1.5 font-medium">VM</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <ShowMoreRows items={storePerformance} limit={7} colSpan={4}>
-                        {(s) => (
-                          <tr key={s.store} className="border-b border-[var(--c-hover)]">
-                            <td className="py-2 pr-1.5 max-w-[6.5rem] truncate" title={s.store}>{s.store}</td>
-                            <td className="py-2 px-1.5 text-right">{s.sales ? fmtGHS(s.sales) : '—'}</td>
-                            <td className="py-2 px-1.5 text-right">{s.ops || '—'}</td>
-                            <td className="py-2 pl-1.5 text-right">{s.vm || '—'}</td>
-                          </tr>
-                        )}
-                      </ShowMoreRows>
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <EmptyState message="No store data yet" hint="Store sales (Commercial) and audits (Operations) populate this." height={140} />
-              )}
-            </div>
-            <div>
-              <div className="text-sm text-gray-400 mb-2">People Health <span className="text-gray-600">· Operations HR</span></div>
-              {(ops?.peopleHealth?.count ?? 0) > 0 ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <KPICard label="Overall Score" value={pct(ops?.peopleHealth?.score ?? 0)} status={(ops?.peopleHealth?.score ?? 0) >= 90 ? 'green' : (ops?.peopleHealth?.score ?? 0) >= 70 ? 'yellow' : 'red'} small />
-                  <KPICard label="Attendance" value={pct(ops?.peopleHealth?.attendance ?? 0)} small />
-                  <KPICard label="Punctuality" value={pct(ops?.peopleHealth?.punctuality ?? 0)} small />
-                  <KPICard label="Training" value={pct(ops?.peopleHealth?.training ?? 0)} small />
-                  <KPICard label="Absences" value={(ops?.peopleHealth?.absences ?? 0) ? String(ops?.peopleHealth?.absences) : '—'} small />
-                </div>
-              ) : (
-                <EmptyState message="No people-health data yet" hint="Captured via Operations → Human Resources." height={120} />
-              )}
-            </div>
-          </div>
-        </Section>
+          {/* Sales by store / brand / payment mix */}
+          <Panel span={4} title="Sales by Store" meta="Net sales · GHS">
+            {salesByStore.length ? (
+              <SimpleBarChart data={salesByStore} height={220} color="#e8c75a" prefix="GHS " />
+            ) : (
+              <EmptyState message="No store sales yet" hint="Add Daily Store Sales in the Commercial form." height={220} />
+            )}
+          </Panel>
+          <Panel span={4} title="Brand Performance" meta="Sales rolled up by brand">
+            {brandPerformance.length ? (
+              <SimpleBarChart data={brandPerformance} height={220} color="#a78bfa" horizontal prefix="GHS " />
+            ) : (
+              <EmptyState message="No brand sales yet" hint="Set Brand → Stores in Settings so store sales roll up." height={200} />
+            )}
+          </Panel>
+          <Panel span={4} title="Payment Mix" meta="How customers pay">
+            {paymentsByMode.length ? (
+              <SimpleDonutChart data={paymentsByMode} height={210} innerRadius={58} outerRadius={82} colors={CC} />
+            ) : (
+              <EmptyState message="No payment data yet" hint="Captured via store Daily Closing reports." height={200} />
+            )}
+          </Panel>
 
-        {/* Category performance */}
-        <Section number={3} title="Category Performance">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div>
-              <div className="text-xs text-gray-400 mb-2">Sales by Category</div>
-              {categorySales.length ? (
-                <SimpleBarChart data={categorySales} height={220} color="#c8a951" prefix="GHS " />
-              ) : (
-                <EmptyState message="No category sales yet" hint="Add Category Performance in the Commercial form." height={220} />
-              )}
-            </div>
-            <div>
-              <div className="text-xs text-gray-400 mb-2">Sell-Through by Category</div>
-              {sellThroughByCategory.length ? (
-                <SimpleBarChart data={sellThroughByCategory} height={220} color="#22c55e" />
-              ) : (
-                <EmptyState message="No sell-through data yet" hint="Add Category Performance in the Commercial form." height={220} />
-              )}
-            </div>
-          </div>
-        </Section>
+          {/* Category performance */}
+          <Panel span={6} number={3} title="Sales by Category" meta="Top categories · GHS">
+            {categorySales.length ? (
+              <SimpleBarChart data={categorySales} height={220} color="#e8c75a" prefix="GHS " />
+            ) : (
+              <EmptyState message="No category sales yet" hint="Add Category Performance in the Commercial form." height={220} />
+            )}
+          </Panel>
+          <Panel span={6} title="Sell-Through by Category" meta="% of received stock sold">
+            {sellThroughByCategory.length ? (
+              <SimpleBarChart data={sellThroughByCategory} height={220} color="#2dd4bf" />
+            ) : (
+              <EmptyState message="No sell-through data yet" hint="Add Category Performance in the Commercial form." height={220} />
+            )}
+          </Panel>
 
-        {/* Brand performance */}
-        <Section title="Brand Performance" subtitle="Sales rolled up by brand">
-          {brandPerformance.length ? (
-            <div className="max-w-2xl">
-              <SimpleBarChart data={brandPerformance} height={240} color="#3b82f6" horizontal prefix="GHS " />
+          {/* Store performance + people health */}
+          <Panel span={8} number={2} title="Store Performance" meta="Sales + audit scores · this period">
+            {storePerformance.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--c-border)] text-gray-500">
+                      <th className="text-left py-2 pr-1.5 font-medium">Store</th>
+                      <th className="text-right py-2 px-1.5 font-medium">Sales</th>
+                      <th className="text-right py-2 px-1.5 font-medium">Ops</th>
+                      <th className="text-right py-2 pl-1.5 font-medium">VM</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <ShowMoreRows items={storePerformance} limit={7} colSpan={4}>
+                      {(s) => (
+                        <tr key={s.store} className="border-b border-[var(--c-hover)]">
+                          <td className="py-2 pr-1.5 max-w-[10rem] truncate" title={s.store}>{s.store}</td>
+                          <td className="py-2 px-1.5 text-right">{s.sales ? fmtGHS(s.sales) : '—'}</td>
+                          <td className="py-2 px-1.5 text-right">{s.ops || '—'}</td>
+                          <td className="py-2 pl-1.5 text-right">{s.vm || '—'}</td>
+                        </tr>
+                      )}
+                    </ShowMoreRows>
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState message="No store data yet" hint="Store sales (Commercial) and audits (Operations) populate this." height={140} />
+            )}
+          </Panel>
+          <Panel span={4} title="People Health" meta="Operations · HR">
+            {(ops?.peopleHealth?.count ?? 0) > 0 ? (
+              <div className="grid grid-cols-2 gap-3">
+                <KPICard label="Overall Score" value={pct(ops?.peopleHealth?.score ?? 0)} status={(ops?.peopleHealth?.score ?? 0) >= 90 ? 'green' : (ops?.peopleHealth?.score ?? 0) >= 70 ? 'yellow' : 'red'} small />
+                <KPICard label="Attendance" value={pct(ops?.peopleHealth?.attendance ?? 0)} small />
+                <KPICard label="Punctuality" value={pct(ops?.peopleHealth?.punctuality ?? 0)} small />
+                <KPICard label="Training" value={pct(ops?.peopleHealth?.training ?? 0)} small />
+                <KPICard label="Absences" value={(ops?.peopleHealth?.absences ?? 0) ? String(ops?.peopleHealth?.absences) : '—'} small />
+              </div>
+            ) : (
+              <EmptyState message="No people-health data yet" hint="Captured via Operations → Human Resources." height={120} />
+            )}
+          </Panel>
+
+          {/* Departments + profitability ratios */}
+          <Panel span={8} number={4} title="Departments" meta="Jump to any department dashboard">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {departments.map((d) => (
+                <Link
+                  key={d.name}
+                  href={d.href}
+                  className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-4 hover:border-[#c8a951]/40 transition-colors"
+                >
+                  <div className="text-sm font-semibold text-[var(--c-fg)]">{d.name}</div>
+                  <div className="text-[0.65rem] text-gray-500 mt-2 uppercase tracking-wider">{d.metric}</div>
+                  <div className="text-lg font-bold text-[#c8a951] mt-0.5">{d.value}</div>
+                </Link>
+              ))}
             </div>
-          ) : (
-            <EmptyState message="No brand sales yet" hint="Set Brand → Stores in Settings so store sales roll up to a brand." height={200} />
-          )}
-        </Section>
-
-        {/* Department snapshot */}
-        <Section number={4} title="Departments">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {departments.map((d) => (
-              <Link
-                key={d.name}
-                href={d.href}
-                className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-4 hover:border-[#c8a951]/40 transition-colors"
-              >
-                <div className="text-sm font-semibold text-[var(--c-fg)]">{d.name}</div>
-                <div className="text-[0.65rem] text-gray-500 mt-2 uppercase tracking-wider">{d.metric}</div>
-                <div className="text-lg font-bold text-[#c8a951] mt-0.5">{d.value}</div>
-              </Link>
-            ))}
-          </div>
-
-          {/* Profitability ratios (rated) */}
-          <div className="mt-4">
-            <div className="text-xs text-gray-400 mb-2">Profitability Ratios <span className="text-gray-600">(best on Year/All)</span></div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          </Panel>
+          <Panel span={4} title="Profitability Ratios" meta="Rated · best on Year / All">
+            <div className="grid grid-cols-1 gap-3">
               {([
                 { name: 'Net Profit Margin', kind: 'netMargin' as const, value: fin?.netMargin ?? 0 },
                 { name: 'ROCE', kind: 'roce' as const, value: fin?.roce ?? 0 },
@@ -354,184 +356,186 @@ export default function ExecutiveCommandCenter() {
                 const rating = rateRatio(r.kind, r.value);
                 const tone = rating.tone === 'green' ? 'text-green-400' : rating.tone === 'yellow' ? 'text-yellow-400' : 'text-red-400';
                 return (
-                  <div key={r.kind} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-4">
-                    <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">{r.name}</div>
-                    <div className="text-2xl font-bold mt-1">{r.value ? `${r.value}%` : '—'}</div>
-                    <div className={`text-xs font-semibold mt-1 ${tone}`}>{r.value ? rating.label : 'No data'}</div>
+                  <div key={r.kind} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3 flex items-center justify-between">
+                    <div>
+                      <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">{r.name}</div>
+                      <div className={`text-xs font-semibold mt-0.5 ${tone}`}>{r.value ? rating.label : 'No data'}</div>
+                    </div>
+                    <div className="text-2xl font-bold">{r.value ? `${r.value}%` : '—'}</div>
                   </div>
                 );
               })}
             </div>
-          </div>
-        </Section>
+          </Panel>
 
-        {/* CEO Attention */}
-        <Section number={5} title="CEO Attention Index">
-          {ceoAttention.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-[var(--c-border)] text-gray-500">
-                    <th className="text-left py-2 pr-3 font-medium">Priority</th>
-                    <th className="text-left py-2 px-3 font-medium">Issue</th>
-                    <th className="text-left py-2 px-3 font-medium">Impact</th>
-                    <th className="text-left py-2 px-3 font-medium">Owner</th>
-                    <th className="text-left py-2 pl-3 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <ShowMoreRows items={ceoAttention} limit={7} colSpan={5}>
-                    {(c, i) => (
-                    <tr key={i} className="border-b border-[var(--c-hover)]">
-                      <td className="py-2 pr-3 capitalize">{c.priority || '—'}</td>
-                      <td className="py-2 px-3">{c.issue}</td>
-                      <td className="py-2 px-3 capitalize">{c.impact || '—'}</td>
-                      <td className="py-2 px-3">{c.owner || '—'}</td>
-                      <td className="py-2 pl-3 capitalize">{c.status || '—'}</td>
+          {/* CEO Attention */}
+          <Panel span={12} number={5} title="CEO Attention Index" meta="Issues escalated for the CEO">
+            {ceoAttention.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-[var(--c-border)] text-gray-500">
+                      <th className="text-left py-2 pr-3 font-medium">Priority</th>
+                      <th className="text-left py-2 px-3 font-medium">Issue</th>
+                      <th className="text-left py-2 px-3 font-medium">Impact</th>
+                      <th className="text-left py-2 px-3 font-medium">Owner</th>
+                      <th className="text-left py-2 pl-3 font-medium">Status</th>
                     </tr>
-                    )}
-                  </ShowMoreRows>
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <EmptyState message="No CEO attention items" hint="Raised via the Brand → CEO Attention Items form." height={120} />
-          )}
-        </Section>
-
-        {/* Manager Voices (latest strategic answers per store) */}
-        <Section number={6} title="Manager Voices" subtitle="Latest from store managers">
-          {managerVoices.length ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {managerVoices.map((v, i) => (
-                <div key={`${v.store}-${i}`} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3 flex flex-col">
-                  <div className="text-sm font-semibold text-[var(--c-fg)]">{v.store}</div>
-                  <div className="text-[0.65rem] text-gray-500 mt-0.5">{v.manager || '—'}{v.weekEnd ? ` · week ending ${v.weekEnd}` : ''}</div>
-                  {v.answers.length ? (
-                    <div className="mt-2 space-y-2">
-                      {v.answers.map((x, j) => (
-                        <div key={j}>
-                          <div className="text-[0.65rem] text-[#c8a951]">{x.q}</div>
-                          <div className="text-xs text-gray-200 whitespace-pre-wrap">{x.a || '—'}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-gray-600 mt-2">No answers</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyState message="No manager voices yet" hint="Store managers submit these via Commercial → Weekly Review." height={120} />
-          )}
-        </Section>
-
-        {/* Action Tracker (cross-department) */}
-        <Section number={7} title="Action Tracker">
-          {actionTracker.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-[var(--c-border)] text-gray-500">
-                    <th className="text-left py-2 pr-3 font-medium">Dept</th>
-                    <th className="text-left py-2 px-3 font-medium">Task</th>
-                    <th className="text-left py-2 px-3 font-medium">Owner</th>
-                    <th className="text-left py-2 px-3 font-medium">Priority</th>
-                    <th className="text-left py-2 pl-3 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <ShowMoreRows items={actionTracker} limit={7} colSpan={5}>
-                    {(a, i) => (
-                    <tr key={i} className="border-b border-[var(--c-hover)]">
-                      <td className="py-2 pr-3 text-[#c8a951]">{a.dept}</td>
-                      <td className="py-2 px-3">{a.task}</td>
-                      <td className="py-2 px-3">{a.owner || '—'}</td>
-                      <td className="py-2 px-3 capitalize">{a.priority || '—'}</td>
-                      <td className="py-2 pl-3 capitalize">{a.status || '—'}</td>
-                    </tr>
-                    )}
-                  </ShowMoreRows>
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <EmptyState message="No actions yet" hint="From Marketing → Action Tracker and Operations → Maintenance." height={120} />
-          )}
-        </Section>
-
-        {/* Store Manager CEO Answers (from selected Weekly Review) */}
-        <Section number={8} title="Store Manager — Key Insights" subtitle={wrHeading}>
-          {wr && wr.count > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-              {/* Week history list */}
-              <div className="lg:col-span-1">
-                <div className="text-xs text-gray-400 mb-2">History</div>
-                <div className="space-y-1 max-h-[360px] overflow-y-auto pr-1">
-                  <button
-                    onClick={() => setWrWeek('all')}
-                    className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${wrWeek === 'all' ? 'bg-[#c8a951] text-black border-[#c8a951] font-semibold' : 'bg-[var(--c-card2)] border-[var(--c-border)] text-gray-300 hover:border-[#c8a951]'}`}
-                  >
-                    <div>Latest / All</div>
-                    <div className={wrWeek === 'all' ? 'text-black/70' : 'text-gray-500'}>{wr.count} review{wr.count === 1 ? '' : 's'}</div>
-                  </button>
-                  {wrReviews.map((r) => (
-                    <button
-                      key={r.id}
-                      onClick={() => setWrWeek(r.id)}
-                      className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${wrWeek === r.id ? 'bg-[#c8a951] text-black border-[#c8a951] font-semibold' : 'bg-[var(--c-card2)] border-[var(--c-border)] text-gray-300 hover:border-[#c8a951]'}`}
-                    >
-                      <div>Week ending {r.weekEnd || '—'}</div>
-                      <div className={wrWeek === r.id ? 'text-black/70' : 'text-gray-500'}>{r.store}{r.achievement ? ` · ${r.achievement}%` : ''}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* CEO answers for the selected week */}
-              <div className="lg:col-span-3 space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <KPICard label="Weekly Reviews" value={String(wr.count)} small />
-                  <KPICard label="Achievement" value={wrAchievement ? `${wrAchievement}%` : '—'} small />
-                  <KPICard label="Stock at Risk" value={dash(wrStockAtRisk, fmtGHS)} small />
-                  <KPICard label="At-Risk Categories" value={wrAtRiskCats ? String(wrAtRiskCats) : '—'} small />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {wrInsights.map((ins) => (
-                    <div key={ins.label} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
-                      <div className="text-xs text-[#c8a951] font-semibold mb-2">{ins.label}</div>
-                      {ins.items.length ? (
-                        <ul className="space-y-1">
-                          {ins.items.map((name) => (
-                            <li key={name} className="text-sm text-gray-200">{name}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <div className="text-sm text-gray-600">—</div>
+                  </thead>
+                  <tbody>
+                    <ShowMoreRows items={ceoAttention} limit={7} colSpan={5}>
+                      {(c, i) => (
+                      <tr key={i} className="border-b border-[var(--c-hover)]">
+                        <td className="py-2 pr-3 capitalize">{c.priority || '—'}</td>
+                        <td className="py-2 px-3">{c.issue}</td>
+                        <td className="py-2 px-3 capitalize">{c.impact || '—'}</td>
+                        <td className="py-2 px-3">{c.owner || '—'}</td>
+                        <td className="py-2 pl-3 capitalize">{c.status || '—'}</td>
+                      </tr>
                       )}
-                    </div>
-                  ))}
+                    </ShowMoreRows>
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState message="No CEO attention items" hint="Raised via the Brand → CEO Attention Items form." height={120} />
+            )}
+          </Panel>
+
+          {/* Action Tracker (cross-department) */}
+          <Panel span={12} number={7} title="Action Tracker" meta="Cross-department · Marketing + Operations">
+            {actionTracker.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-[var(--c-border)] text-gray-500">
+                      <th className="text-left py-2 pr-3 font-medium">Dept</th>
+                      <th className="text-left py-2 px-3 font-medium">Task</th>
+                      <th className="text-left py-2 px-3 font-medium">Owner</th>
+                      <th className="text-left py-2 px-3 font-medium">Priority</th>
+                      <th className="text-left py-2 pl-3 font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <ShowMoreRows items={actionTracker} limit={7} colSpan={5}>
+                      {(a, i) => (
+                      <tr key={i} className="border-b border-[var(--c-hover)]">
+                        <td className="py-2 pr-3 text-[#c8a951]">{a.dept}</td>
+                        <td className="py-2 px-3">{a.task}</td>
+                        <td className="py-2 px-3">{a.owner || '—'}</td>
+                        <td className="py-2 px-3 capitalize">{a.priority || '—'}</td>
+                        <td className="py-2 pl-3 capitalize">{a.status || '—'}</td>
+                      </tr>
+                      )}
+                    </ShowMoreRows>
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState message="No actions yet" hint="From Marketing → Action Tracker and Operations → Maintenance." height={120} />
+            )}
+          </Panel>
+
+          {/* Manager Voices (latest strategic answers per store) */}
+          <Panel span={12} number={6} title="Manager Voices" meta="Latest strategic answers from store managers">
+            {managerVoices.length ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {managerVoices.map((v, i) => (
+                  <div key={`${v.store}-${i}`} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3 flex flex-col">
+                    <div className="text-sm font-semibold text-[var(--c-fg)]">{v.store}</div>
+                    <div className="text-[0.65rem] text-gray-500 mt-0.5">{v.manager || '—'}{v.weekEnd ? ` · week ending ${v.weekEnd}` : ''}</div>
+                    {v.answers.length ? (
+                      <div className="mt-2 space-y-2">
+                        {v.answers.map((x, j) => (
+                          <div key={j}>
+                            <div className="text-[0.65rem] text-[#c8a951]">{x.q}</div>
+                            <div className="text-xs text-gray-200 whitespace-pre-wrap">{x.a || '—'}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-600 mt-2">No answers</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState message="No manager voices yet" hint="Store managers submit these via Commercial → Weekly Review." height={120} />
+            )}
+          </Panel>
+
+          {/* Store Manager CEO Answers (from selected Weekly Review) */}
+          <Panel span={12} number={8} title="Store Manager — Key Insights" meta={wrHeading}>
+            {wr && wr.count > 0 ? (
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                {/* Week history list */}
+                <div className="lg:col-span-1">
+                  <div className="text-xs text-gray-400 mb-2">History</div>
+                  <div className="space-y-1 max-h-[360px] overflow-y-auto pr-1">
+                    <button
+                      onClick={() => setWrWeek('all')}
+                      className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${wrWeek === 'all' ? 'bg-[#c8a951] text-black border-[#c8a951] font-semibold' : 'bg-[var(--c-card2)] border-[var(--c-border)] text-gray-300 hover:border-[#c8a951]'}`}
+                    >
+                      <div>Latest / All</div>
+                      <div className={wrWeek === 'all' ? 'text-black/70' : 'text-gray-500'}>{wr.count} review{wr.count === 1 ? '' : 's'}</div>
+                    </button>
+                    {wrReviews.map((r) => (
+                      <button
+                        key={r.id}
+                        onClick={() => setWrWeek(r.id)}
+                        className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${wrWeek === r.id ? 'bg-[#c8a951] text-black border-[#c8a951] font-semibold' : 'bg-[var(--c-card2)] border-[var(--c-border)] text-gray-300 hover:border-[#c8a951]'}`}
+                      >
+                        <div>Week ending {r.weekEnd || '—'}</div>
+                        <div className={wrWeek === r.id ? 'text-black/70' : 'text-gray-500'}>{r.store}{r.achievement ? ` · ${r.achievement}%` : ''}</div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Store manager's judgement answers */}
-                {wrAnswers.length > 0 && (
-                  <div className="space-y-3">
-                    <div className="text-xs text-gray-400 uppercase tracking-wide">Manager&apos;s Plan</div>
-                    {wrAnswers.map((x, i) => (
-                      <div key={i} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
-                        <div className="text-xs text-[#c8a951] mb-1">{x.q}</div>
-                        <div className="text-sm text-gray-200 whitespace-pre-wrap">{x.a}</div>
+                {/* CEO answers for the selected week */}
+                <div className="lg:col-span-3 space-y-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <KPICard label="Weekly Reviews" value={String(wr.count)} small />
+                    <KPICard label="Achievement" value={wrAchievement ? `${wrAchievement}%` : '—'} small />
+                    <KPICard label="Stock at Risk" value={dash(wrStockAtRisk, fmtGHS)} small />
+                    <KPICard label="At-Risk Categories" value={wrAtRiskCats ? String(wrAtRiskCats) : '—'} small />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {wrInsights.map((ins) => (
+                      <div key={ins.label} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
+                        <div className="text-xs text-[#c8a951] font-semibold mb-2">{ins.label}</div>
+                        {ins.items.length ? (
+                          <ul className="space-y-1">
+                            {ins.items.map((name) => (
+                              <li key={name} className="text-sm text-gray-200">{name}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <div className="text-sm text-gray-600">—</div>
+                        )}
                       </div>
                     ))}
                   </div>
-                )}
+
+                  {/* Store manager's judgement answers */}
+                  {wrAnswers.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="text-xs text-gray-400 uppercase tracking-wide">Manager&apos;s Plan</div>
+                      {wrAnswers.map((x, i) => (
+                        <div key={i} className="bg-[var(--c-card2)] border border-[var(--c-border)] rounded-lg p-3">
+                          <div className="text-xs text-[#c8a951] mb-1">{x.q}</div>
+                          <div className="text-sm text-gray-200 whitespace-pre-wrap">{x.a}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ) : (
-            <EmptyState message="No weekly reviews yet" hint="Store managers submit these via Commercial → Weekly Review." height={120} />
-          )}
-        </Section>
+            ) : (
+              <EmptyState message="No weekly reviews yet" hint="Store managers submit these via Commercial → Weekly Review." height={120} />
+            )}
+          </Panel>
+        </Bento>
       </div>
     </div>
   );
