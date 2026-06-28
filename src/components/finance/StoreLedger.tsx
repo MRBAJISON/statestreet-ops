@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { STORE_LABELS, CATEGORY_LABELS, labelFor } from '@/lib/config';
+import { ShowMoreRows } from '@/components/ui/ShowMore';
 
 interface EntryRow { id: number; payload: Record<string, unknown>; createdAt: string }
 interface AuditRow { id: number; entryId: number; action: string; userName: string | null; changes: Record<string, unknown> | null; createdAt: string }
@@ -56,7 +57,8 @@ export default function StoreLedger() {
           </tr>
         </thead>
         <tbody>
-          {sorted.map((e) => {
+          <ShowMoreRows items={sorted} limit={7} colSpan={6}>
+            {(e) => {
             const trail = trailFor(e.id);
             return (
               <Fragment key={e.id}>
@@ -95,7 +97,8 @@ export default function StoreLedger() {
                 )}
               </Fragment>
             );
-          })}
+            }}
+          </ShowMoreRows>
         </tbody>
       </table>
     </div>
