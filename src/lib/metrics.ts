@@ -120,11 +120,13 @@ function financeMetrics(rows: Entry[]) {
     if (day >= 1 && day <= 31) daily[day - 1] += gross;
   }
 
-  // Debtors / creditors (debtors form)
+  // Debtors = credit sales captured by the stores (Daily Sales) + any debtors logged
+  // on the Finance Debtors/Creditors form. Creditors come from that form only.
   const deb = payloads(rows, 'debtors');
   const debtors = deb
     .filter((p) => String(p.type) === 'debtor')
-    .reduce((s, p) => s + num(p.amount), 0);
+    .reduce((s, p) => s + num(p.amount), 0)
+    + payloads(rows, 'revenue').reduce((s, p) => s + num(p.creditSales), 0);
   const creditors = deb
     .filter((p) => String(p.type) === 'creditor')
     .reduce((s, p) => s + num(p.amount), 0);

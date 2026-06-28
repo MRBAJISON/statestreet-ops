@@ -97,6 +97,7 @@ export default function DailySales({ assignedStore, recent, onSaved }: { assigne
           <FormField label="Cost of Goods (COGS)" name="cogs" type="number" prefix="GHS" step={0.01} required />
           <FormField label="Discounts Given" name="discounts" type="number" prefix="GHS" step={0.01} value={discounts} onChange={(e) => setDiscounts(e.target.value)} />
           <FormField label="Net Revenue (auto)" name="netRevenue" type="number" prefix="GHS" value={netRevenue ? String(netRevenue) : ''} readOnly />
+          <FormField label="Credit Sales" name="creditSales" type="number" prefix="GHS" step={0.01} />
           <FormField label="Transactions" name="transactions" type="number" />
           <FormField label="Footfall" name="footfall" type="number" />
           <FormField label="Items Sold" name="itemsSold" type="number" required />

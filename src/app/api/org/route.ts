@@ -16,7 +16,7 @@ export async function GET() {
 
 // Update (partial patch merged over current settings).
 // Owner, Commercial and Operations may edit organization settings.
-const ORG_EDITORS = ['owner', 'commercial', 'operations'];
+const ORG_EDITORS = ['owner', 'finance', 'commercial', 'operations'];
 export async function PATCH(req: NextRequest) {
   const session = await getSession();
   if (!session || !ORG_EDITORS.includes(session.user.role)) {
