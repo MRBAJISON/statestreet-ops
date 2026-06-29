@@ -55,6 +55,37 @@ function ListEditor({ title, items, onChange }: { title: string; items: Opt[]; o
   );
 }
 
+// Open/Closed status per store. Closed stores are stored as a list of values; a
+// store not in the list is open. Drives the executive Active Stores breakdown.
+function StoreStatusEditor({ stores, closed, onChange }: { stores: Opt[]; closed: string[]; onChange: (next: string[]) => void }) {
+  const isClosed = (v: string) => closed.includes(v);
+  const toggle = (v: string) => onChange(isClosed(v) ? closed.filter((x) => x !== v) : [...closed, v]);
+  const real = stores.filter((s) => s.label.trim() && s.value !== 'head-office');
+  return (
+    <div>
+      <div className="text-xs text-gray-400 mb-1">Store Status</div>
+      {real.length ? (
+        <div className="space-y-2">
+          {real.map((s) => (
+            <div key={s.value} className="flex items-center justify-between gap-2">
+              <span className="text-sm text-[var(--c-fg)] truncate">{s.label}</span>
+              <button
+                type="button"
+                onClick={() => toggle(s.value)}
+                className={`text-xs font-semibold px-3 py-1 rounded-lg border transition-colors ${isClosed(s.value) ? 'border-red-500/40 text-red-400 bg-red-500/10' : 'border-green-500/40 text-green-400 bg-green-500/10'}`}
+              >
+                {isClosed(s.value) ? 'Closed' : 'Open'}
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-gray-500">Add stores above first.</p>
+      )}
+    </div>
+  );
+}
+
 type ExpOpt = { label: string; value: string; group: 'operating' | 'capital' | 'below-line' };
 function ExpenseEditor({ items, onChange }: { items: ExpOpt[]; onChange: (next: ExpOpt[]) => void }) {
   const set = (i: number, patch: Partial<ExpOpt>) => onChange(items.map((it, k) => (k === i ? { ...it, ...patch, value: (patch.label !== undefined ? slugify(patch.label) : it.value) } : it)));
@@ -227,6 +258,7 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
           brandCategories: orgDraft.brandCategories,
           brandStores: orgDraft.brandStores,
           categorySubcategories: orgDraft.categorySubcategories,
+          closedStores: orgDraft.closedStores,
         }),
       });
       const data = await res.json();
@@ -389,6 +421,7 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
             {orgTab === 'catalog' && (
             <div className="space-y-4">
               <ListEditor title="Stores / Locations" items={orgDraft.stores} onChange={(stores) => setOrgDraft((d) => ({ ...d, stores }))} />
+              <StoreStatusEditor stores={orgDraft.stores} closed={orgDraft.closedStores} onChange={(closedStores) => setOrgDraft((d) => ({ ...d, closedStores }))} />
               <ListEditor title="Brands" items={orgDraft.brands} onChange={(brands) => setOrgDraft((d) => ({ ...d, brands }))} />
               <ListEditor title="Product Categories" items={orgDraft.categories} onChange={(categories) => setOrgDraft((d) => ({ ...d, categories }))} />
               <ListEditor title="Sub-categories" items={orgDraft.subCategories} onChange={(subCategories) => setOrgDraft((d) => ({ ...d, subCategories }))} />

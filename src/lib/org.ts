@@ -20,6 +20,7 @@ export interface OrgSettings {
   brandCategories: Record<string, string[]>; // brandValue -> [categoryValue,...]
   brandStores: Record<string, string[]>;     // brandValue -> [storeValue,...]
   categorySubcategories: Record<string, string[]>; // categoryValue -> [subCategoryValue,...]
+  closedStores: string[]; // store values currently marked closed (default: all open)
 }
 
 export const DEFAULT_ORG: OrgSettings = {
@@ -37,6 +38,7 @@ export const DEFAULT_ORG: OrgSettings = {
   brandCategories: {},
   brandStores: {},
   categorySubcategories: {},
+  closedStores: [],
 };
 
 // Merge a stored (possibly partial) record over the defaults.
@@ -60,6 +62,7 @@ export function mergeOrg(raw: Partial<OrgSettings> | null | undefined): OrgSetti
     brandCategories: r.brandCategories ?? {},
     brandStores: r.brandStores ?? {},
     categorySubcategories: r.categorySubcategories ?? {},
+    closedStores: r.closedStores ?? [],
   };
 }
 

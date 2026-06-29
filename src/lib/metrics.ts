@@ -556,6 +556,9 @@ function commercialMetrics(rows: Entry[]) {
   const units = rev.reduce((s, p) => s + num(p.itemsSold), 0);
   const footfall = rev.reduce((s, p) => s + num(p.footfall), 0);
   const salesByStoreRaw = groupSum(rev, 'store', 'grossRevenue');
+  // Per-store sales target = sum of the commercial weekly targets in range, by store.
+  const storeTargetMap = new Map<string, number>();
+  for (const p of payloads(rows, 'weekly-target')) storeTargetMap.set(String(p.store), (storeTargetMap.get(String(p.store)) ?? 0) + num(p.target));
   const categorySalesRaw = groupSum(rev, 'category', 'grossRevenue');
 
   // SKU performance
@@ -652,6 +655,7 @@ function commercialMetrics(rows: Entry[]) {
     salesByStore: salesByStoreRaw.map((x) => ({
       name: labelFor(STORE_LABELS, x.name),
       value: x.value,
+      target: storeTargetMap.get(x.name) ?? 0,
     })),
     topSelling,
     lowMoving,

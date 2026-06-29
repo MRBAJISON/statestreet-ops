@@ -60,9 +60,10 @@ interface SimpleBarChartProps {
   horizontal?: boolean;
   prefix?: string;
   stacked?: boolean;
+  barSize?: number; // fixed bar thickness (px); falls back to maxBarSize when unset
 }
 
-export function SimpleBarChart({ data, height = 200, color = '#c8a951', color2, horizontal = false, prefix = '', stacked = false }: SimpleBarChartProps) {
+export function SimpleBarChart({ data, height = 200, color = '#c8a951', color2, horizontal = false, prefix = '', stacked = false, barSize }: SimpleBarChartProps) {
   const layout = horizontal ? 'vertical' as const : 'horizontal' as const;
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -82,8 +83,8 @@ export function SimpleBarChart({ data, height = 200, color = '#c8a951', color2, 
           </>
         )}
         <Tooltip {...tooltipStyle} formatter={(v) => prefix + Number(v).toLocaleString()} />
-        <Bar dataKey="value" fill={color} radius={[4, 4, 0, 0]} stackId={stacked ? 'a' : undefined} maxBarSize={46} />
-        {color2 && <Bar dataKey="value2" fill={color2} radius={[4, 4, 0, 0]} stackId={stacked ? 'a' : undefined} maxBarSize={46} />}
+        <Bar dataKey="value" fill={color} radius={[4, 4, 0, 0]} stackId={stacked ? 'a' : undefined} barSize={barSize} maxBarSize={barSize ?? 46} />
+        {color2 && <Bar dataKey="value2" fill={color2} radius={[4, 4, 0, 0]} stackId={stacked ? 'a' : undefined} barSize={barSize} maxBarSize={barSize ?? 46} />}
       </BarChart>
     </ResponsiveContainer>
   );

@@ -25,8 +25,9 @@ const dash = (n: number, f: (x: number) => string) => (n ? f(n) : '—');
 const pct = (n: number) => (n ? `${n}%` : '—');
 const money = (n: number) => `GHS ${Math.round(n).toLocaleString()}`;
 
-// Command-center category/series palette (matches the prototype).
-const CC = ['#e8c75a', '#a78bfa', '#2dd4bf', '#5b9dff', '#f472b6', '#f59e0b', '#34d399', '#475569'];
+// Category + payment palettes — exact shades from the prototype.
+const CC = ['#e8c75a', '#a78bfa', '#2dd4bf', '#5b9dff', '#f472b6', '#f59e0b', '#475569'];
+const PAY = ['#2dd4bf', '#5b9dff', '#e8c75a', '#a78bfa', '#34d399', '#f472b6'];
 
 // Priority chip colours (text, background) — from the prototype's PRI map.
 const PRIO: Record<string, [string, string]> = {
@@ -104,10 +105,13 @@ export default function ExecutiveCommandCenter() {
   const [anchor, setAnchor] = useState('');
   const [store, setStore] = useState('');
   const { org } = useOrg();
-  const retailStoreCount = org.stores.filter((s) => s.value !== 'head-office').length;
+  const closedSet = new Set(org.closedStores ?? []);
+  const retailStores = org.stores.filter((s) => s.value !== 'head-office');
+  const openCount = retailStores.filter((s) => !closedSet.has(s.value)).length;
+  const closedCount = retailStores.length - openCount;
   const finQ = useMetrics<{ revenueMtd: number; netProfit: number; grossProfit: number; operatingProfit: number; grossMargin: number; cashNet: number; netMargin: number; roce: number; roi: number; revenueByCategory: { name: string; value: number }[]; daily: number[]; dailyGP: number[]; labels: string[]; paymentsByMode: { name: string; value: number }[] }>('finance', period, anchor, store);
   const fin = finQ.data;
-  const com = useMetrics<{ groupSales: number; convRate: number; sellThrough: number; salesByStore: { name: string; value: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null; insights: { best: string[]; concern: string[]; risk: string[] } }[] }; managerVoices?: { store: string; manager: string; weekEnd: string; answers: { q: string; a: string }[] }[] }>('commercial', period, anchor, store).data;
+  const com = useMetrics<{ groupSales: number; convRate: number; sellThrough: number; salesByStore: { name: string; value: number; target: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null; insights: { best: string[]; concern: string[]; risk: string[] } }[] }; managerVoices?: { store: string; manager: string; weekEnd: string; answers: { q: string; a: string }[] }[] }>('commercial', period, anchor, store).data;
   const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[]; priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[]; peopleHealth: { score: number; attendance: number; punctuality: number; training: number; absences: number; count: number }; staffing: { total: number; onDuty: number; absent: number } }>('operations', period, anchor, store).data;
   const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory', period, anchor, store).data;
   const brd = useMetrics<{ healthIndex: number; sentiment: { positive: number }; ceoAttention: { priority: string; issue: string; impact: string; owner: string; status: string }[] }>('brand', period, anchor, store).data;
@@ -149,10 +153,10 @@ export default function ExecutiveCommandCenter() {
   const paymentsByMode = fin?.paymentsByMode ?? [];
 
   // Merge commercial sales + operations audit scores into one store-performance view
-  const storeMap = new Map<string, { sales: number; ops: number; vm: number }>();
-  for (const s of salesByStore) storeMap.set(s.name, { sales: s.value, ops: 0, vm: 0 });
+  const storeMap = new Map<string, { sales: number; target: number; ops: number; vm: number }>();
+  for (const s of salesByStore) storeMap.set(s.name, { sales: s.value, target: s.target ?? 0, ops: 0, vm: 0 });
   for (const s of ops?.storeScores ?? []) {
-    const cur = storeMap.get(s.store) ?? { sales: 0, ops: 0, vm: 0 };
+    const cur = storeMap.get(s.store) ?? { sales: 0, target: 0, ops: 0, vm: 0 };
     cur.ops = s.ops;
     cur.vm = s.vm;
     storeMap.set(s.store, cur);
@@ -255,6 +259,12 @@ export default function ExecutiveCommandCenter() {
           <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={org.stores} onStoreChange={setStore} />
         </div>
 
+        <div className="cc-mission mb-[18px]">
+          <span className="m1">One Vision · One Team · One Destination</span>
+          <span className="sep" />
+          <span className="m2"><b>Mission:</b> Build Ghana&apos;s most trusted premium retail group.</span>
+        </div>
+
         {/* GROUP KPI BAR */}
         <div className="cc-kpis mb-[18px]">
           <KpiProgress icon="💰" label="Group Revenue (MTD)" value={fin?.revenueMtd ?? 0} target={T.revenueMtd} />
@@ -262,7 +272,7 @@ export default function ExecutiveCommandCenter() {
           <KpiProgress icon="📈" label="Operating Profit (MTD)" value={fin?.operatingProfit ?? 0} target={T.operatingProfit} />
           <KpiDelta icon="🧮" label="Group GM% (MTD)" value={fin?.grossMargin ?? 0} target={T.grossMargin} />
           <KpiDelta icon="🛒" label="Sell-Through (YTD)" value={com?.sellThrough ?? 0} target={T.sellThrough} />
-          <KpiStat icon="🏬" label="Active Stores" value={String(retailStoreCount)} sub1={`Total Stores: ${retailStoreCount}`} sub2={`Open: ${retailStoreCount} · Closed: 0`} />
+          <KpiStat icon="🏬" label="Active Stores" value={String(openCount)} sub1={`Total Stores: ${retailStores.length}`} sub2={`Open: ${openCount} · Closed: ${closedCount}`} />
           <KpiStat icon="👥" label="Total Employees" value={(ops?.staffing?.total ?? 0) ? String(ops?.staffing?.total) : '—'}
             sub1={(ops?.staffing?.total ?? 0) ? `On Duty: ${ops?.staffing?.onDuty ?? 0}` : 'No HR data'}
             sub2={(ops?.staffing?.total ?? 0) ? `Absent: ${ops?.staffing?.absent ?? 0}` : ''} />
@@ -312,7 +322,7 @@ export default function ExecutiveCommandCenter() {
           <div className="cc-panel c4">
             <div className="phead"><div><h3>Brand Performance</h3><div className="meta">Sales rolled up by brand</div></div></div>
             {brandPerformance.length ? (
-              <SimpleBarChart data={brandPerformance} height={210} color="#a78bfa" horizontal prefix="GHS " />
+              <SimpleBarChart data={brandPerformance} height={210} color="#a78bfa" horizontal barSize={16} prefix="GHS " />
             ) : (
               <EmptyState message="No brand sales yet" hint="Set Brand → Stores in Settings so store sales roll up." height={200} />
             )}
@@ -320,7 +330,14 @@ export default function ExecutiveCommandCenter() {
           <div className="cc-panel c4">
             <div className="phead"><div><h3>Payment Mix</h3><div className="meta">How customers pay</div></div></div>
             {paymentsByMode.length ? (
-              <SimpleDonutChart data={paymentsByMode} height={210} innerRadius={56} outerRadius={82} colors={CC} />
+              <>
+                <SimpleDonutChart data={paymentsByMode} height={200} innerRadius={56} outerRadius={82} colors={PAY} />
+                <ShowMoreGrid items={paymentsByMode} limit={6} wrapClass="cc-legend">
+                  {(p, i) => (
+                    <span key={p.name}><i style={{ background: PAY[i % PAY.length] }} />{p.name} · <b>{fmtGHS(p.value)}</b></span>
+                  )}
+                </ShowMoreGrid>
+              </>
             ) : (
               <EmptyState message="No payment data yet" hint="Captured via store Daily Closing reports." height={200} />
             )}
@@ -350,11 +367,13 @@ export default function ExecutiveCommandCenter() {
               <span className="pill">{storePerformance.length} store{storePerformance.length === 1 ? '' : 's'}</span></div>
             {storePerformance.length ? (
               <table>
-                <thead><tr><th>Store</th><th>Brand</th><th>Sales</th><th>Ops</th><th>VM</th></tr></thead>
+                <thead><tr><th>Store</th><th>Brand</th><th>Sales</th><th>Ops</th><th>VM</th><th>vs Target</th></tr></thead>
                 <tbody>
-                  <ShowMoreRows items={storePerformance} limit={7} colSpan={5}>
+                  <ShowMoreRows items={storePerformance} limit={7} colSpan={6}>
                     {(s) => {
                       const brand = brandForStore(s.store);
+                      const tp = s.target > 0 ? Math.round((s.sales / s.target) * 100) : 0;
+                      const tc = tp >= 100 ? '#34d399' : tp >= 90 ? '#e8c75a' : '#f87171';
                       return (
                         <tr key={s.store}>
                           <td><b>{s.store}</b></td>
@@ -362,6 +381,7 @@ export default function ExecutiveCommandCenter() {
                           <td><b>{s.sales ? fmtGHS(s.sales) : '—'}</b></td>
                           <td>{s.ops || '—'}</td>
                           <td>{s.vm || '—'}</td>
+                          <td>{s.target ? <span className="status"><span className="d" style={{ background: tc }} />{tp}%</span> : '—'}</td>
                         </tr>
                       );
                     }}
