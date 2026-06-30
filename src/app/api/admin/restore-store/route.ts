@@ -10,15 +10,16 @@ export const runtime = 'nodejs';
 
 // The store each audited daily-sales entry was ORIGINALLY created under, read from
 // the create snapshot — survives any later store recode, so it can undo a bad move.
-async function originalStoreByEntry(): Promise<Map<number, string>> {
+async function originalStores(): Promise<{ byEntry: Map<number, string>; createCount: number; withStore: number }> {
   const creates = await db.select().from(auditLog).where(eq(auditLog.action, 'create'));
-  const m = new Map<number, string>();
+  const byEntry = new Map<number, string>();
+  let withStore = 0;
   for (const a of creates) {
     const snap = (a.changes as { snapshot?: Record<string, unknown> } | null)?.snapshot;
     const s = String(snap?.store ?? '').trim();
-    if (s && !m.has(a.entryId)) m.set(a.entryId, s);
+    if (s) { withStore += 1; if (!byEntry.has(a.entryId)) byEntry.set(a.entryId, s); }
   }
-  return m;
+  return { byEntry, createCount: creates.length, withStore };
 }
 
 const labelOf = (code: string, org: Awaited<ReturnType<typeof getOrgSettings>>) =>
@@ -33,7 +34,7 @@ export async function GET() {
     if (!session || session.user.role !== 'owner') {
       return NextResponse.json({ error: 'Owner access required' }, { status: 403 });
     }
-    const original = await originalStoreByEntry();
+    const { byEntry: original, createCount, withStore } = await originalStores();
     const rows = await db.select().from(entries);
     const org = await getOrgSettings();
     const cur = new Map(rows.map((r) => [r.id, String((r.payload as Record<string, unknown>).store ?? '').trim()]));
@@ -60,7 +61,7 @@ export async function GET() {
       }))
       .sort((a, b) => b.misplaced - a.misplaced);
 
-    return NextResponse.json({ groups: result, stores: org.stores });
+    return NextResponse.json({ groups: result, stores: org.stores, diag: { auditCreates: createCount, withStore, entriesScanned: rows.length, mapped: original.size } });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
     const apply = body?.apply === true;
     if (!from || !to) return NextResponse.json({ error: 'from and to are required' }, { status: 400 });
 
-    const original = await originalStoreByEntry();
+    const { byEntry: original } = await originalStores();
     const ids = [...original.entries()].filter(([, code]) => code === from).map(([id]) => id);
     const rows = (await db.select().from(entries)).filter((r) => ids.includes(r.id));
 
