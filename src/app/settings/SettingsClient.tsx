@@ -30,10 +30,13 @@ const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-'
 type Opt = { label: string; value: string };
 
 // Editable label/value list (Stores, Brands, Categories). Value auto-derives from the label.
-function ListEditor({ title, items, onChange }: { title: string; items: Opt[]; onChange: (next: Opt[]) => void }) {
-  // Code tracks the full name as you type (don't freeze on the first letter, or
-  // "Dresses" would end up coded "d"). Editing an existing name re-derives its code.
-  const set = (i: number, label: string) => onChange(items.map((it, k) => (k === i ? { label, value: slugify(label) } : it)));
+function ListEditor({ title, items, onChange, locked }: { title: string; items: Opt[]; onChange: (next: Opt[]) => void; locked?: Set<string> }) {
+  // New items code from the full name as you type (don't freeze on the first letter,
+  // or "Dresses" would code as "d"). Items that already exist (their value is in
+  // `locked`) KEEP their value when relabeled — the value is a stable identifier that
+  // historical data points at, so a rename flows through to the dashboards instead of
+  // orphaning every past record under the old code.
+  const set = (i: number, label: string) => onChange(items.map((it, k) => (k === i ? { label, value: locked?.has(it.value) ? it.value : slugify(label) } : it)));
   const remove = (i: number) => onChange(items.filter((_, k) => k !== i));
   const add = () => onChange([...items, { label: '', value: '' }]);
   return (
@@ -87,8 +90,8 @@ function StoreStatusEditor({ stores, closed, onChange }: { stores: Opt[]; closed
 }
 
 type ExpOpt = { label: string; value: string; group: 'operating' | 'capital' | 'below-line' };
-function ExpenseEditor({ items, onChange }: { items: ExpOpt[]; onChange: (next: ExpOpt[]) => void }) {
-  const set = (i: number, patch: Partial<ExpOpt>) => onChange(items.map((it, k) => (k === i ? { ...it, ...patch, value: (patch.label !== undefined ? slugify(patch.label) : it.value) } : it)));
+function ExpenseEditor({ items, onChange, locked }: { items: ExpOpt[]; onChange: (next: ExpOpt[]) => void; locked?: Set<string> }) {
+  const set = (i: number, patch: Partial<ExpOpt>) => onChange(items.map((it, k) => (k === i ? { ...it, ...patch, value: locked?.has(it.value) ? it.value : (patch.label !== undefined ? slugify(patch.label) : it.value) } : it)));
   const remove = (i: number) => onChange(items.filter((_, k) => k !== i));
   const add = () => onChange([...items, { label: '', value: '', group: 'operating' }]);
   return (
@@ -228,6 +231,13 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
 
   // Organization (owner only)
   const [orgDraft, setOrgDraft] = useState(org);
+  // Values already persisted in the saved catalog are stable identifiers: renaming
+  // such an item keeps its value (only the label changes) so existing data stays linked.
+  const lockedStores = new Set(org.stores.map((s) => s.value));
+  const lockedBrands = new Set(org.brands.map((s) => s.value));
+  const lockedCategories = new Set(org.categories.map((s) => s.value));
+  const lockedSubCategories = new Set(org.subCategories.map((s) => s.value));
+  const lockedExpenses = new Set(org.expenseItems.map((s) => s.value));
   useEffect(() => { setOrgDraft(org); }, [org]);
   const [savingOrg, setSavingOrg] = useState(false);
   const [orgMsg, setOrgMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -420,12 +430,12 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
             )}
             {orgTab === 'catalog' && (
             <div className="space-y-4">
-              <ListEditor title="Stores / Locations" items={orgDraft.stores} onChange={(stores) => setOrgDraft((d) => ({ ...d, stores }))} />
+              <ListEditor title="Stores / Locations" items={orgDraft.stores} locked={lockedStores} onChange={(stores) => setOrgDraft((d) => ({ ...d, stores }))} />
               <StoreStatusEditor stores={orgDraft.stores} closed={orgDraft.closedStores} onChange={(closedStores) => setOrgDraft((d) => ({ ...d, closedStores }))} />
-              <ListEditor title="Brands" items={orgDraft.brands} onChange={(brands) => setOrgDraft((d) => ({ ...d, brands }))} />
-              <ListEditor title="Product Categories" items={orgDraft.categories} onChange={(categories) => setOrgDraft((d) => ({ ...d, categories }))} />
-              <ListEditor title="Sub-categories" items={orgDraft.subCategories} onChange={(subCategories) => setOrgDraft((d) => ({ ...d, subCategories }))} />
-              <ExpenseEditor items={orgDraft.expenseItems} onChange={(expenseItems) => setOrgDraft((d) => ({ ...d, expenseItems }))} />
+              <ListEditor title="Brands" items={orgDraft.brands} locked={lockedBrands} onChange={(brands) => setOrgDraft((d) => ({ ...d, brands }))} />
+              <ListEditor title="Product Categories" items={orgDraft.categories} locked={lockedCategories} onChange={(categories) => setOrgDraft((d) => ({ ...d, categories }))} />
+              <ListEditor title="Sub-categories" items={orgDraft.subCategories} locked={lockedSubCategories} onChange={(subCategories) => setOrgDraft((d) => ({ ...d, subCategories }))} />
+              <ExpenseEditor items={orgDraft.expenseItems} locked={lockedExpenses} onChange={(expenseItems) => setOrgDraft((d) => ({ ...d, expenseItems }))} />
             </div>
             )}
             {orgTab === 'mappings' && (
