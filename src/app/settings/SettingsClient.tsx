@@ -6,6 +6,7 @@ import { Spinner } from '@/components/ui/BrandedLoader';
 import { useOrg } from '@/components/providers/OrgProvider';
 import CategoryRecoder from './CategoryRecoder';
 import StoreReconcile from './StoreReconcile';
+import StoreRestore from './StoreRestore';
 
 interface UserInfo { name: string; email: string; role: string; store: string }
 
@@ -461,7 +462,7 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
       )}
 
       {/* Owner-only data cleanup tools */}
-      {isOwner && tab === 'organization' && <div className="space-y-4"><StoreReconcile /><CategoryRecoder /></div>}
+      {isOwner && tab === 'organization' && <div className="space-y-4"><StoreRestore /><StoreReconcile /><CategoryRecoder /></div>}
 
       {/* Appearance */}
       {tab === 'appearance' && (
