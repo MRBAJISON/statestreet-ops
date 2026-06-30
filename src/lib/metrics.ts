@@ -69,6 +69,31 @@ export function filterByPeriod(rows: Entry[], period: Period, anchorISO?: string
   });
 }
 
+// Anchor for the period immediately before the current one (for "vs last period"
+// comparisons). Returns null when there's no meaningful prior period (all time).
+export function previousAnchor(period: Period, anchorISO?: string): string | null {
+  if (period === 'all') return null;
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  if (period === 'custom') {
+    const [f, t] = String(anchorISO ?? '').split('~');
+    if (!f || !t) return null;
+    const from = new Date(f), to = new Date(t);
+    if (isNaN(from.getTime()) || isNaN(to.getTime())) return null;
+    const dayMs = 86400000;
+    const lenDays = Math.round((to.getTime() - from.getTime()) / dayMs) + 1;
+    const pTo = new Date(from.getTime() - dayMs);
+    const pFrom = new Date(pTo.getTime() - (lenDays - 1) * dayMs);
+    return `${iso(pFrom)}~${iso(pTo)}`;
+  }
+  const d = anchorISO ? new Date(anchorISO) : new Date();
+  if (isNaN(d.getTime())) return null;
+  if (period === 'day') d.setDate(d.getDate() - 1);
+  else if (period === 'week') d.setDate(d.getDate() - 7);
+  else if (period === 'ytd') d.setFullYear(d.getFullYear() - 1);
+  else d.setMonth(d.getMonth() - 1); // mtd
+  return iso(d);
+}
+
 // Filter entries to a single store ('' or 'all' = every store).
 export function filterByStore(rows: Entry[], store: string): Entry[] {
   if (!store || store === 'all') return rows;
@@ -560,6 +585,7 @@ function commercialMetrics(rows: Entry[]) {
   const storeTargetMap = new Map<string, number>();
   for (const p of payloads(rows, 'weekly-target')) storeTargetMap.set(String(p.store), (storeTargetMap.get(String(p.store)) ?? 0) + num(p.target));
   const categorySalesRaw = groupSum(rev, 'category', 'grossRevenue');
+  const categoryUnitsRaw = groupSum(rev, 'category', 'itemsSold');
 
   // SKU performance
   const skus = sku.map((p) => ({
@@ -644,6 +670,10 @@ function commercialMetrics(rows: Entry[]) {
     sellThrough: round1(avg(cp.map((p) => num(p.sellThrough)).filter((n) => n > 0))),
     activeSku: new Set(sku.map((p) => String(p.sku)).filter(Boolean)).size,
     categorySales: categorySalesRaw.map((x) => ({
+      name: labelFor(CATEGORY_LABELS, x.name),
+      value: x.value,
+    })),
+    categoryUnits: categoryUnitsRaw.map((x) => ({
       name: labelFor(CATEGORY_LABELS, x.name),
       value: x.value,
     })),

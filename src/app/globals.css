@@ -87,8 +87,8 @@
 @keyframes cc-pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
 /* kpi sparkline (replaces the progress bar) */
-.cc .cc-kpi.has-spark{padding-bottom:34px}
-.cc .cc-kpi .spark{position:absolute;left:0;right:0;bottom:0;height:30px;opacity:.55;pointer-events:none}
+.cc .cc-kpi.has-spark{padding-bottom:38px}
+.cc .cc-kpi .spark{position:absolute;left:0;right:0;bottom:0;height:34px;opacity:.9;pointer-events:none}
 
 /* mission strip */
 .cc .cc-mission{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:linear-gradient(180deg,var(--cc-panel),var(--cc-bg2));border:1px solid var(--cc-line-soft);border-radius:var(--cc-radius);padding:14px 18px;box-shadow:var(--cc-shadow)}

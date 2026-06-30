@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import EmptyState from '@/components/ui/EmptyState';
 import { ShowMoreRows, ShowMoreGrid } from '@/components/ui/ShowMore';
-import { SimpleDonutChart, SimpleBarChart, SimpleLineChart, MiniSparkline } from '@/components/charts/Charts';
+import { SimpleDonutChart, SimpleBarChart, SimpleLineChart, MiniSparkline, PolarAreaChart } from '@/components/charts/Charts';
 import { useState, useEffect } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, useEntries, type Period } from '@/lib/api';
@@ -60,28 +60,30 @@ const relTime = (iso: string) => {
 
 // KPI cards (command-center styling). Money vs target, with a trend sparkline
 // bleeding to the bottom edge (replaces the old progress bar).
-function KpiProgress({ icon, label, value, target, spark }: { icon: string; label: string; value: number; target: number; spark?: number[] }) {
+function KpiProgress({ icon, label, value, target, spark, change, changeLabel }: { icon: string; label: string; value: number; target: number; spark?: number[]; change?: number; changeLabel?: string }) {
   const ratio = target > 0 ? (value / target) * 100 : 0;
   const hasSpark = !!(spark && spark.length > 1 && spark.some((v) => v > 0));
   return (
     <div className={`cc-kpi${hasSpark ? ' has-spark' : ''}`}>
       <div className="lbl"><span className="ic">{icon}</span>{label}</div>
       <div className="val">{value ? money(value) : '—'}</div>
-      <div className="sub2">Target: {target ? money(target) : '—'}{target ? <span style={{ color: 'var(--cc-gold2)', fontWeight: 700 }}> · {ratio.toFixed(0)}% of target</span> : ''}</div>
-      {hasSpark ? <div className="spark"><MiniSparkline data={spark!} color="#e8c75a" height={30} /></div> : null}
+      {change !== undefined ? (
+        <div className="sub"><span className={`chip ${change >= 0 ? 'up' : 'down'}`}>{change >= 0 ? '▲' : '▼'} {Math.abs(change).toFixed(1)}%</span> {changeLabel}</div>
+      ) : null}
+      <div className="sub2">Target: {target ? money(target) : '—'}{target ? <span style={{ color: 'var(--cc-gold2)', fontWeight: 700 }}> · {ratio.toFixed(0)}%</span> : ''}</div>
+      {hasSpark ? <div className="spark"><MiniSparkline data={spark!} color="#e8c75a" height={34} /></div> : null}
     </div>
   );
 }
 
-// Percentage KPI vs target, gap shown in percentage points.
-function KpiDelta({ icon, label, value, target }: { icon: string; label: string; value: number; target: number }) {
-  const delta = Math.round((value - target) * 10) / 10;
+// Percentage KPI with a vs-last-period change (in percentage points) and target line.
+function KpiDelta({ icon, label, value, target, change, changeLabel }: { icon: string; label: string; value: number; target: number; change?: number; changeLabel?: string }) {
   return (
     <div className="cc-kpi">
       <div className="lbl"><span className="ic">{icon}</span>{label}</div>
       <div className="val">{value ? `${value}%` : '—'}</div>
-      {value ? (
-        <div className="sub"><span className={`chip ${delta >= 0 ? 'up' : 'down'}`}>{delta >= 0 ? '▲' : '▼'} {Math.abs(delta)}pp</span></div>
+      {change !== undefined ? (
+        <div className="sub"><span className={`chip ${change >= 0 ? 'up' : 'down'}`}>{change >= 0 ? '▲' : '▼'} {Math.abs(change)}pt</span> {changeLabel}</div>
       ) : null}
       <div className="sub2">Target: {target ? `${target}%` : '—'}</div>
     </div>
@@ -111,9 +113,9 @@ export default function ExecutiveCommandCenter() {
   const retailStores = org.stores.filter((s) => s.value !== 'head-office');
   const openCount = retailStores.filter((s) => !closedSet.has(s.value)).length;
   const closedCount = retailStores.length - openCount;
-  const finQ = useMetrics<{ revenueMtd: number; netProfit: number; grossProfit: number; operatingProfit: number; grossMargin: number; cashNet: number; netMargin: number; roce: number; roi: number; revenueByCategory: { name: string; value: number }[]; daily: number[]; dailyGP: number[]; labels: string[]; paymentsByMode: { name: string; value: number }[] }>('finance', period, anchor, store);
+  const finQ = useMetrics<{ revenueMtd: number; netProfit: number; grossProfit: number; operatingProfit: number; grossMargin: number; cashNet: number; netMargin: number; roce: number; roi: number; revenueByCategory: { name: string; value: number }[]; daily: number[]; dailyGP: number[]; labels: string[]; paymentsByMode: { name: string; value: number }[]; prev?: { revenueMtd: number; grossProfit: number; operatingProfit: number; grossMargin: number } }>('finance', period, anchor, store);
   const fin = finQ.data;
-  const com = useMetrics<{ groupSales: number; convRate: number; sellThrough: number; salesByStore: { name: string; value: number; target: number }[]; categorySales: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null; insights: { best: string[]; concern: string[]; risk: string[] } }[] }; managerVoices?: { store: string; manager: string; weekEnd: string; answers: { q: string; a: string }[] }[] }>('commercial', period, anchor, store).data;
+  const com = useMetrics<{ groupSales: number; convRate: number; sellThrough: number; salesByStore: { name: string; value: number; target: number }[]; categorySales: { name: string; value: number }[]; categoryUnits: { name: string; value: number }[]; sellThroughByCategory: { name: string; value: number }[]; weeklyReview: { count: number; stockAtRisk: number; atRiskCategories: number; latest: { store: string; weekEnd: string; manager: string; achievement: number } | null; ceo: Record<string, string> | null; reviews: { id: number; store: string; weekEnd: string; manager: string; achievement: number; stockAtRisk: number; atRiskCategories: number; ceo: Record<string, string> | null; insights: { best: string[]; concern: string[]; risk: string[] } }[] }; managerVoices?: { store: string; manager: string; weekEnd: string; answers: { q: string; a: string }[] }[]; prev?: { sellThrough: number } }>('commercial', period, anchor, store).data;
   const ops = useMetrics<{ opsScore: number; openIssues: number; storeScores: { store: string; ops: number; vm: number; readiness: number; cx: number }[]; priorityActions: { description: string; priority: string; owner: string; store: string; status: string }[]; peopleHealth: { score: number; attendance: number; punctuality: number; training: number; absences: number; count: number }; staffing: { total: number; onDuty: number; absent: number } }>('operations', period, anchor, store).data;
   const inv = useMetrics<{ inventoryValue: number; accuracy: number }>('inventory', period, anchor, store).data;
   const brd = useMetrics<{ healthIndex: number; sentiment: { positive: number }; ceoAttention: { priority: string; issue: string; impact: string; owner: string; status: string }[] }>('brand', period, anchor, store).data;
@@ -153,6 +155,15 @@ export default function ExecutiveCommandCenter() {
   const dailyData = daily.map((v, i) => ({ name: labels[i] ?? String(i + 1), value: v, value2: dailyGP[i] ?? 0 }));
   const hasDaily = daily.some((v) => v > 0);
   const paymentsByMode = fin?.paymentsByMode ?? [];
+  const categoryUnits = com?.categoryUnits ?? [];
+
+  // Period-over-period deltas (from the metrics' attached prior-period `prev`).
+  const finPrev = fin?.prev;
+  const comPrev = com?.prev;
+  const pctChange = (cur: number, prev?: number) => (prev && prev !== 0 ? ((cur - prev) / prev) * 100 : undefined);
+  const ppChange = (cur: number, prev?: number) => (prev !== undefined ? Math.round((cur - prev) * 10) / 10 : undefined);
+  const PREV_LABEL: Record<Period, string> = { day: 'vs yesterday', week: 'vs last week', mtd: 'vs last month', ytd: 'vs last year', all: '', custom: 'vs prev. period' };
+  const prevWord = PREV_LABEL[period];
 
   // Merge commercial sales + operations audit scores into one store-performance view
   const storeMap = new Map<string, { sales: number; target: number; ops: number; vm: number }>();
@@ -267,11 +278,11 @@ export default function ExecutiveCommandCenter() {
 
         {/* GROUP KPI BAR */}
         <div className="cc-kpis mb-[18px]">
-          <KpiProgress icon="💰" label="Group Revenue (MTD)" value={fin?.revenueMtd ?? 0} target={T.revenueMtd} spark={daily} />
-          <KpiProgress icon="🪙" label="Gross Profit (MTD)" value={fin?.grossProfit ?? 0} target={T.grossProfit} spark={dailyGP} />
-          <KpiProgress icon="📈" label="Operating Profit (MTD)" value={fin?.operatingProfit ?? 0} target={T.operatingProfit} spark={dailyGP} />
-          <KpiDelta icon="🧮" label="Group GM% (MTD)" value={fin?.grossMargin ?? 0} target={T.grossMargin} />
-          <KpiDelta icon="🛒" label="Sell-Through (YTD)" value={com?.sellThrough ?? 0} target={T.sellThrough} />
+          <KpiProgress icon="💰" label="Group Revenue (MTD)" value={fin?.revenueMtd ?? 0} target={T.revenueMtd} spark={daily} change={pctChange(fin?.revenueMtd ?? 0, finPrev?.revenueMtd)} changeLabel={prevWord} />
+          <KpiProgress icon="🪙" label="Gross Profit (MTD)" value={fin?.grossProfit ?? 0} target={T.grossProfit} spark={dailyGP} change={pctChange(fin?.grossProfit ?? 0, finPrev?.grossProfit)} changeLabel={prevWord} />
+          <KpiProgress icon="📈" label="Operating Profit (MTD)" value={fin?.operatingProfit ?? 0} target={T.operatingProfit} spark={dailyGP} change={pctChange(fin?.operatingProfit ?? 0, finPrev?.operatingProfit)} changeLabel={prevWord} />
+          <KpiDelta icon="🧮" label="Group GM% (MTD)" value={fin?.grossMargin ?? 0} target={T.grossMargin} change={ppChange(fin?.grossMargin ?? 0, finPrev?.grossMargin)} changeLabel={prevWord} />
+          <KpiDelta icon="🛒" label="Sell-Through (YTD)" value={com?.sellThrough ?? 0} target={T.sellThrough} change={ppChange(com?.sellThrough ?? 0, comPrev?.sellThrough)} changeLabel={prevWord} />
           <KpiStat icon="🏬" label="Active Stores" value={String(openCount)} sub1={`Total Stores: ${retailStores.length}`} sub2={`Open: ${openCount} · Closed: ${closedCount}`} />
           <KpiStat icon="👥" label="Total Employees" value={(ops?.staffing?.total ?? 0) ? String(ops?.staffing?.total) : '—'}
             sub1={(ops?.staffing?.total ?? 0) ? `On Duty: ${ops?.staffing?.onDuty ?? 0}` : 'No HR data'}
@@ -280,7 +291,7 @@ export default function ExecutiveCommandCenter() {
 
         <div className="cc-bento">
           {/* Trend + revenue by category */}
-          <div className="cc-panel c8">
+          <div className="cc-panel c6">
             <div className="phead"><div><h3><span className="num">1</span>Group Revenue &amp; Margin Trend</h3><div className="meta">Daily net revenue vs gross profit · this period</div></div></div>
             {hasDaily ? (
               <>
@@ -294,7 +305,22 @@ export default function ExecutiveCommandCenter() {
               <EmptyState message="No daily revenue yet" hint="Add revenue entries in the Finance form." height={250} />
             )}
           </div>
-          <div className="cc-panel c4">
+          <div className="cc-panel c3">
+            <div className="phead"><div><h3>Category Mix</h3><div className="meta">Units by category</div></div></div>
+            {categoryUnits.length ? (
+              <>
+                <PolarAreaChart data={categoryUnits} colors={CC} height={188} />
+                <ShowMoreGrid items={categoryUnits} limit={6} wrapClass="cc-legend">
+                  {(c, i) => (
+                    <span key={c.name}><i style={{ background: CC[i % CC.length] }} />{c.name}</span>
+                  )}
+                </ShowMoreGrid>
+              </>
+            ) : (
+              <EmptyState message="No unit data yet" hint="From items sold per category in Daily Sales." height={188} />
+            )}
+          </div>
+          <div className="cc-panel c3">
             <div className="phead"><div><h3>Revenue by Category</h3><div className="meta">Share of group revenue</div></div></div>
             {revenueByCategory.length ? (
               <>

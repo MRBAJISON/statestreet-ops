@@ -203,3 +203,30 @@ export function MiniSparkline({ data, color = '#c8a951', height = 40 }: { data: 
     </ResponsiveContainer>
   );
 }
+
+// Polar-area (rose) chart: equal-angle wedges, radius ∝ value, over faint rings.
+// Used for "Category Mix" (units by category).
+export function PolarAreaChart({ data, colors, height = 200 }: { data: { name: string; value: number }[]; colors: string[]; height?: number }) {
+  const size = height;
+  const cx = size / 2, cy = size / 2, maxR = size / 2 - 8;
+  const max = Math.max(...data.map((d) => d.value), 1);
+  const n = Math.max(data.length, 1);
+  const ang = (2 * Math.PI) / n;
+  const large = ang > Math.PI ? 1 : 0;
+  const wedge = (i: number, r: number) => {
+    const a0 = -Math.PI / 2 + i * ang, a1 = a0 + ang;
+    const x0 = cx + r * Math.cos(a0), y0 = cy + r * Math.sin(a0);
+    const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+    return `M${cx},${cy} L${x0.toFixed(2)},${y0.toFixed(2)} A${r.toFixed(2)},${r.toFixed(2)} 0 ${large} 1 ${x1.toFixed(2)},${y1.toFixed(2)} Z`;
+  };
+  return (
+    <svg viewBox={`0 0 ${size} ${size}`} width="100%" height={height} role="img" aria-label="Category mix">
+      {[0.25, 0.5, 0.75, 1].map((f) => (
+        <circle key={f} cx={cx} cy={cy} r={maxR * f} fill="none" stroke="#1b2233" strokeWidth={1} />
+      ))}
+      {data.map((d, i) => (
+        <path key={d.name} d={wedge(i, (d.value / max) * maxR)} fill={colors[i % colors.length]} fillOpacity={0.85} stroke="#0e111a" strokeWidth={1.5} />
+      ))}
+    </svg>
+  );
+}

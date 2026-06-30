@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { entries } from '@/lib/db/schema';
 import { and, eq, or } from 'drizzle-orm';
-import { computeMetrics, filterByPeriod, filterByStore, type Period } from '@/lib/metrics';
+import { computeMetrics, filterByPeriod, filterByStore, previousAnchor, type Period } from '@/lib/metrics';
 import { getSession } from '@/lib/auth';
 
 // Live aggregated metrics for a department, computed from its entries for a period.
@@ -34,7 +34,14 @@ export async function GET(
       : eq(entries.department, department);
     const rows = await db.select().from(entries).where(where);
     const filtered = filterByStore(filterByPeriod(rows, period, date), store);
-    return NextResponse.json(computeMetrics(department, filtered));
+    const result = computeMetrics(department, filtered) as Record<string, unknown>;
+    // Attach the prior period's metrics for "vs last period" deltas on the dashboards.
+    const prevA = previousAnchor(period, date);
+    if (prevA !== null) {
+      const prevFiltered = filterByStore(filterByPeriod(rows, period, prevA), store);
+      result.prev = computeMetrics(department, prevFiltered);
+    }
+    return NextResponse.json(result);
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
