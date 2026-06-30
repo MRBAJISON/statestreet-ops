@@ -1,11 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import DashboardHeader from '@/components/layout/DashboardHeader';
 import EmptyState from '@/components/ui/EmptyState';
 import { ShowMoreRows, ShowMoreGrid } from '@/components/ui/ShowMore';
-import { SimpleDonutChart, SimpleBarChart, SimpleLineChart } from '@/components/charts/Charts';
-import { useState } from 'react';
+import { SimpleDonutChart, SimpleBarChart, SimpleLineChart, MiniSparkline } from '@/components/charts/Charts';
+import { useState, useEffect } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, useEntries, type Period } from '@/lib/api';
 import { rateRatio } from '@/lib/config';
@@ -59,16 +58,17 @@ const relTime = (iso: string) => {
   return `${Math.floor(h / 24)}d`;
 };
 
-// KPI cards (command-center styling). Money vs target with a gold progress bar.
-function KpiProgress({ icon, label, value, target }: { icon: string; label: string; value: number; target: number }) {
+// KPI cards (command-center styling). Money vs target, with a trend sparkline
+// bleeding to the bottom edge (replaces the old progress bar).
+function KpiProgress({ icon, label, value, target, spark }: { icon: string; label: string; value: number; target: number; spark?: number[] }) {
   const ratio = target > 0 ? (value / target) * 100 : 0;
+  const hasSpark = !!(spark && spark.length > 1 && spark.some((v) => v > 0));
   return (
-    <div className="cc-kpi">
+    <div className={`cc-kpi${hasSpark ? ' has-spark' : ''}`}>
       <div className="lbl"><span className="ic">{icon}</span>{label}</div>
       <div className="val">{value ? money(value) : '—'}</div>
-      <div className="sub2">Target: {target ? money(target) : '—'}</div>
-      <div className="pbar"><i style={{ width: `${Math.min(100, Math.max(0, ratio))}%` }} /></div>
-      <div className="pct">{target ? `${ratio.toFixed(1)}%` : ''}</div>
+      <div className="sub2">Target: {target ? money(target) : '—'}{target ? <span style={{ color: 'var(--cc-gold2)', fontWeight: 700 }}> · {ratio.toFixed(0)}% of target</span> : ''}</div>
+      {hasSpark ? <div className="spark"><MiniSparkline data={spark!} color="#e8c75a" height={30} /></div> : null}
     </div>
   );
 }
@@ -104,6 +104,8 @@ export default function ExecutiveCommandCenter() {
   const [period, setPeriod] = useState<Period>('mtd');
   const [anchor, setAnchor] = useState('');
   const [store, setStore] = useState('');
+  const [today, setToday] = useState('');
+  useEffect(() => { setToday(new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })); }, []);
   const { org } = useOrg();
   const closedSet = new Set(org.closedStores ?? []);
   const retailStores = org.stores.filter((s) => s.value !== 'head-office');
@@ -247,15 +249,13 @@ export default function ExecutiveCommandCenter() {
 
   return (
     <div className="min-h-screen text-[var(--c-fg)]" style={{ background: '#0a0c12' }}>
-      <DashboardHeader
-        title="EXECUTIVE COMMAND CENTER"
-        subtitle="ONE VISION. ONE TEAM. ONE DESTINATION."
-        mission="Mission"
-        missionDetail="Build Ghana's most trusted premium retail group."
-      />
-
-      <div className="cc px-6 pb-10 pt-3">
-        <div className="flex justify-end mb-3">
+      <div className="cc px-6 pb-10 pt-4">
+        <div className="cc-topbar">
+          <div className="title-block">
+            <h1>Executive Command Center <span className="live"><span className="dot" />LIVE</span></h1>
+            <p>All brands · {store ? storeValueToLabel(store) : 'All stores'}{today ? ` · ${today}` : ''} · updated live</p>
+          </div>
+          <div className="cc-spacer" />
           <PeriodTabs value={period} date={anchor} onChange={setPeriod} onDateChange={setAnchor} store={store} stores={org.stores} onStoreChange={setStore} />
         </div>
 
@@ -267,9 +267,9 @@ export default function ExecutiveCommandCenter() {
 
         {/* GROUP KPI BAR */}
         <div className="cc-kpis mb-[18px]">
-          <KpiProgress icon="💰" label="Group Revenue (MTD)" value={fin?.revenueMtd ?? 0} target={T.revenueMtd} />
-          <KpiProgress icon="🪙" label="Gross Profit (MTD)" value={fin?.grossProfit ?? 0} target={T.grossProfit} />
-          <KpiProgress icon="📈" label="Operating Profit (MTD)" value={fin?.operatingProfit ?? 0} target={T.operatingProfit} />
+          <KpiProgress icon="💰" label="Group Revenue (MTD)" value={fin?.revenueMtd ?? 0} target={T.revenueMtd} spark={daily} />
+          <KpiProgress icon="🪙" label="Gross Profit (MTD)" value={fin?.grossProfit ?? 0} target={T.grossProfit} spark={dailyGP} />
+          <KpiProgress icon="📈" label="Operating Profit (MTD)" value={fin?.operatingProfit ?? 0} target={T.operatingProfit} spark={dailyGP} />
           <KpiDelta icon="🧮" label="Group GM% (MTD)" value={fin?.grossMargin ?? 0} target={T.grossMargin} />
           <KpiDelta icon="🛒" label="Sell-Through (YTD)" value={com?.sellThrough ?? 0} target={T.sellThrough} />
           <KpiStat icon="🏬" label="Active Stores" value={String(openCount)} sub1={`Total Stores: ${retailStores.length}`} sub2={`Open: ${openCount} · Closed: ${closedCount}`} />
