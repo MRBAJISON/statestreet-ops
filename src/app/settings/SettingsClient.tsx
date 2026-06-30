@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Spinner } from '@/components/ui/BrandedLoader';
 import { useOrg } from '@/components/providers/OrgProvider';
 import CategoryRecoder from './CategoryRecoder';
+import StoreReconcile from './StoreReconcile';
 
 interface UserInfo { name: string; email: string; role: string; store: string }
 
@@ -459,8 +460,8 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
         </section>
       )}
 
-      {/* Owner-only data cleanup tool */}
-      {isOwner && tab === 'organization' && <CategoryRecoder />}
+      {/* Owner-only data cleanup tools */}
+      {isOwner && tab === 'organization' && <div className="space-y-4"><StoreReconcile /><CategoryRecoder /></div>}
 
       {/* Appearance */}
       {tab === 'appearance' && (
