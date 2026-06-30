@@ -7,6 +7,7 @@ import { useOrg } from '@/components/providers/OrgProvider';
 import CategoryRecoder from './CategoryRecoder';
 import StoreReconcile from './StoreReconcile';
 import MoveSales from './MoveSales';
+import StoreMap from './StoreMap';
 
 interface UserInfo { name: string; email: string; role: string; store: string }
 
@@ -462,7 +463,7 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
       )}
 
       {/* Owner-only data cleanup tools */}
-      {isOwner && tab === 'organization' && <div className="space-y-4"><MoveSales /><StoreReconcile /><CategoryRecoder /></div>}
+      {isOwner && tab === 'organization' && <div className="space-y-4"><StoreMap /><MoveSales /><StoreReconcile /><CategoryRecoder /></div>}
 
       {/* Appearance */}
       {tab === 'appearance' && (
