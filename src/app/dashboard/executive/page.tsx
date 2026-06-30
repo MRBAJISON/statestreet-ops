@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import EmptyState from '@/components/ui/EmptyState';
 import { ShowMoreRows, ShowMoreGrid } from '@/components/ui/ShowMore';
-import { SimpleDonutChart, SimpleBarChart, SimpleLineChart, MiniSparkline, PolarAreaChart } from '@/components/charts/Charts';
+import { SimpleDonutChart, SimpleBarChart, SimpleLineChart, MiniSparkline } from '@/components/charts/Charts';
 import { useState, useEffect } from 'react';
 import PeriodTabs from '@/components/ui/PeriodTabs';
 import { useMetrics, useEntries, type Period } from '@/lib/api';
@@ -155,7 +155,6 @@ export default function ExecutiveCommandCenter() {
   const dailyData = daily.map((v, i) => ({ name: labels[i] ?? String(i + 1), value: v, value2: dailyGP[i] ?? 0 }));
   const hasDaily = daily.some((v) => v > 0);
   const paymentsByMode = fin?.paymentsByMode ?? [];
-  const categoryUnits = com?.categoryUnits ?? [];
 
   // Period-over-period deltas (from the metrics' attached prior-period `prev`).
   const finPrev = fin?.prev;
@@ -291,7 +290,7 @@ export default function ExecutiveCommandCenter() {
 
         <div className="cc-bento">
           {/* Trend + revenue by category */}
-          <div className="cc-panel c6">
+          <div className="cc-panel c8">
             <div className="phead"><div><h3><span className="num">1</span>Group Revenue &amp; Margin Trend</h3><div className="meta">Daily net revenue vs gross profit · this period</div></div></div>
             {hasDaily ? (
               <>
@@ -305,22 +304,7 @@ export default function ExecutiveCommandCenter() {
               <EmptyState message="No daily revenue yet" hint="Add revenue entries in the Finance form." height={250} />
             )}
           </div>
-          <div className="cc-panel c3">
-            <div className="phead"><div><h3>Category Mix</h3><div className="meta">Units by category</div></div></div>
-            {categoryUnits.length ? (
-              <>
-                <PolarAreaChart data={categoryUnits} colors={CC} height={188} />
-                <ShowMoreGrid items={categoryUnits} limit={6} wrapClass="cc-legend">
-                  {(c, i) => (
-                    <span key={c.name}><i style={{ background: CC[i % CC.length] }} />{c.name}</span>
-                  )}
-                </ShowMoreGrid>
-              </>
-            ) : (
-              <EmptyState message="No unit data yet" hint="From items sold per category in Daily Sales." height={188} />
-            )}
-          </div>
-          <div className="cc-panel c3">
+          <div className="cc-panel c4">
             <div className="phead"><div><h3>Revenue by Category</h3><div className="meta">Share of group revenue</div></div></div>
             {revenueByCategory.length ? (
               <>
