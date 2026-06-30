@@ -29,26 +29,33 @@ const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-'
 
 type Opt = { label: string; value: string };
 
-// Editable label/value list (Stores, Brands, Categories). Value auto-derives from the label.
-function ListEditor({ title, items, onChange, locked }: { title: string; items: Opt[]; onChange: (next: Opt[]) => void; locked?: Set<string> }) {
-  // New items code from the full name as you type (don't freeze on the first letter,
-  // or "Dresses" would code as "d"). Items that already exist (their value is in
-  // `locked`) KEEP their value when relabeled — the value is a stable identifier that
-  // historical data points at, so a rename flows through to the dashboards instead of
-  // orphaning every past record under the old code.
-  const set = (i: number, label: string) => onChange(items.map((it, k) => (k === i ? { label, value: locked?.has(it.value) ? it.value : slugify(label) } : it)));
+// Editable label/value list (Stores, Brands, Categories).
+// The `value` (code) is the stable identifier historical data points at. New items
+// derive it from the full name as you type (don't freeze on the first letter, or
+// "Dresses" would code as "d"); existing items (`locked`) keep their code on rename
+// so the rename flows through to the dashboards. With `editableCode` the code is
+// shown and editable — used for Stores so a drifted code can be pointed back at the
+// code its data actually uses (e.g. a Boulevard Women store back to `bw-labone`).
+function ListEditor({ title, items, onChange, locked, editableCode }: { title: string; items: Opt[]; onChange: (next: Opt[]) => void; locked?: Set<string>; editableCode?: boolean }) {
+  const setLabel = (i: number, label: string) =>
+    onChange(items.map((it, k) => (k === i ? { ...it, label, value: editableCode ? it.value : (locked?.has(it.value) ? it.value : slugify(label)) } : it)));
+  const setCode = (i: number, code: string) =>
+    onChange(items.map((it, k) => (k === i ? { ...it, value: slugify(code) } : it)));
   const remove = (i: number) => onChange(items.filter((_, k) => k !== i));
   const add = () => onChange([...items, { label: '', value: '' }]);
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-xs text-gray-400">{title}</span>
+        <span className="text-xs text-gray-400">{title}{editableCode ? <span className="text-gray-600"> · code must match historical data</span> : null}</span>
         <button type="button" onClick={add} className="text-xs text-[#c8a951] hover:underline">+ Add</button>
       </div>
       <div className="space-y-2">
         {items.map((it, i) => (
           <div key={i} className="flex items-center gap-2">
-            <input className={inputCls} value={it.label} placeholder="Name" onChange={(e) => set(i, e.target.value)} />
+            <input className={inputCls} value={it.label} placeholder="Name" onChange={(e) => setLabel(i, e.target.value)} />
+            {editableCode && (
+              <input className={`${inputCls} w-40 font-mono text-xs`} value={it.value} placeholder="code" title="Internal code — change only to reconcile with existing data" onChange={(e) => setCode(i, e.target.value)} />
+            )}
             <button type="button" onClick={() => remove(i)} className="text-gray-400 hover:text-red-400 text-sm px-1" aria-label="Remove">✕</button>
           </div>
         ))}
@@ -260,7 +267,7 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
         body: JSON.stringify({
           companyName: orgDraft.companyName, tagline: orgDraft.tagline, currency: orgDraft.currency,
           logo: orgDraft.logo, weekStart: orgDraft.weekStart, security: orgDraft.security,
-          stores: orgDraft.stores.filter((s) => s.label.trim()),
+          stores: orgDraft.stores.filter((s) => s.label.trim()).map((s) => ({ ...s, value: s.value?.trim() ? s.value : slugify(s.label) })),
           brands: orgDraft.brands.filter((s) => s.label.trim()),
           categories: orgDraft.categories.filter((s) => s.label.trim()),
           expenseItems: orgDraft.expenseItems.filter((s) => s.label.trim()),
@@ -430,7 +437,7 @@ export default function SettingsClient({ user, isOwner, canEditOrg }: { user: Us
             )}
             {orgTab === 'catalog' && (
             <div className="space-y-4">
-              <ListEditor title="Stores / Locations" items={orgDraft.stores} locked={lockedStores} onChange={(stores) => setOrgDraft((d) => ({ ...d, stores }))} />
+              <ListEditor title="Stores / Locations" items={orgDraft.stores} locked={lockedStores} editableCode onChange={(stores) => setOrgDraft((d) => ({ ...d, stores }))} />
               <StoreStatusEditor stores={orgDraft.stores} closed={orgDraft.closedStores} onChange={(closedStores) => setOrgDraft((d) => ({ ...d, closedStores }))} />
               <ListEditor title="Brands" items={orgDraft.brands} locked={lockedBrands} onChange={(brands) => setOrgDraft((d) => ({ ...d, brands }))} />
               <ListEditor title="Product Categories" items={orgDraft.categories} locked={lockedCategories} onChange={(categories) => setOrgDraft((d) => ({ ...d, categories }))} />
