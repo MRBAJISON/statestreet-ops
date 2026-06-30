@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { entries } from '@/lib/db/schema';
 import { and, eq, or } from 'drizzle-orm';
-import { computeMetrics, filterByPeriod, filterByStore, previousAnchor, type Period } from '@/lib/metrics';
+import { computeMetrics, filterByPeriod, filterByStore, previousAnchor, type Period, type MetricLabels } from '@/lib/metrics';
 import { getSession } from '@/lib/auth';
+import { getOrgSettings } from '@/lib/org-server';
+import { toLabelMap } from '@/lib/org';
 
 // Live aggregated metrics for a department, computed from its entries for a period.
 export async function GET(
@@ -33,13 +35,22 @@ export async function GET(
         )
       : eq(entries.department, department);
     const rows = await db.select().from(entries).where(where);
+    // Live label maps from org settings so renamed/added stores, brands, categories
+    // and expense items are reflected in the dashboard metrics (not the static defaults).
+    const org = await getOrgSettings();
+    const labels: MetricLabels = {
+      store: toLabelMap(org.stores),
+      brand: toLabelMap(org.brands),
+      category: toLabelMap(org.categories),
+      expense: toLabelMap(org.expenseItems),
+    };
     const filtered = filterByStore(filterByPeriod(rows, period, date), store);
-    const result = computeMetrics(department, filtered) as Record<string, unknown>;
+    const result = computeMetrics(department, filtered, labels) as Record<string, unknown>;
     // Attach the prior period's metrics for "vs last period" deltas on the dashboards.
     const prevA = previousAnchor(period, date);
     if (prevA !== null) {
       const prevFiltered = filterByStore(filterByPeriod(rows, period, prevA), store);
-      result.prev = computeMetrics(department, prevFiltered);
+      result.prev = computeMetrics(department, prevFiltered, labels);
     }
     return NextResponse.json(result);
   } catch (e) {

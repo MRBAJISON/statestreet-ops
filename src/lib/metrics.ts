@@ -1,5 +1,15 @@
 import type { Entry } from './db/schema';
-import { BRAND_LABELS, STORE_LABELS, CATEGORY_LABELS, EXPENSE_LABELS, CAPITAL_CATEGORIES, labelFor, PAYMENT_MODES, payKey } from './config';
+import { CAPITAL_CATEGORIES, labelFor, PAYMENT_MODES, payKey } from './config';
+
+// Live label maps (value -> display name) sourced from org settings, so renamed/
+// added stores, brands, categories and expense items show through on the dashboards.
+// Each metric function shadows the old static maps with the relevant fields here.
+export interface MetricLabels {
+  store: Record<string, string>;
+  brand: Record<string, string>;
+  category: Record<string, string>;
+  expense: Record<string, string>;
+}
 
 const num = (v: unknown) => Number(String(v ?? '').replace(/[, ]/g, '')) || 0;
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
@@ -125,7 +135,8 @@ function groupAvg(items: P[], key: string, valKey: string) {
 }
 
 /* ----------------------------- FINANCE ----------------------------- */
-function financeMetrics(rows: Entry[]) {
+function financeMetrics(rows: Entry[], L: MetricLabels) {
+  const { store: STORE_LABELS, category: CATEGORY_LABELS, expense: EXPENSE_LABELS } = L;
   const labels = Array.from({ length: 31 }, (_, i) => String(i + 1));
   const daily = new Array(31).fill(0);
   const dailyGP = new Array(31).fill(0); // daily gross profit (gross − cogs) — drives the margin trend
@@ -368,7 +379,8 @@ function financeMetrics(rows: Entry[]) {
 }
 
 /* ---------------------------- COMMERCIAL --------------------------- */
-function commercialMetrics(rows: Entry[]) {
+function commercialMetrics(rows: Entry[], L: MetricLabels) {
+  const { store: STORE_LABELS, category: CATEGORY_LABELS, brand: BRAND_LABELS } = L;
   const cp = payloads(rows, 'category-perf');
   const sku = payloads(rows, 'sku-entry');
 
@@ -714,7 +726,8 @@ function commercialMetrics(rows: Entry[]) {
 }
 
 /* ---------------------------- OPERATIONS --------------------------- */
-function operationsMetrics(rows: Entry[]) {
+function operationsMetrics(rows: Entry[], L: MetricLabels) {
+  const { store: STORE_LABELS } = L;
   const audit = payloads(rows, 'store-audit');
   const vm = payloads(rows, 'vm-check');
   const maint = payloads(rows, 'maintenance');
@@ -956,7 +969,8 @@ function operationsMetrics(rows: Entry[]) {
 }
 
 /* ----------------------------- INVENTORY --------------------------- */
-function inventoryMetrics(rows: Entry[]) {
+function inventoryMetrics(rows: Entry[], L: MetricLabels) {
+  const { store: STORE_LABELS, category: CATEGORY_LABELS, brand: BRAND_LABELS } = L;
   const sc = payloads(rows, 'stock-count');
   const gr = payloads(rows, 'goods-receipt');
   const ds = payloads(rows, 'dead-stock');
@@ -1096,7 +1110,8 @@ function inventoryMetrics(rows: Entry[]) {
 }
 
 /* --------------------------- BRAND HEALTH -------------------------- */
-function brandMetrics(rows: Entry[]) {
+function brandMetrics(rows: Entry[], L: MetricLabels) {
+  const { brand: BRAND_LABELS } = L;
   const score = payloads(rows, 'brand-score');
   const sent = payloads(rows, 'sentiment');
   const comp = payloads(rows, 'competitor');
@@ -1215,7 +1230,8 @@ function brandMetrics(rows: Entry[]) {
 }
 
 /* ---------------------------- MARKETING ---------------------------- */
-function marketingMetrics(rows: Entry[]) {
+function marketingMetrics(rows: Entry[], L: MetricLabels) {
+  const { store: STORE_LABELS, brand: BRAND_LABELS } = L;
   const leads = payloads(rows, 'leads');
   const camp = payloads(rows, 'campaign');
   const spend = camp.reduce((s, p) => s + num(p.spend), 0);
@@ -1358,20 +1374,20 @@ function marketingMetrics(rows: Entry[]) {
   };
 }
 
-export function computeMetrics(department: string, rows: Entry[]) {
+export function computeMetrics(department: string, rows: Entry[], labels: MetricLabels) {
   switch (department) {
     case 'finance':
-      return { department, ...financeMetrics(rows) };
+      return { department, ...financeMetrics(rows, labels) };
     case 'commercial':
-      return { department, ...commercialMetrics(rows) };
+      return { department, ...commercialMetrics(rows, labels) };
     case 'operations':
-      return { department, ...operationsMetrics(rows) };
+      return { department, ...operationsMetrics(rows, labels) };
     case 'inventory':
-      return { department, ...inventoryMetrics(rows) };
+      return { department, ...inventoryMetrics(rows, labels) };
     case 'brand':
-      return { department, ...brandMetrics(rows) };
+      return { department, ...brandMetrics(rows, labels) };
     case 'marketing':
-      return { department, ...marketingMetrics(rows) };
+      return { department, ...marketingMetrics(rows, labels) };
     default:
       return { department, entryCount: rows.length };
   }
