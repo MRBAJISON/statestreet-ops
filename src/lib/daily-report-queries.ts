@@ -206,7 +206,9 @@ export function buildDecideDailyReportQuery(
     ), updated_report as (
       update daily_reports report
       set
-        status = case when ${action}::text = 'approve' then 'approved' else 'submitted' end,
+        status = case when ${action}::text = 'approve' then 'approved' else 'draft' end,
+        submitted_by_user_id = case when ${action}::text = 'approve' then report.submitted_by_user_id else null end,
+        submitted_at = case when ${action}::text = 'approve' then report.submitted_at else null end,
         approved_by_user_id = case when ${action}::text = 'approve' then ${userId}::integer else null::integer end,
         approved_at = case when ${action}::text = 'approve' then now() else null::timestamptz end,
         updated_by_user_id = ${userId},

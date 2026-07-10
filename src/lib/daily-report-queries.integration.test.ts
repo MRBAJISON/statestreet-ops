@@ -129,25 +129,56 @@ describeWithDatabase('daily report SQL integration', () => {
     expect(stale.rowCount).toBe(0);
     expect((await client.query('select lock_version from daily_reports where id = $1', [reportId])).rows[0].lock_version).toBe(2);
 
-    const approved = await execute(buildDecideDailyReportQuery(userId, reportId, 'approve', 2));
-    expect(approved.rows[0]).toMatchObject({ status: 'approved', lock_version: 3 });
-    const locked = await execute(buildReplaceDailyReportQuery(userId, reportId, { ...submitted, lockVersion: 3 }));
+    const correctedSubmission = await execute(
+      buildReplaceDailyReportQuery(userId, reportId, {
+        ...submitted,
+        transactions: 13,
+        lockVersion: 2,
+      })
+    );
+    expect(correctedSubmission.rows[0]).toMatchObject({ lock_version: 3 });
+    expect((await client.query('select status from daily_reports where id = $1', [reportId])).rows[0].status).toBe(
+      'submitted'
+    );
+
+    const approved = await execute(buildDecideDailyReportQuery(userId, reportId, 'approve', 3));
+    expect(approved.rows[0]).toMatchObject({ status: 'approved', lock_version: 4 });
+    const locked = await execute(buildReplaceDailyReportQuery(userId, reportId, { ...submitted, lockVersion: 4 }));
     expect(locked.rowCount).toBe(0);
 
     const reopened = await execute(
-      buildDecideDailyReportQuery(userId, reportId, 'reopen', 3, 'Correcting the payment split')
+      buildDecideDailyReportQuery(userId, reportId, 'reopen', 4, 'Correcting the payment split')
     );
-    expect(reopened.rows[0]).toMatchObject({ status: 'submitted', lock_version: 4 });
+    expect(reopened.rows[0]).toMatchObject({ status: 'draft', lock_version: 5 });
+    expect(
+      (
+        await client.query(
+          'select submitted_by_user_id, submitted_at from daily_reports where id = $1',
+          [reportId]
+        )
+      ).rows[0]
+    ).toEqual({ submitted_by_user_id: null, submitted_at: null });
+    const corrected = await execute(
+      buildReplaceDailyReportQuery(userId, reportId, { ...submitted, status: 'draft', lockVersion: 5 })
+    );
+    expect(corrected.rows[0]).toMatchObject({ lock_version: 6 });
     const audit = await client.query(
       `select action, before, after, metadata
        from audit_events where entity_type = 'daily-report' and entity_id = $1 order by id`,
       [reportId]
     );
-    expect(audit.rows.map((row) => row.action)).toEqual(['create', 'update', 'approve', 'reopen']);
+    expect(audit.rows.map((row) => row.action)).toEqual([
+      'create',
+      'update',
+      'update',
+      'approve',
+      'reopen',
+      'update',
+    ]);
     expect(audit.rows[1].before.sales[0].category_id).toBe(categoryOneId);
     expect(audit.rows[1].after.sales[0].categoryId).toBe(categoryTwoId);
-    expect(audit.rows[2].before.status).toBe('submitted');
-    expect(audit.rows[2].after.status).toBe('approved');
-    expect(audit.rows[3].metadata).toEqual({ reason: 'Correcting the payment split' });
+    expect(audit.rows[3].before.status).toBe('submitted');
+    expect(audit.rows[3].after.status).toBe('approved');
+    expect(audit.rows[4].metadata).toEqual({ reason: 'Correcting the payment split' });
   });
 });

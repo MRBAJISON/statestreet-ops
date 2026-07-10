@@ -36,7 +36,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (permittedStoreId !== existing.storeId) {
       return NextResponse.json({ error: 'A report cannot be moved to another store' }, { status: 400 });
     }
-    await validateDailyReportReferences(parsed.data, existing.storeId);
+    await validateDailyReportReferences(parsed.data, existing.storeId, {
+      categoryIds: existing.categoryIds,
+      paymentMethodIds: existing.paymentMethodIds,
+    });
     const report = await replaceDailyReport(session.user, reportId, {
       ...parsed.data,
       lockVersion: parsed.data.lockVersion,
