@@ -6,9 +6,9 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const profiles = {
-  fast: ["npm run lint", "npm run build"],
+  fast: ["npm run lint", "npm test", "npm run build"],
   db: ["npm run db:push"],
-  all: ["npm run lint", "npm run build", "npm run db:push"],
+  all: ["npm run lint", "npm test", "npm run build", "npm run db:push"],
 };
 
 const profile = process.argv[2] ?? "fast";

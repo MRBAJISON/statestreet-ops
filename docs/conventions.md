@@ -55,6 +55,12 @@ npm run db:seed
   Do not run it casually against a shared dev database.
 - Session role data is embedded in the signed session token. Role access changes
   must be reflected in both `src/lib/auth.ts` and `src/proxy.ts`.
+- Typed workflows use resource-specific Zod contracts and server-derived user or
+  store ownership. Do not add new form types to the generic `entries` endpoint.
+- Use exact decimal strings at API boundaries for money. Derived totals are not
+  accepted from clients when the server can calculate them.
+- Production schema changes use reviewed migrations, not `db:push`. Follow
+  `docs/data-foundation.md` for the staged transition from legacy JSON rows.
 
 ## Role Access
 

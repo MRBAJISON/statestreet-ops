@@ -4,6 +4,7 @@ import { entries } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { isAudited, recordAudit, diffPayload } from '@/lib/audit';
 import { getSession } from '@/lib/auth';
+import { canMutateLegacyEntry } from '@/lib/entry-permissions';
 
 function parseId(v: string): number | null {
   const n = Number(v);
@@ -13,7 +14,8 @@ function parseId(v: string): number | null {
 // Update an entry's payload.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    if (!(await getSession())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { id } = await params;
     const numId = parseId(id);
     if (!numId) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
@@ -23,6 +25,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'payload object required' }, { status: 400 });
     }
     const [before] = await db.select().from(entries).where(eq(entries.id, numId));
+    if (!before) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (!canMutateLegacyEntry(session.user, before, 'update')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    if (!canMutateLegacyEntry(session.user, { ...before, payload }, 'update')) {
+      return NextResponse.json({ error: 'Store ownership fields cannot be changed' }, { status: 403 });
+    }
     const [row] = await db.update(entries).set({ payload }).where(eq(entries.id, numId)).returning();
     if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     if (before && isAudited(before.department, before.formType)) {
@@ -39,14 +48,15 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (session.user.role === 'store-manager') {
-      return NextResponse.json({ error: 'Store managers cannot delete entries — edit only.' }, { status: 403 });
-    }
     const { id } = await params;
     const numId = parseId(id);
     if (!numId) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+    const [before] = await db.select().from(entries).where(eq(entries.id, numId));
+    if (!before) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (!canMutateLegacyEntry(session.user, before, 'delete')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     const [row] = await db.delete(entries).where(eq(entries.id, numId)).returning();
-    if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     if (isAudited(row.department, row.formType)) {
       await recordAudit(numId, 'delete', { snapshot: row.payload });
     }

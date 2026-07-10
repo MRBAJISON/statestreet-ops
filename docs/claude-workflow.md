@@ -39,6 +39,7 @@ Open `http://127.0.0.1:3000`. The root route redirects based on session state.
 Before handoff:
 
 ```bash
+npm test
 npm run verify:fast
 ```
 
@@ -46,7 +47,11 @@ For schema/setup work:
 
 ```bash
 npm run db:push
+npm run db:generate
 ```
+
+`db:push` is development-only. Test generated SQL against an isolated database
+and follow `docs/data-foundation.md` before any remote migration or backfill.
 
 ## Browser Verification
 
@@ -73,9 +78,10 @@ For meaningful changes, Claude should finish with a practical handoff:
 
 1. Implement the smallest scoped change.
 2. Run `npm run verify:fast`.
-3. Browser-smoke any changed UI route.
-4. Re-read the diff using `docs/code-review.md` as a checklist.
-5. Tell the user what was verified, what was not verified, and what risks remain.
+3. Run `npm test`; include the isolated database test for persistence changes.
+4. Browser-smoke any changed UI route.
+5. Re-read the diff using `docs/code-review.md` as a checklist.
+6. Tell the user what was verified, what was not verified, and what risks remain.
 
 This is not an independent review system. Recommend a second reviewer only when
 the change touches auth, role access, data persistence, exports, or dashboard

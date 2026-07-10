@@ -16,6 +16,12 @@
     "verify:fast": "node scripts/verify.mjs fast",
     "verify:db": "node scripts/verify.mjs db",
     "verify:all": "node scripts/verify.mjs all",
+    "test": "vitest run",
+    "test:db": "vitest run src/lib/daily-report-queries.integration.test.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:plan-backfill": "node scripts/plan-foundation-backfill.mjs",
+    "db:seed:foundation": "node scripts/seed-foundation-catalog.mjs",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "node scripts/seed-users.mjs",
@@ -30,17 +36,21 @@
     "next": "16.2.7",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "recharts": "^3.8.1"
+    "recharts": "^3.8.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
+    "pg": "^8.22.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "3.2.7"
   }
 }

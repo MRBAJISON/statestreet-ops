@@ -22,7 +22,10 @@ Finance sees every main department dashboard, including Executive Command, but d
 stays scoped to Finance forms.
 
 ## How it works
-- Forms POST submissions to `POST /api/entries` → stored in the `entries` table (jsonb payload).
+- Existing forms POST submissions to `POST /api/entries` and remain on the
+  transitional JSON model until each workflow is migrated.
+- Typed product and daily-report contracts are available for the redesigned
+  workflows. See [`docs/data-foundation.md`](docs/data-foundation.md).
 - Dashboards read `GET /api/metrics/[department]?period=&date=&store=` — aggregated live in
   `src/lib/metrics.ts`. Filters: period (day/week/month/year/all) + calendar date + store.
 - Entries can be edited/deleted (`PATCH`/`DELETE /api/entries/[id]`) from the forms and dashboards.
@@ -53,6 +56,10 @@ Fill `.env.local` before running database commands. `npm run db:push` loads
 
 ## Database scripts
 - `npm run db:push` — sync schema to the database
+- `npm run db:generate` — generate a reviewed SQL migration
+- `npm run db:migrate` — apply versioned migrations to a supported remote database
+- `npm run db:plan-backfill` — read-only legacy conversion and parity report
+- `npm run db:seed:foundation` — preview master-data conversion (`-- --apply` writes)
 - `npm run db:studio` — open Drizzle Studio
 - `npm run db:seed` — seed demo users (updates seeded passwords on conflict)
 - `npm run db:seed:all` — seed users plus sample operating data
@@ -61,6 +68,7 @@ Fill `.env.local` before running database commands. `npm run db:push` loads
 ## Verification
 ```bash
 npm run lint
+npm test
 npm run build
 npm run verify:fast
 ```
@@ -77,6 +85,7 @@ This repo is primarily edited through Claude. Start with:
 - [`docs/claude-workflow.md`](docs/claude-workflow.md) for setup and verification
 - [`docs/code-review.md`](docs/code-review.md) for the review checklist
 - [`docs/deployment.md`](docs/deployment.md) for the current Vercel setup
+- [`docs/data-foundation.md`](docs/data-foundation.md) for schema and migration rules
 
 ## Deployment (Vercel)
 This repo is already connected to Vercel. Current project details live in

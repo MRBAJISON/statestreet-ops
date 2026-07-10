@@ -40,6 +40,8 @@ npm run dev
 npm run lint
 npm run build
 npm run verify:fast
+npm test
+npm run db:generate
 ```
 
 Database setup:
@@ -48,6 +50,10 @@ Database setup:
 npm run db:push
 npm run db:seed
 ```
+
+Production data-foundation work follows `docs/data-foundation.md`. Never use
+`db:push` against production or run a backfill before its read-only plan is
+reviewed.
 
 `npm run db:seed` resets the seeded demo users' passwords. Check whether the dev
 database already has users before running it.

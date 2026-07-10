@@ -22,6 +22,9 @@ drift, broken commands, unsafe shortcuts, or undocumented assumptions.
   asked to proceed.
 - Keep product behavior stable unless the user asks to change it.
 - Run `npm run verify:fast` before reporting implementation work as done.
+- Run `npm test` for data contracts, permissions, or persistence changes.
+- Follow `docs/data-foundation.md` for migrations and legacy backfill planning;
+  never use `db:push` against production.
 - For UI changes, open the app locally and verify the actual route.
 - Do not push `main` unless the user explicitly wants a production deploy.
 - Do not invent extra process. No forced PR workflow, worktree workflow, or

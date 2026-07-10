@@ -19,6 +19,14 @@ project unless the current production project is being intentionally replaced.
 Pushing to `main` is expected to create a Production deployment. Do not push to
 `main` unless the user explicitly wants to deploy.
 
+## Database Release Gate
+
+Application deploys do not automatically make a production schema change safe.
+For data-foundation releases, follow `docs/data-foundation.md`: run the read-only
+planner, test migrations on a Neon branch or backup, seed master data, reconcile
+counts and money totals, and only then switch application reads. Never run
+`npm run db:push` against production.
+
 ## Environment Variables
 
 Vercel currently has these variables configured for Preview and Production:
