@@ -3,12 +3,19 @@ import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
 import { saveDailyReportSchema } from '@/lib/contracts/daily-report';
 import { dateSchema, formatContractError } from '@/lib/contracts/shared';
-import { createDailyReport, resolveDailyReportStore, validateDailyReportReferences } from '@/lib/daily-reports';
+import {
+  createDailyReport,
+  getDailyReportReferenceData,
+  resolveDailyReportStore,
+  validateDailyReportReferences,
+} from '@/lib/daily-reports';
 import { db } from '@/lib/db';
 import {
+  categories,
   dailyPaymentLines,
   dailyReports,
   dailySalesLines,
+  paymentMethods,
   stores,
 } from '@/lib/db/foundation-schema';
 import { databaseErrorCode, HttpError } from '@/lib/server-errors';
@@ -74,35 +81,57 @@ export async function GET(req: NextRequest) {
     if (from) conditions.push(gte(dailyReports.businessDate, from));
     if (to) conditions.push(lte(dailyReports.businessDate, to));
     if (status) conditions.push(eq(dailyReports.status, status));
-    const reports = await db
-      .select({
-        id: dailyReports.id,
-        storeId: dailyReports.storeId,
-        storeCode: stores.code,
-        storeName: stores.name,
-        businessDate: dailyReports.businessDate,
-        status: dailyReports.status,
-        transactions: dailyReports.transactions,
-        footfall: dailyReports.footfall,
-        totalCustomers: dailyReports.totalCustomers,
-        newCustomers: dailyReports.newCustomers,
-        returningCustomers: dailyReports.returningCustomers,
-        notes: dailyReports.notes,
-        lockVersion: dailyReports.lockVersion,
-        submittedAt: dailyReports.submittedAt,
-        approvedAt: dailyReports.approvedAt,
-        updatedAt: dailyReports.updatedAt,
-      })
-      .from(dailyReports)
-      .innerJoin(stores, eq(dailyReports.storeId, stores.id))
-      .where(conditions.length ? and(...conditions) : undefined)
-      .orderBy(desc(dailyReports.businessDate), desc(dailyReports.updatedAt))
-      .limit(366);
+    const [reports, references] = await Promise.all([
+      db
+        .select({
+          id: dailyReports.id,
+          storeId: dailyReports.storeId,
+          storeCode: stores.code,
+          storeName: stores.name,
+          businessDate: dailyReports.businessDate,
+          status: dailyReports.status,
+          transactions: dailyReports.transactions,
+          footfall: dailyReports.footfall,
+          totalCustomers: dailyReports.totalCustomers,
+          newCustomers: dailyReports.newCustomers,
+          returningCustomers: dailyReports.returningCustomers,
+          notes: dailyReports.notes,
+          lockVersion: dailyReports.lockVersion,
+          submittedAt: dailyReports.submittedAt,
+          approvedAt: dailyReports.approvedAt,
+          updatedAt: dailyReports.updatedAt,
+        })
+        .from(dailyReports)
+        .innerJoin(stores, eq(dailyReports.storeId, stores.id))
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(dailyReports.businessDate), desc(dailyReports.updatedAt))
+        .limit(366),
+      getDailyReportReferenceData(storeId),
+    ]);
     const reportIds = reports.map((report) => report.id);
     const [sales, payments] = reportIds.length
       ? await Promise.all([
-          db.select().from(dailySalesLines).where(inArray(dailySalesLines.dailyReportId, reportIds)),
-          db.select().from(dailyPaymentLines).where(inArray(dailyPaymentLines.dailyReportId, reportIds)),
+          db
+            .select({
+              dailyReportId: dailySalesLines.dailyReportId,
+              categoryId: dailySalesLines.categoryId,
+              openingStock: dailySalesLines.openingStock,
+              unitsSold: dailySalesLines.unitsSold,
+              grossRevenue: dailySalesLines.grossRevenue,
+              cogs: dailySalesLines.cogs,
+              discounts: dailySalesLines.discounts,
+              creditSales: dailySalesLines.creditSales,
+            })
+            .from(dailySalesLines)
+            .where(inArray(dailySalesLines.dailyReportId, reportIds)),
+          db
+            .select({
+              dailyReportId: dailyPaymentLines.dailyReportId,
+              paymentMethodId: dailyPaymentLines.paymentMethodId,
+              amount: dailyPaymentLines.amount,
+            })
+            .from(dailyPaymentLines)
+            .where(inArray(dailyPaymentLines.dailyReportId, reportIds)),
         ])
       : [[], []];
     const salesByReport = new Map<number, typeof sales>();
@@ -111,7 +140,44 @@ export async function GET(req: NextRequest) {
     for (const line of payments) {
       paymentsByReport.set(line.dailyReportId, [...(paymentsByReport.get(line.dailyReportId) ?? []), line]);
     }
+    const knownCategoryIds = new Set(references.categories.map((category) => category.id));
+    const knownPaymentMethodIds = new Set(references.paymentMethods.map((method) => method.id));
+    const historicalCategoryIds = [
+      ...new Set(sales.map((line) => line.categoryId).filter((categoryId) => !knownCategoryIds.has(categoryId))),
+    ];
+    const historicalPaymentMethodIds = [
+      ...new Set(
+        payments
+          .map((line) => line.paymentMethodId)
+          .filter((paymentMethodId) => !knownPaymentMethodIds.has(paymentMethodId))
+      ),
+    ];
+    const [historicalCategories, historicalPaymentMethods] = await Promise.all([
+      historicalCategoryIds.length
+        ? db
+            .select({ id: categories.id, code: categories.code, name: categories.name })
+            .from(categories)
+            .where(inArray(categories.id, historicalCategoryIds))
+        : Promise.resolve([]),
+      historicalPaymentMethodIds.length
+        ? db
+            .select({ id: paymentMethods.id, code: paymentMethods.code, name: paymentMethods.name })
+            .from(paymentMethods)
+            .where(inArray(paymentMethods.id, historicalPaymentMethodIds))
+        : Promise.resolve([]),
+    ]);
     return NextResponse.json({
+      references: {
+        ...references,
+        categories: [
+          ...references.categories,
+          ...historicalCategories.map((category) => ({ ...category, available: false })),
+        ],
+        paymentMethods: [
+          ...references.paymentMethods,
+          ...historicalPaymentMethods.map((method) => ({ ...method, available: false })),
+        ],
+      },
       reports: reports.map((report) => ({
         ...report,
         sales: salesByReport.get(report.id) ?? [],

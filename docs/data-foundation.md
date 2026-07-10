@@ -46,6 +46,11 @@ The server derives the store for store managers and never trusts a client-sent
 store assignment. Shared Zod contracts reject duplicate lines, invalid dates,
 inconsistent customer totals, and invalid money precision.
 
+The typed store-manager workflow is available only at the unlinked preview route
+when `ENABLE_TYPED_DAILY_REPORT_PREVIEW=true`. Keep that flag off in production
+until typed reports have parity and the dashboard and Finance readers switch in
+the same release.
+
 ## Migration Files
 
 - `drizzle/0000_small_naoko.sql` is an idempotent baseline for the three legacy

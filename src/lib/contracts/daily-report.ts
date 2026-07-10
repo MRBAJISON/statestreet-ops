@@ -3,6 +3,8 @@ import { dateSchema, moneySchema, moneyToCents, positiveIdSchema } from './share
 
 const countSchema = z.number().int().min(0).max(10_000_000);
 
+export const dailyReportStatusSchema = z.enum(['draft', 'submitted', 'approved']);
+
 export const dailySalesLineSchema = z
   .object({
     categoryId: positiveIdSchema,
@@ -34,7 +36,7 @@ export const saveDailyReportSchema = z
   .object({
     businessDate: dateSchema,
     storeId: positiveIdSchema.optional(),
-    status: z.enum(['draft', 'submitted']).default('draft'),
+    status: dailyReportStatusSchema.exclude(['approved']).default('draft'),
     transactions: countSchema.default(0),
     footfall: countSchema.default(0),
     totalCustomers: countSchema.default(0),
@@ -87,3 +89,74 @@ export const dailyReportDecisionSchema = z
 
 export type SaveDailyReportInput = z.infer<typeof saveDailyReportSchema>;
 export type DailyReportDecisionInput = z.infer<typeof dailyReportDecisionSchema>;
+export type DailyReportStatus = z.infer<typeof dailyReportStatusSchema>;
+
+export interface DailyReportReference {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export interface DailyReportOption extends DailyReportReference {
+  available: boolean;
+}
+
+export interface DailyReportSalesRecord {
+  categoryId: number;
+  openingStock: number;
+  unitsSold: number;
+  grossRevenue: string;
+  cogs: string;
+  discounts: string;
+  creditSales: string;
+}
+
+export interface DailyReportPaymentRecord {
+  paymentMethodId: number;
+  amount: string;
+}
+
+export interface DailyReportRecord {
+  id: number;
+  storeId: number;
+  storeCode: string;
+  storeName: string;
+  businessDate: string;
+  status: DailyReportStatus;
+  transactions: number;
+  footfall: number;
+  totalCustomers: number;
+  newCustomers: number;
+  returningCustomers: number;
+  notes: string | null;
+  lockVersion: number;
+  submittedAt: string | null;
+  approvedAt: string | null;
+  updatedAt: string;
+  sales: DailyReportSalesRecord[];
+  payments: DailyReportPaymentRecord[];
+}
+
+export interface DailyReportReferences {
+  store: DailyReportReference | null;
+  categories: DailyReportOption[];
+  paymentMethods: DailyReportOption[];
+}
+
+export interface DailyReportsResponse {
+  reports: DailyReportRecord[];
+  references: DailyReportReferences;
+}
+
+export interface DailyReportMutationRecord {
+  id: number;
+  lockVersion: number;
+  status: 'draft' | 'submitted';
+  salesCount: number;
+  paymentCount: number;
+}
+
+export interface DailyReportMutationResponse {
+  ok: true;
+  report: DailyReportMutationRecord;
+}
