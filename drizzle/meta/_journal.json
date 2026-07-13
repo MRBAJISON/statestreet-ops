@@ -1,0 +1,83 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1783676105091,
+      "tag": "0000_small_naoko",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783676818280,
+      "tag": "0001_material_expediter",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783781365235,
+      "tag": "0002_operational_parity",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783784654897,
+      "tag": "0003_long_masque",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783789763253,
+      "tag": "0004_finance_import_ledger",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783795233145,
+      "tag": "0005_hesitant_spot",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783953436234,
+      "tag": "0006_legacy_upgrade_safety",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1783957000000,
+      "tag": "0007_concurrency_guards",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1783961100000,
+      "tag": "0008_survey_contact_retention",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1783961800000,
+      "tag": "0009_audited_upsert_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1783970000000,
+      "tag": "0010_legacy_migration_ledger",
+      "breakpoints": true
+    }
+  ]
+}

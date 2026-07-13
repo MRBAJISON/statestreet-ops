@@ -1,66 +1,257 @@
 'use client';
 
 import { useState } from 'react';
+import {
+  CalendarRange,
+  Database,
+  Download,
+  FileSpreadsheet,
+  LoaderCircle,
+  ShieldCheck,
+  TriangleAlert,
+} from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import type { ExportScope } from '@/lib/export';
 
-const pad = (n: number) => String(n).padStart(2, '0');
-const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const monthStart = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-01`; };
-const today = () => iso(new Date());
-const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return iso(d); };
+type DatePreset = 'month' | 'last-7' | 'last-30' | 'all' | 'custom';
 
-const inputCls = 'w-full bg-[var(--c-card2)] border border-[var(--c-border)] rounded px-3 py-2 text-sm text-[var(--c-fg)] focus:outline-none focus:border-[#c8a951]';
+interface ReportsClientProps {
+  scope: ExportScope;
+  label: string;
+  description: string;
+  includeCustomerContacts: boolean;
+}
 
-export default function ReportsClient({ scope, label }: { scope: string; label: string }) {
+const pad = (value: number) => String(value).padStart(2, '0');
+const toIsoDate = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+
+function today(): string {
+  return toIsoDate(new Date());
+}
+
+function monthStart(): string {
+  const date = new Date();
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-01`;
+}
+
+function inclusiveDaysAgo(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - (days - 1));
+  return toIsoDate(date);
+}
+
+function filenameFromDisposition(disposition: string | null): string {
+  const encoded = disposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  if (encoded) return decodeURIComponent(encoded);
+  return disposition?.match(/filename="?([^";]+)"?/i)?.[1] ?? 'statestreet-export.xlsx';
+}
+
+export default function ReportsClient({
+  scope,
+  label,
+  description,
+  includeCustomerContacts,
+}: ReportsClientProps) {
+  const [preset, setPreset] = useState<DatePreset>('month');
   const [from, setFrom] = useState(monthStart());
   const [to, setTo] = useState(today());
   const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState('');
 
-  function download() {
-    const params = new URLSearchParams({ scope });
-    if (from) params.set('from', from);
-    if (to) params.set('to', to);
+  const invalidRange = Boolean(from && to && from > to);
+  const rangeLabel = !from && !to ? 'All time' : `${from || 'Start'} to ${to || 'Today'}`;
+
+  function applyPreset(value: string) {
+    if (!value) return;
+    const next = value as Exclude<DatePreset, 'custom'>;
+    setPreset(next);
+    setDownloadError('');
+    if (next === 'month') {
+      setFrom(monthStart());
+      setTo(today());
+    } else if (next === 'last-7') {
+      setFrom(inclusiveDaysAgo(7));
+      setTo(today());
+    } else if (next === 'last-30') {
+      setFrom(inclusiveDaysAgo(30));
+      setTo(today());
+    } else {
+      setFrom('');
+      setTo('');
+    }
+  }
+
+  async function download() {
+    if (invalidRange || downloading) return;
     setDownloading(true);
-    // Content-Disposition: attachment makes the browser download the .xlsx.
-    window.location.href = `/api/export?${params.toString()}`;
-    setTimeout(() => setDownloading(false), 2500);
+    setDownloadError('');
+    try {
+      const params = new URLSearchParams({ scope });
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const response = await fetch(`/api/export?${params.toString()}`, {
+        method: 'GET',
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error ?? 'The export could not be prepared');
+      }
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = filenameFromDisposition(response.headers.get('Content-Disposition'));
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    } catch (error) {
+      setDownloadError(error instanceof Error ? error.message : 'The export could not be prepared');
+    } finally {
+      setDownloading(false);
+    }
   }
 
   return (
-    <div className="min-h-screen bg-[var(--c-bg)] text-[var(--c-fg)] p-6">
-      <div className="max-w-lg mx-auto space-y-5">
-        <div className="text-center">
-          <h1 className="text-xl font-bold">Entry Report</h1>
-          <p className="text-sm text-gray-500 mt-1">{label} · choose a date range, then download the Excel report.</p>
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+      <header className="flex flex-col gap-3 border-b pb-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-normal">Data export</h1>
+          <p className="max-w-2xl text-sm text-muted-foreground">{description}</p>
         </div>
+        <Badge variant="outline" className="shrink-0">
+          <Database data-icon="inline-start" aria-hidden="true" />
+          Typed PostgreSQL
+        </Badge>
+      </header>
 
-        <div className="bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg p-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">From</label>
-              <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} className={inputCls} />
+      {downloadError ? (
+        <Alert variant="destructive">
+          <TriangleAlert aria-hidden="true" />
+          <AlertTitle>Export failed</AlertTitle>
+          <AlertDescription>{downloadError}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <Card>
+          <CardHeader>
+            <CardTitle>Date range</CardTitle>
+            <CardDescription>{rangeLabel}</CardDescription>
+            <CardAction>
+              <CalendarRange aria-hidden="true" className="text-muted-foreground" />
+            </CardAction>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-6">
+            <ToggleGroup
+              type="single"
+              value={preset === 'custom' ? '' : preset}
+              onValueChange={applyPreset}
+              variant="outline"
+              spacing={0}
+              className="grid w-full grid-cols-2 sm:grid-cols-4"
+              aria-label="Date preset"
+            >
+              <ToggleGroupItem value="month" className="min-w-0">This month</ToggleGroupItem>
+              <ToggleGroupItem value="last-7" className="min-w-0">Last 7 days</ToggleGroupItem>
+              <ToggleGroupItem value="last-30" className="min-w-0">Last 30 days</ToggleGroupItem>
+              <ToggleGroupItem value="all" className="min-w-0">All time</ToggleGroupItem>
+            </ToggleGroup>
+
+            <FieldGroup className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <Field data-invalid={invalidRange || undefined}>
+                <FieldLabel htmlFor="export-from">From</FieldLabel>
+                <Input
+                  id="export-from"
+                  type="date"
+                  value={from}
+                  max={to || undefined}
+                  aria-invalid={invalidRange}
+                  onChange={(event) => {
+                    setFrom(event.target.value);
+                    setPreset('custom');
+                    setDownloadError('');
+                  }}
+                />
+              </Field>
+              <Field data-invalid={invalidRange || undefined}>
+                <FieldLabel htmlFor="export-to">To</FieldLabel>
+                <Input
+                  id="export-to"
+                  type="date"
+                  value={to}
+                  min={from || undefined}
+                  aria-invalid={invalidRange}
+                  onChange={(event) => {
+                    setTo(event.target.value);
+                    setPreset('custom');
+                    setDownloadError('');
+                  }}
+                />
+              </Field>
+            </FieldGroup>
+            {invalidRange ? <FieldDescription className="text-destructive">From cannot be after To.</FieldDescription> : null}
+          </CardContent>
+          <CardFooter className="justify-end">
+            <Button type="button" size="lg" disabled={downloading || invalidRange} onClick={download}>
+              {downloading ? (
+                <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+              ) : (
+                <Download data-icon="inline-start" aria-hidden="true" />
+              )}
+              {downloading ? 'Preparing workbook' : 'Download Excel workbook'}
+            </Button>
+          </CardFooter>
+        </Card>
+
+        <Card size="sm" className="h-fit">
+          <CardHeader>
+            <CardTitle>Export scope</CardTitle>
+            <CardDescription>Server-enforced access</CardDescription>
+            <CardAction>
+              <FileSpreadsheet aria-hidden="true" className="text-muted-foreground" />
+            </CardAction>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">Scope</span>
+              <span className="text-base font-semibold">{label}</span>
             </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">To</label>
-              <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className={inputCls} />
+            <Separator />
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">Date basis</span>
+              <span className="text-sm">{rangeLabel}</span>
             </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => { setFrom(monthStart()); setTo(today()); }} className="text-xs px-3 py-1.5 rounded border border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)]">This month</button>
-            <button type="button" onClick={() => { setFrom(daysAgo(7)); setTo(today()); }} className="text-xs px-3 py-1.5 rounded border border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)]">Last 7 days</button>
-            <button type="button" onClick={() => { setFrom(daysAgo(30)); setTo(today()); }} className="text-xs px-3 py-1.5 rounded border border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)]">Last 30 days</button>
-            <button type="button" onClick={() => { setFrom(''); setTo(''); }} className="text-xs px-3 py-1.5 rounded border border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)]">All time</button>
-          </div>
-
-          <div className="pt-1">
-            <button type="button" onClick={download} disabled={downloading}
-              className="w-full bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-5 py-2.5 rounded-lg text-sm disabled:opacity-50">
-              {downloading ? 'Preparing…' : `⬇ Download ${from || to ? 'selected range' : 'all-time'} report`}
-            </button>
-          </div>
-          <p className="text-[0.7rem] text-gray-500">{from || to ? `Includes entries dated ${from || 'the beginning'} → ${to || 'today'}.` : 'No date filter — includes every entry.'}</p>
-        </div>
+            <Separator />
+            <div className="flex gap-2">
+              <ShieldCheck aria-hidden="true" className="mt-0.5 shrink-0 text-muted-foreground" />
+              <div className="flex min-w-0 flex-col gap-1">
+                <span className="text-xs font-medium text-muted-foreground">Customer contacts</span>
+                <span className="text-sm">
+                  {includeCustomerContacts ? 'Included for this operational scope' : 'Excluded from this workbook'}
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </section>
   );
 }

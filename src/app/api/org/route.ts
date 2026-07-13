@@ -1,46 +1,78 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { entries } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import { getSession } from '@/lib/auth';
-import { getOrgRow, getOrgSettings } from '@/lib/org-server';
-import { mergeOrg, type OrgSettings } from '@/lib/org';
+import { formatContractError } from '@/lib/contracts/shared';
+import { db } from '@/lib/db';
+import { getOrgSettings } from '@/lib/org-server';
+import { sessionUserId } from '@/lib/server-errors';
+import { sql } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
 
-// Public read — branding (name/logo) is needed on the login screen too.
+const patchSchema = z
+  .object({
+    companyName: z.string().trim().min(1).max(120).optional(),
+    tagline: z.string().trim().max(160).optional(),
+    currency: z.string().trim().min(3).max(8).optional(),
+    logo: z.string().max(300_000).optional(),
+    weekStart: z.enum(['monday', 'sunday']).optional(),
+    security: z
+      .object({
+        minPasswordLen: z.number().int().min(8).max(128).optional(),
+        sessionDays: z.number().int().min(1).max(90).optional(),
+      })
+      .optional(),
+  })
+  .strict();
+
 export async function GET() {
-  const org = await getOrgSettings();
-  return NextResponse.json(org);
+  const [org, session] = await Promise.all([getOrgSettings(), getSession()]);
+  if (!session) {
+    return NextResponse.json({
+      companyName: org.companyName,
+      tagline: org.tagline,
+      currency: org.currency,
+      logo: org.logo,
+      passwordMinLength: org.security.minPasswordLen,
+    });
+  }
+  return NextResponse.json(org, { headers: { 'Cache-Control': 'private, no-store' } });
 }
 
-// Update (partial patch merged over current settings).
-// Owner, Commercial and Operations may edit organization settings.
-const ORG_EDITORS = ['owner', 'finance', 'commercial', 'operations'];
 export async function PATCH(req: NextRequest) {
   const session = await getSession();
-  if (!session || !ORG_EDITORS.includes(session.user.role)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-  let body: Partial<OrgSettings>;
-  try {
-    body = (await req.json()) ?? {};
-  } catch {
-    return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
-  }
-  // Guard logo size (data URLs can balloon the row).
-  if (typeof body.logo === 'string' && body.logo.length > 300_000) {
-    return NextResponse.json({ error: 'Logo is too large (max ~200 KB). Use a smaller PNG/SVG.' }, { status: 400 });
-  }
-
-  const row = await getOrgRow();
-  const current = mergeOrg((row?.payload as Partial<OrgSettings>) ?? null);
-  const next = mergeOrg({ ...current, ...body, security: { ...current.security, ...(body.security ?? {}) } });
-
-  if (row) {
-    await db.update(entries).set({ payload: next as unknown as Record<string, unknown> }).where(eq(entries.id, row.id));
-  } else {
-    await db.insert(entries).values({ department: 'admin', formType: 'org-settings', payload: next as unknown as Record<string, unknown> });
-  }
-  return NextResponse.json({ ok: true, org: next });
+  if (session?.user.role !== 'owner') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const parsed = patchSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: formatContractError(parsed.error) }, { status: 400 });
+  if (!Object.keys(parsed.data).length) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
+  const input = parsed.data;
+  const actorUserId = sessionUserId(session.user.id);
+  const result = await db.execute(sql`
+    with before_settings as materialized (
+      select * from organization_settings where id = 1 for update
+    ), updated as (
+      update organization_settings settings
+      set company_name = coalesce(${input.companyName ?? null}::text, before.company_name),
+          tagline = coalesce(${input.tagline ?? null}::text, before.tagline),
+          currency = coalesce(${input.currency ?? null}::text, before.currency),
+          logo = coalesce(${input.logo ?? null}::text, before.logo),
+          week_start = coalesce(${input.weekStart ?? null}::text, before.week_start),
+          minimum_password_length = coalesce(${input.security?.minPasswordLen ?? null}::integer, before.minimum_password_length),
+          session_days = coalesce(${input.security?.sessionDays ?? null}::integer, before.session_days),
+          updated_by_user_id = ${actorUserId},
+          updated_at = now()
+      from before_settings before
+      where settings.id = before.id
+      returning settings.*
+    ), audit as (
+      insert into audit_events (entity_type, entity_id, action, actor_user_id, before, after)
+      select 'organization-settings', updated.id, 'update', ${actorUserId},
+             to_jsonb(before_settings) - 'logo', to_jsonb(updated) - 'logo'
+      from updated join before_settings on before_settings.id = updated.id
+      returning id
+    )
+    select id from updated
+  `);
+  if (!result.rows.length) return NextResponse.json({ error: 'Organization settings are unavailable' }, { status: 409 });
+  return NextResponse.json({ ok: true, org: await getOrgSettings() });
 }

@@ -1,8 +1,8 @@
-import InventoryForms from './InventoryForms';
-import { getSession } from '@/lib/auth';
+'use client';
 
-export default async function InventoryFormsPage() {
-  const session = await getSession();
-  const managerName = session?.user.name ?? '';
-  return <InventoryForms managerName={managerName} />;
+import { WorkflowWorkspace } from '@/components/forms/WorkflowWorkspace';
+import { inventoryShortcuts, inventoryWorkflows } from '@/components/forms/workflow-definitions';
+
+export default function InventoryFormsPage() {
+  return <WorkflowWorkspace title="Inventory workflows" definitions={inventoryWorkflows} shortcuts={inventoryShortcuts} />;
 }

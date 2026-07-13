@@ -29,7 +29,7 @@ export const DEFAULT_ORG: OrgSettings = {
   currency: 'GHS',
   logo: '',
   weekStart: 'monday',
-  security: { minPasswordLen: 6, sessionDays: 7 },
+  security: { minPasswordLen: 8, sessionDays: 7 },
   stores: STORES,
   brands: BRANDS,
   categories: PRODUCT_CATEGORIES,

@@ -19,6 +19,5 @@ export default async function SettingsPage() {
   };
 
   const role = u?.role ?? session.user.role;
-  const canEditOrg = ['owner', 'finance', 'commercial', 'operations'].includes(role);
-  return <SettingsClient user={user} isOwner={role === 'owner'} canEditOrg={canEditOrg} />;
+  return <SettingsClient user={user} isOwner={role === 'owner'} />;
 }

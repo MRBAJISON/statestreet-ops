@@ -3,9 +3,10 @@ import { cookies } from 'next/headers';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
-import { getSession } from '@/lib/auth';
-import { signSession, verifySession } from '@/lib/session';
+import { getSession, getSessionFromToken } from '@/lib/auth';
+import { signSession } from '@/lib/session';
 import { getOrgSettings } from '@/lib/org-server';
+import { isDepartment, isUserRole, isValidRoleDepartment } from '@/lib/access';
 
 export const runtime = 'nodejs';
 
@@ -42,7 +43,10 @@ export async function POST(req: NextRequest) {
   if (!Number.isInteger(numId)) return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
 
   const [target] = await db.select().from(users).where(eq(users.id, numId));
-  if (!target) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+  if (!target || !target.active) return NextResponse.json({ error: 'Active user not found' }, { status: 404 });
+  if (!isUserRole(target.role) || !isDepartment(target.department) || !isValidRoleDepartment(target.role, target.department)) {
+    return NextResponse.json({ error: 'User access configuration is invalid' }, { status: 409 });
+  }
 
   const cookieStore = await cookies();
   const opts = await cookieOpts();
@@ -51,11 +55,13 @@ export async function POST(req: NextRequest) {
   if (current) cookieStore.set('admin_session', current.value, opts);
 
   const token = await signSession({
-    id: target.id, name: target.name, role: target.role, department: target.department, store: target.store ?? '',
+    id: target.id,
+    role: target.role,
+    sessionVersion: target.sessionVersion,
   });
   cookieStore.set('session', token, opts);
   // Cosmetic flag for the banner (display name only — not security-bearing).
-  cookieStore.set('impersonating', encodeURIComponent(target.name), { ...opts, httpOnly: false });
+  cookieStore.set('impersonating', target.name, { ...opts, httpOnly: false });
 
   return NextResponse.json({ ok: true, redirect: homeFor(target.role, target.department) });
 }
@@ -64,8 +70,8 @@ export async function POST(req: NextRequest) {
 export async function DELETE() {
   const cookieStore = await cookies();
   const admin = cookieStore.get('admin_session');
-  const data = admin ? await verifySession(admin.value) : null;
-  if (!admin || !data || data.role !== 'owner') {
+  const session = admin ? await getSessionFromToken(admin.value) : null;
+  if (!admin || session?.user.role !== 'owner') {
     return NextResponse.json({ error: 'No admin session to return to' }, { status: 400 });
   }
   const opts = await cookieOpts();

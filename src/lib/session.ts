@@ -29,23 +29,24 @@ async function hmac(data: string): Promise<string> {
 
 export interface SessionData {
   userId: string;
-  name: string;
   role: string;
-  department: string;
-  store?: string;
+  sessionVersion: number;
   ts: number;
 }
 
 export async function signSession(user: {
   id: string | number;
-  name: string;
   role: string;
-  department: string;
-  store?: string | null;
+  sessionVersion: number;
 }): Promise<string> {
   const payload = toB64url(
     enc.encode(
-      JSON.stringify({ userId: String(user.id), name: user.name, role: user.role, department: user.department, store: user.store ?? '', ts: Date.now() })
+      JSON.stringify({
+        userId: String(user.id),
+        role: user.role,
+        sessionVersion: user.sessionVersion,
+        ts: Date.now(),
+      })
     )
   );
   const sig = await hmac(payload);
@@ -60,6 +61,8 @@ export async function verifySession(token: string | undefined | null): Promise<S
     const data = JSON.parse(new TextDecoder().decode(fromB64url(payload))) as SessionData;
     // Reject stale tokens even if the cookie somehow outlives its maxAge.
     if (!data.ts || Date.now() - data.ts > MAX_AGE_MS) return null;
+    if (!/^\d+$/.test(data.userId) || !data.role) return null;
+    if (!Number.isInteger(data.sessionVersion) || data.sessionVersion < 1) return null;
     return data;
   } catch {
     return null;

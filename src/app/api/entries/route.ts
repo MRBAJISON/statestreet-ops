@@ -1,22 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { entries } from '@/lib/db/schema';
+import { legacyMigrationRecords } from '@/lib/db/operational-schema';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { isAudited, recordAudit } from '@/lib/audit';
 import { getSession } from '@/lib/auth';
-
-const DEPARTMENTS = ['finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'];
+import {
+  canReadLegacyDepartment,
+  canReadLegacyForm,
+  canWriteLegacyForm,
+  isKnownLegacyForm,
+  isLegacyDepartment,
+  legacyEntryBelongsToStore,
+} from '@/lib/entry-permissions';
 
 // Persist a form submission. Body: { department, formType, payload }
 export async function POST(req: NextRequest) {
   try {
-    if (!(await getSession())) {
+    const session = await getSession();
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const [migration] = await db
+      .select({ entryId: legacyMigrationRecords.entryId })
+      .from(legacyMigrationRecords)
+      .limit(1);
+    if (migration) {
+      return NextResponse.json({ error: 'Legacy entry writes are closed after migration' }, { status: 409 });
     }
     const body = await req.json();
     const { department, formType, payload } = body ?? {};
 
-    if (!DEPARTMENTS.includes(String(department))) {
+    if (!isLegacyDepartment(String(department))) {
       return NextResponse.json({ error: `Unknown department "${department}"` }, { status: 400 });
     }
     if (!formType || typeof formType !== 'string') {
@@ -24,6 +39,12 @@ export async function POST(req: NextRequest) {
     }
     if (typeof payload !== 'object' || payload === null) {
       return NextResponse.json({ error: 'payload object is required' }, { status: 400 });
+    }
+    if (!isKnownLegacyForm(department, formType)) {
+      return NextResponse.json({ error: `Unknown form type "${formType}"` }, { status: 400 });
+    }
+    if (!canWriteLegacyForm(session.user, department, formType)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Drop empty fields and require at least one meaningful value.
@@ -33,6 +54,12 @@ export async function POST(req: NextRequest) {
     }
     if (Object.keys(cleaned).length === 0) {
       return NextResponse.json({ error: 'Cannot save an empty entry' }, { status: 400 });
+    }
+    if (
+      session.user.role === 'store-manager' &&
+      (!session.user.store || !legacyEntryBelongsToStore(department, formType, cleaned, session.user.store))
+    ) {
+      return NextResponse.json({ error: 'Store ownership fields do not match this account' }, { status: 403 });
     }
 
     const [row] = await db
@@ -59,8 +86,26 @@ export async function GET(req: NextRequest) {
     const department = sp.get('department');
     const formType = sp.get('formType');
     const conds = [];
-    if (department) conds.push(eq(entries.department, department));
-    if (formType) conds.push(eq(entries.formType, formType));
+    const legacyDepartment = department && isLegacyDepartment(department) ? department : null;
+    if (department) {
+      if (!legacyDepartment) {
+        return NextResponse.json({ error: `Unknown department "${department}"` }, { status: 400 });
+      }
+      conds.push(eq(entries.department, legacyDepartment));
+    } else if (!['owner', 'finance', 'operations'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'A department filter is required' }, { status: 400 });
+    }
+    if (formType) {
+      if (!legacyDepartment || !isKnownLegacyForm(legacyDepartment, formType)) {
+        return NextResponse.json({ error: `Unknown form type "${formType}"` }, { status: 400 });
+      }
+      if (!canReadLegacyForm(session.user, legacyDepartment, formType)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      conds.push(eq(entries.formType, formType));
+    } else if (legacyDepartment && !canReadLegacyDepartment(session.user.role, legacyDepartment)) {
+      return NextResponse.json({ error: 'A permitted formType filter is required' }, { status: 403 });
+    }
     // A store manager only ever sees their own store's submissions (the store
     // lives in the payload under store / fromStore / toStore). Other roles
     // oversee all stores, so they are unaffected.

@@ -1,6 +1,12 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
+import { ArrowLeft, CircleCheck, KeyRound, LoaderCircle, Mail } from 'lucide-react';
+import { AuthShell, AuthTextField } from '@/components/auth/AuthShell';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Field, FieldGroup } from '@/components/ui/field';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -20,41 +26,60 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-xl font-bold tracking-wider">STATESTREET</h1>
-          <p className="text-xs text-[#c8a951] tracking-widest">RETAIL GROUP</p>
-          <h2 className="text-lg font-semibold text-gray-300 mt-4">Reset your password</h2>
+    <AuthShell
+      title="Reset your password"
+      description="Enter your work email to receive a reset link."
+      icon={KeyRound}
+    >
+      {sent ? (
+        <div className="flex flex-col gap-5">
+          <Alert className="border-primary/20 bg-accent/45">
+            <CircleCheck className="text-primary" aria-hidden="true" />
+            <AlertTitle>Check your inbox</AlertTitle>
+            <AlertDescription>
+              If an account exists for <span className="font-medium text-foreground">{email}</span>, a reset link has
+              been sent. The link expires in 1 hour.
+            </AlertDescription>
+          </Alert>
+          <Button asChild variant="outline" size="lg" className="h-11 w-full">
+            <Link href="/login">
+              <ArrowLeft data-icon="inline-start" aria-hidden="true" />
+              Back to sign in
+            </Link>
+          </Button>
         </div>
-
-        <div className="bg-[var(--c-card)] border border-[var(--c-border)] rounded-xl p-6">
-          {sent ? (
-            <div className="text-center space-y-4">
-              <p className="text-sm text-gray-300">
-                If an account exists for <span className="text-[var(--c-fg)]">{email}</span>, a reset link has been sent.
-                The link expires in 1 hour.
-              </p>
-              <a href="/login" className="inline-block text-sm text-[#c8a951] hover:underline">Back to sign in</a>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <p className="text-sm text-gray-500">Enter your email and we&apos;ll send you a reset link.</p>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Email</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full" placeholder="your@email.com" required />
-              </div>
-              <button type="submit" disabled={loading}
-                className="w-full bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-50">
+      ) : (
+        <form onSubmit={handleSubmit}>
+          <FieldGroup className="gap-4">
+            <AuthTextField
+              id="email"
+              label="Email"
+              icon={Mail}
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="your@email.com"
+              autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              disabled={loading}
+              required
+            />
+            <Field className="gap-3 pt-1">
+              <Button type="submit" size="lg" className="h-11 w-full" disabled={loading} aria-busy={loading}>
+                {loading && <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />}
                 {loading ? 'Sending...' : 'Send reset link'}
-              </button>
-              <div className="text-center">
-                <a href="/login" className="text-xs text-gray-500 hover:text-[#c8a951]">Back to sign in</a>
-              </div>
-            </form>
-          )}
-        </div>
-      </div>
-    </div>
+              </Button>
+              <Button asChild variant="link" size="sm" className="h-auto self-center p-0 text-xs">
+                <Link href="/login">
+                  <ArrowLeft data-icon="inline-start" aria-hidden="true" />
+                  Back to sign in
+                </Link>
+              </Button>
+            </Field>
+          </FieldGroup>
+        </form>
+      )}
+    </AuthShell>
   );
 }

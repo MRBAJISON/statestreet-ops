@@ -1,9 +1,11 @@
-import StoreDashboard from './StoreDashboard';
-import { getSession } from '@/lib/auth';
+import { AnalyticsDashboard } from '@/components/analytics/AnalyticsDashboard';
 
-export default async function StoreManagerDashboardPage() {
-  const session = await getSession();
-  const assignedStore = session?.user.store ?? '';
-  const managerName = session?.user.name ?? '';
-  return <StoreDashboard assignedStore={assignedStore} managerName={managerName} />;
+export default function StoreManagerDashboardPage() {
+  return (
+    <AnalyticsDashboard
+      view="store"
+      title="Store Manager Command Center"
+      description="Today’s trading picture, recent submissions, stock risks, and weekly commitments."
+    />
+  );
 }

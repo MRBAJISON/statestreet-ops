@@ -1,8 +1,8 @@
-import OperationsForms from './OperationsForms';
-import { getSession } from '@/lib/auth';
+'use client';
 
-export default async function OperationsFormsPage() {
-  const session = await getSession();
-  const managerName = session?.user.name ?? '';
-  return <OperationsForms managerName={managerName} />;
+import { WorkflowWorkspace } from '@/components/forms/WorkflowWorkspace';
+import { operationsWorkflows } from '@/components/forms/workflow-definitions';
+
+export default function OperationsFormsPage() {
+  return <WorkflowWorkspace title="Operations workflows" definitions={operationsWorkflows} />;
 }

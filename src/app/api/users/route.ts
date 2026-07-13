@@ -1,59 +1,90 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema';
+import { asc, sql } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
+import { homeDepartmentForRole } from '@/lib/access';
+import { createUserSchema } from '@/lib/contracts/user';
+import { formatContractError } from '@/lib/contracts/shared';
+import { db } from '@/lib/db';
+import { auditEvents, stores } from '@/lib/db/foundation-schema';
+import { users } from '@/lib/db/schema';
 import { hashPassword } from '@/lib/password';
+import { databaseErrorCode, sessionUserId } from '@/lib/server-errors';
 import { getOrgSettings } from '@/lib/org-server';
-import { asc } from 'drizzle-orm';
-
-const ROLES = ['owner', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand', 'store-manager'];
-const DEPARTMENTS = ['executive', 'finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand'];
-async function validStore(s: unknown) {
-  if (s === undefined || s === null || s === '') return true;
-  const values = (await getOrgSettings()).stores.map((o) => o.value);
-  return values.includes(String(s));
-}
 
 async function requireOwner() {
   const session = await getSession();
   return session?.user.role === 'owner' ? session : null;
 }
 
-// List users (owner only). Never returns password hashes.
+async function validateStoreAssignment(role: string, store: string | null): Promise<string | null> {
+  if (role !== 'store-manager') return null;
+  if (!store) return 'A store is required for a store manager';
+  const [row] = await db
+    .select({ id: stores.id })
+    .from(stores)
+    .where(sql`${stores.code} = ${store} and ${stores.active} = true and ${stores.type} = 'store'`)
+    .limit(1);
+  return row ? null : 'The selected retail store is not available';
+}
+
 export async function GET() {
   if (!(await requireOwner())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const rows = await db.select().from(users).orderBy(asc(users.id));
+  const rows = await db.select().from(users).orderBy(asc(users.name), asc(users.id));
   return NextResponse.json({
-    users: rows.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, department: u.department, store: u.store ?? '' })),
+    users: rows.map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      department: user.department,
+      store: user.store ?? '',
+      active: user.active,
+      updatedAt: user.updatedAt,
+    })),
   });
 }
 
-// Create a user (owner only).
 export async function POST(req: NextRequest) {
-  if (!(await requireOwner())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const session = await requireOwner();
+  if (!session) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   try {
-    const { name, email, password, role, department, store } = (await req.json()) ?? {};
-    if (!name || !email || !password) {
-      return NextResponse.json({ error: 'Name, email and password are required' }, { status: 400 });
+    const parsed = createUserSchema.safeParse(await req.json().catch(() => null));
+    if (!parsed.success) {
+      return NextResponse.json({ error: formatContractError(parsed.error) }, { status: 400 });
     }
-    if (!ROLES.includes(role) || !DEPARTMENTS.includes(department)) {
-      return NextResponse.json({ error: 'Invalid role or department' }, { status: 400 });
+    const input = parsed.data;
+    const department = homeDepartmentForRole(input.role);
+    if (input.department && input.department !== department) {
+      return NextResponse.json({ error: `Department must be ${department} for this role` }, { status: 400 });
     }
-    if (!(await validStore(store))) {
-      return NextResponse.json({ error: 'Invalid store' }, { status: 400 });
+    const store = input.role === 'store-manager' ? input.store?.trim() || null : null;
+    const storeError = await validateStoreAssignment(input.role, store);
+    if (storeError) return NextResponse.json({ error: storeError }, { status: 400 });
+    const minPasswordLength = (await getOrgSettings()).security.minPasswordLen;
+    if (input.password.length < minPasswordLength) {
+      return NextResponse.json({ error: `Password must be at least ${minPasswordLength} characters` }, { status: 400 });
     }
-    if (String(password).length < 6) {
-      return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
+    const actorUserId = sessionUserId(session.user.id);
+    const passwordHash = await hashPassword(input.password);
+    const result = await db.execute(sql`
+      with new_user as (
+        insert into users (name, email, password_hash, role, department, store)
+        values (${input.name}, ${input.email}, ${passwordHash}, ${input.role}, ${department}, ${store})
+        returning *
+      ), new_audit as (
+        insert into ${auditEvents} (entity_type, entity_id, action, actor_user_id, after)
+        select 'user', created.id, 'create', ${actorUserId}, to_jsonb(created) - 'password_hash'
+        from new_user created
+        returning id
+      )
+      select id, name, email, role, department, store, active, updated_at from new_user
+    `);
+    const [user] = result.rows as Array<Record<string, unknown>>;
+    return NextResponse.json({ ok: true, user }, { status: 201 });
+  } catch (error) {
+    if (databaseErrorCode(error) === '23505') {
+      return NextResponse.json({ error: 'Email already exists' }, { status: 409 });
     }
-    const passwordHash = await hashPassword(String(password));
-    const [row] = await db
-      .insert(users)
-      .values({ name, email: String(email).toLowerCase().trim(), passwordHash, role, department, store: store || null })
-      .returning();
-    return NextResponse.json({ ok: true, user: { id: row.id, name: row.name, email: row.email, role: row.role, department: row.department, store: row.store ?? '' } });
-  } catch (e) {
-    const msg = (e as Error).message;
-    if (/unique|duplicate/i.test(msg)) return NextResponse.json({ error: 'Email already exists' }, { status: 409 });
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }
 }

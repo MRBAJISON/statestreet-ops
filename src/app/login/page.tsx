@@ -1,12 +1,18 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { CircleAlert, LoaderCircle, LogIn, Mail } from 'lucide-react';
+import { AuthPasswordField, AuthShell, AuthTextField } from '@/components/auth/AuthShell';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Field, FieldGroup } from '@/components/ui/field';
 import { useOrg } from '@/components/providers/OrgProvider';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { org } = useOrg();
+  const { refresh: refreshOrg } = useOrg();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -25,6 +31,7 @@ export default function LoginPage() {
 
     if (res.ok) {
       const data = await res.json();
+      await refreshOrg();
       if (data.user.role === 'owner') {
         router.push('/dashboard/executive');
       } else if (data.user.role === 'store-manager') {
@@ -40,57 +47,53 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            {org.logo ? (
-              <img src={org.logo} alt="" className="w-12 h-12 rounded-lg object-contain" />
-            ) : (
-              <div className="w-12 h-12 bg-[#c8a951] rounded-lg flex items-center justify-center">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round">
-                  <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                  <path d="M2 17l10 5 10-5" />
-                  <path d="M2 12l10 5 10-5" />
-                </svg>
-              </div>
-            )}
-            <div className="text-left">
-              <h1 className="text-xl font-bold tracking-wider">{org.companyName.toUpperCase()}</h1>
-              <p className="text-xs text-[#c8a951] tracking-widest">{org.tagline.toUpperCase()}</p>
-            </div>
-          </div>
-          <h2 className="text-lg font-semibold text-gray-300">Operations Command Center</h2>
-          <p className="text-sm text-gray-500 mt-1">Sign in to access your dashboard</p>
-        </div>
-
-        <form onSubmit={handleLogin} className="bg-[var(--c-card)] border border-[var(--c-border)] rounded-xl p-6 space-y-4">
+    <AuthShell title="Sign in" description="Use your StateStreet account to continue." icon={LogIn}>
+      <form onSubmit={handleLogin}>
+        <FieldGroup className="gap-4">
           {error && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm p-3 rounded-lg">{error}</div>
+            <Alert variant="destructive">
+              <CircleAlert aria-hidden="true" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
 
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full" placeholder="your@email.com" required />
-          </div>
+          <AuthTextField
+            id="email"
+            label="Email"
+            icon={Mail}
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="your@email.com"
+            autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            disabled={loading}
+            required
+          />
 
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Password</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full" placeholder="Enter password" required />
-          </div>
+          <AuthPasswordField
+            id="password"
+            label="Password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="Enter password"
+            autoComplete="current-password"
+            disabled={loading}
+            required
+          />
 
-          <button type="submit" disabled={loading}
-            className="w-full bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-50">
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-
-          <div className="text-center">
-            <a href="/forgot-password" className="text-xs text-gray-500 hover:text-[#c8a951]">Forgot password?</a>
-          </div>
-        </form>
-
-        <p className="text-[0.65rem] text-gray-600 text-center mt-4">Authorized personnel only.</p>
-      </div>
-    </div>
+          <Field className="gap-3 pt-1">
+            <Button type="submit" size="lg" className="h-11 w-full" disabled={loading} aria-busy={loading}>
+              {loading && <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />}
+              {loading ? 'Signing in...' : 'Sign In'}
+            </Button>
+            <Button asChild variant="link" size="sm" className="h-auto self-center p-0 text-xs">
+              <Link href="/forgot-password">Forgot password?</Link>
+            </Button>
+          </Field>
+        </FieldGroup>
+      </form>
+    </AuthShell>
   );
 }

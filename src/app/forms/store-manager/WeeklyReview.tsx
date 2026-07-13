@@ -1,344 +1,425 @@
 'use client';
 
-import { useState } from 'react';
-import { useOrg } from '@/components/providers/OrgProvider';
-import { categoriesForStore } from '@/lib/org';
-import { postEntry, updateEntry } from '@/lib/api';
-import { Spinner } from '@/components/ui/BrandedLoader';
-import { ShowMoreRows } from '@/components/ui/ShowMore';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { AlertCircle, ArrowLeft, LoaderCircle, LockKeyhole, Plus, Save, Send, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import type { ReferenceDataResponse } from '@/lib/contracts/reference-data';
+import type { WeeklyReviewRecord } from '@/lib/contracts/documents';
+import { ProductCombobox } from '@/components/forms/ProductCombobox';
 
-export interface DailySale { date: string; category: string; grossRevenue: number; itemsSold: number; store?: string }
-export interface WeekTarget { weekEnd: string; target: number; store?: string }
+interface ReviewValues {
+  weekEnd: string;
+  summary: string;
+  risks: string;
+  opportunities: string;
+  marketingAmplifyCategoryId: string;
+  differentThisWeek: string;
+  firstThreeActions: string;
+  lockVersion?: number;
+}
 
-type Col = { key: string; label: string; type?: 'number' | 'text'; options?: string[]; auto?: boolean };
+interface CategoryNoteDraft {
+  key: number;
+  categoryId: string;
+  performanceComment: string;
+  overstocked: boolean;
+  slowMoving: boolean;
+  weeksWithoutMovement: string;
+  valueAtRisk: string;
+  correctiveAction: string;
+  managerComment: string;
+}
 
-const SECTIONS: { id: string; title: string; note?: string; cols: Col[] }[] = [
-  {
-    id: 's1', title: 'Section 1 · Category Performance Review', note: 'Enter opening stock, units sold and unit price — revenue, current stock and rating fill in automatically.',
-    cols: [
-      { key: 'openingStock', label: 'Opening Stock', type: 'number' },
-      { key: 'unitsSold', label: 'Units Sold (auto, from daily sales)', auto: true },
-      { key: 'unitPrice', label: 'Unit Price (GHC)', type: 'number' },
-      { key: 'revenue', label: 'Revenue (auto, from daily sales)', auto: true },
-      { key: 'currentStock', label: 'Current Stock (auto)', auto: true },
-      { key: 'rating', label: 'Performance Rating (auto)', auto: true },
-      { key: 'comments', label: 'Comments', type: 'text' },
-    ],
-  },
-  {
-    id: 's2', title: 'Section 2 · Inventory Risk Assessment', note: 'Review every category.',
-    cols: [
-      { key: 'overstocked', label: 'Overstocked?', options: ['', 'Y', 'N'] },
-      { key: 'slowMoving', label: 'Slow Moving?', options: ['', 'Y', 'N'] },
-      { key: 'weeksNoMove', label: 'Weeks w/o Movement', type: 'number' },
-      { key: 'valueAtRisk', label: 'Stock Value at Risk (GHC)', type: 'number' },
-      { key: 'corrective', label: 'Corrective Action', type: 'text' },
-    ],
-  },
-  {
-    id: 's3', title: "Section 3 · This Week's Commercial Plan", note: 'Every category must have a plan.',
-    cols: [
-      { key: 'salesTargetUnits', label: 'Sales Target Units', type: 'number' },
-      { key: 'revenueTarget', label: 'Revenue Target (GHC)', type: 'number' },
-      { key: 'keyActivity', label: 'Key Selling Activity', type: 'text' },
-      { key: 'planAdvisor', label: 'Responsible Advisor', type: 'text' },
-    ],
-  },
-  {
-    id: 's4', title: 'Section 4 · Category Ownership',
-    cols: [
-      { key: 'assignedAdvisor', label: 'Assigned Advisor', type: 'text' },
-      { key: 'weeklyUnitTarget', label: 'Weekly Unit Target', type: 'number' },
-      { key: 'actualUnits', label: 'Actual Units Sold', type: 'number' },
-      { key: 'achievement', label: 'Achievement % (auto)', auto: true },
-      { key: 'mgrComments', label: 'Manager Comments', type: 'text' },
-    ],
-  },
-];
+interface ActionDraft {
+  key: number;
+  categoryId: string;
+  productId: string;
+  action: string;
+  ownerUserId: string;
+  ownerName: string;
+  targetUnits: string;
+  targetRevenue: string;
+  dueDate: string;
+  status: 'open' | 'in-progress' | 'completed' | 'cancelled';
+  managerComment: string;
+}
 
-// Manager judgement questions, shown under Section 1.
-const CEO_QUESTIONS = [
-  { key: 'q3', text: 'Which category should Marketing amplify this week?' },
-  { key: 'q5', text: 'What will you do differently this week to increase sales?' },
-  { key: 'q6', text: 'If this store belonged to you, what would be your first three actions?' },
-];
+let nextKey = 1;
 
-const inputCls ='w-full bg-[var(--c-card)] border border-[var(--c-border)] rounded px-1.5 py-1 text-xs text-[var(--c-fg)] focus:outline-none focus:border-[#c8a951]';
-const headInputCls = 'bg-[var(--c-card)] border border-[var(--c-border)] rounded px-3 py-2 text-sm text-[var(--c-fg)] focus:outline-none focus:border-[#c8a951]';
-const num = (s: string) => Number(s) || 0;
+function recentSunday() {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - date.getUTCDay());
+  return date.toISOString().slice(0, 10);
+}
 
-export default function WeeklyReview({ assignedStore = '', managerName = '', dailySales = [], targets = [] }: { assignedStore?: string; managerName?: string; dailySales?: DailySale[]; targets?: WeekTarget[] }) {
-  const { org } = useOrg();
-  const [header, setHeader] = useState({ store: assignedStore, manager: managerName, weekEnd: '' });
-  // The review covers only the selected store's brand categories (Brand→Stores +
-  // Brand→Categories mappings in Settings); falls back to all if unmapped.
-  const catOptions = categoriesForStore(org, header.store);
-  // rows[category][colKey] = manually entered value
-  const [rows, setRows] = useState<Record<string, Record<string, string>>>({});
-  const [ceo, setCeo] = useState<Record<string, string>>({});
-  const [activeSection, setActiveSection] = useState('s1');
-  const [submitting, setSubmitting] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [entryId, setEntryId] = useState<number | null>(null);
-
-  // Daily sales that fall in the Mon–Sun week ending on the chosen weekEnd.
-  const inWeek = (dateStr: string) => {
-    if (!header.weekEnd) return false;
-    const end = new Date(header.weekEnd);
-    const d = new Date(dateStr);
-    if (isNaN(end.getTime()) || isNaN(d.getTime())) return false;
-    const diff = (end.getTime() - d.getTime()) / 86_400_000;
-    return diff >= 0 && diff < 7;
+function emptyValues(weekEnd = recentSunday()): ReviewValues {
+  return {
+    weekEnd,
+    summary: '',
+    risks: '',
+    opportunities: '',
+    marketingAmplifyCategoryId: '',
+    differentThisWeek: '',
+    firstThreeActions: '',
   };
-  // Only this store's daily sales for the chosen week (store is fixed for a
-  // store manager, picked from the header for commercial).
-  const weekDaily = header.store ? dailySales.filter((d) => inWeek(d.date) && (d.store ?? header.store) === header.store) : [];
-  // Revenue + units per category, keyed by the category VALUE (exactly as daily
-  // sales store it) so the grid rows match reliably.
-  const perCat = new Map<string, { revenue: number; units: number }>();
-  for (const d of weekDaily) {
-    const e = perCat.get(d.category) ?? { revenue: 0, units: 0 };
-    e.revenue += Number(d.grossRevenue) || 0;
-    e.units += Number(d.itemsSold) || 0;
-    perCat.set(d.category, e);
+}
+
+function emptyCategoryNote(): CategoryNoteDraft {
+  return {
+    key: nextKey++,
+    categoryId: '',
+    performanceComment: '',
+    overstocked: false,
+    slowMoving: false,
+    weeksWithoutMovement: '',
+    valueAtRisk: '',
+    correctiveAction: '',
+    managerComment: '',
+  };
+}
+
+function emptyAction(): ActionDraft {
+  return {
+    key: nextKey++,
+    categoryId: '',
+    productId: '',
+    action: '',
+    ownerUserId: '',
+    ownerName: '',
+    targetUnits: '',
+    targetRevenue: '',
+    dueDate: '',
+    status: 'open',
+    managerComment: '',
+  };
+}
+
+async function responseError(response: Response) {
+  const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+  return payload?.error ?? 'The weekly review could not be saved';
+}
+
+function valuesFromReview(review: WeeklyReviewRecord): ReviewValues {
+  return {
+    weekEnd: review.weekEnd,
+    summary: review.summary ?? '',
+    risks: review.risks ?? '',
+    opportunities: review.opportunities ?? '',
+    marketingAmplifyCategoryId: review.marketingAmplifyCategoryId ? String(review.marketingAmplifyCategoryId) : '',
+    differentThisWeek: review.differentThisWeek ?? '',
+    firstThreeActions: review.firstThreeActions ?? '',
+    lockVersion: review.lockVersion,
+  };
+}
+
+export default function WeeklyReview() {
+  const [references, setReferences] = useState<ReferenceDataResponse | null>(null);
+  const [values, setValues] = useState<ReviewValues>(() => emptyValues());
+  const [review, setReview] = useState<WeeklyReviewRecord | null>(null);
+  const [categoryNotes, setCategoryNotes] = useState<CategoryNoteDraft[]>([]);
+  const [actions, setActions] = useState<ActionDraft[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<'draft' | 'submitted' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/reference-data', { signal: controller.signal, cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(await responseError(response));
+        return response.json() as Promise<ReferenceDataResponse>;
+      })
+      .then(setReferences)
+      .catch((loadError: Error) => {
+        if (loadError.name !== 'AbortError') setError(loadError.message);
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const weekEnd = values.weekEnd;
+    setLoading(true);
+    fetch(`/api/weekly-reviews?${new URLSearchParams({ weekEnd })}`, { signal: controller.signal, cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(await responseError(response));
+        return response.json() as Promise<{ review: WeeklyReviewRecord | null }>;
+      })
+      .then(({ review: current }) => {
+        setReview(current);
+        if (current) {
+          setValues(valuesFromReview(current));
+          setCategoryNotes(current.categoryNotes.map((note) => ({
+            key: nextKey++,
+            categoryId: String(note.categoryId),
+            performanceComment: note.performanceComment ?? '',
+            overstocked: note.overstocked,
+            slowMoving: note.slowMoving,
+            weeksWithoutMovement: note.weeksWithoutMovement === null ? '' : String(note.weeksWithoutMovement),
+            valueAtRisk: note.valueAtRisk ?? '',
+            correctiveAction: note.correctiveAction ?? '',
+            managerComment: note.managerComment ?? '',
+          })));
+          setActions(current.actions.map((action) => ({
+            key: nextKey++,
+            categoryId: action.categoryId ? String(action.categoryId) : '',
+            productId: action.productId ? String(action.productId) : '',
+            action: action.action,
+            ownerUserId: action.ownerUserId ? String(action.ownerUserId) : '',
+            ownerName: action.ownerName ?? '',
+            targetUnits: action.targetUnits === null ? '' : String(action.targetUnits),
+            targetRevenue: action.targetRevenue ?? '',
+            dueDate: action.dueDate ?? '',
+            status: action.status as ActionDraft['status'],
+            managerComment: action.managerComment ?? '',
+          })));
+        } else {
+          setValues(emptyValues(weekEnd));
+          setCategoryNotes([]);
+          setActions([]);
+        }
+        setError(null);
+      })
+      .catch((loadError: Error) => {
+        if (loadError.name !== 'AbortError') setError(loadError.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [values.weekEnd]);
+
+  function updateCategoryNote(key: number, field: keyof CategoryNoteDraft, value: string | boolean) {
+    setCategoryNotes((current) => current.map((note) => note.key === key ? { ...note, [field]: value } : note));
   }
-  const actualSales = weekDaily.reduce((s, d) => s + (Number(d.grossRevenue) || 0), 0);
-  const weeklyTarget = targets.find((t) => t.weekEnd === header.weekEnd && (t.store ?? header.store) === header.store)?.target ?? 0;
-  const headerAchievement = weeklyTarget > 0 ? Math.round((actualSales / weeklyTarget) * 1000) / 10 : 0;
 
-  const setCell = (cat: string, key: string, val: string) =>
-    setRows((r) => ({ ...r, [cat]: { ...(r[cat] ?? {}), [key]: val } }));
-  const cell = (cat: string, key: string) => rows[cat]?.[key] ?? '';
-
-  // Section 1 — units & revenue come from the daily sales; current stock & rating derive from them.
-  const unitsSoldOf = (cat: string) => perCat.get(cat)?.units ?? 0;
-  const revenueOf = (cat: string) => perCat.get(cat)?.revenue ?? 0;
-  const currentStockOf = (cat: string) => num(cell(cat, 'openingStock')) - unitsSoldOf(cat);
-  const ratingOf = (cat: string) => {
-    const opening = num(cell(cat, 'openingStock'));
-    if (opening <= 0) return '';
-    const pct = (unitsSoldOf(cat) / opening) * 100; // sell-through of opening stock
-    if (pct >= 80) return 'Good';
-    if (pct >= 50) return 'Fair';
-    return 'Poor';
-  };
-  // Section 4 auto-calculation.
-  const rowAchievement = (cat: string) => {
-    const t = num(cell(cat, 'weeklyUnitTarget'));
-    return t ? Math.round((num(cell(cat, 'actualUnits')) / t) * 1000) / 10 : 0;
-  };
-
-  const isFinalSection = activeSection === 's4';
-
-  async function submit() {
-    if (!header.store || !header.weekEnd) {
-      setMsg({ ok: false, text: 'Store and Week Ending are required.' });
-      return;
-    }
-    setSubmitting(true);
-    try {
-      // Merge manual fields with the computed ones so the dashboards get revenue/rating/etc.
-      const categories: Record<string, Record<string, string | number>> = {};
-      for (const c of catOptions) {
-        const r = rows[c.value];
-        const hasDaily = perCat.has(c.value);
-        if (!r && !hasDaily) continue;
-        // Saved under the friendly label so dashboards read clean category names.
-        categories[c.label] = {
-          ...(r ?? {}),
-          unitsSold: unitsSoldOf(c.value),
-          revenue: revenueOf(c.value),
-          currentStock: currentStockOf(c.value),
-          rating: ratingOf(c.value),
-          achievement: rowAchievement(c.value),
-        };
-      }
-      const payload = {
-        ...header,
-        weeklySalesTarget: weeklyTarget,
-        actualSales,
-        achievement: headerAchievement,
-        categories,
-        ceo,
-      };
-
-      // First save creates the entry; later sections update the same record.
-      if (entryId == null) {
-        const res = await postEntry('commercial', 'weekly-review', payload);
-        setEntryId(res?.entry?.id ?? null);
-      } else {
-        await updateEntry(entryId, payload);
-      }
-
-      if (isFinalSection) {
-        // Final submission — clear the whole form for the next review.
-        setMsg({ ok: true, text: 'Weekly review submitted to the live database.' });
-        setRows({});
-        setCeo({});
-        setHeader({ store: assignedStore, manager: managerName, weekEnd: '' });
-        setEntryId(null);
-        setActiveSection('s1');
-      } else {
-        // Keep the header and everything entered; just confirm the save.
-        setMsg({ ok: true, text: 'Saved. Your header and entries are kept — continue to the next section.' });
-      }
-    } catch (e) {
-      setMsg({ ok: false, text: 'Could not save: ' + (e as Error).message });
-    }
-    setSubmitting(false);
+  function updateAction(key: number, field: keyof ActionDraft, value: string) {
+    setActions((current) => current.map((action) => action.key === key ? { ...action, [field]: value } : action));
   }
 
-  const section = SECTIONS.find((s) => s.id === activeSection)!;
-
-  // Render an auto-calculated cell for the active section.
-  const autoCell = (cat: string, key: string) => {
-    if (key === 'unitsSold') {
-      const u = unitsSoldOf(cat);
-      return <div className="px-1.5 py-1">{u || '—'}</div>;
-    }
-    if (key === 'revenue') {
-      const v = revenueOf(cat);
-      return <div className="px-1.5 py-1 text-[#c8a951] whitespace-nowrap">{v ? `GHS ${v.toLocaleString()}` : '—'}</div>;
-    }
-    if (key === 'currentStock') {
-      return <div className="px-1.5 py-1">{cell(cat, 'openingStock') !== '' ? currentStockOf(cat) : '—'}</div>;
-    }
-    if (key === 'rating') {
-      const r = ratingOf(cat);
-      const color = r === 'Good' ? 'text-green-400' : r === 'Fair' ? 'text-yellow-400' : r === 'Poor' ? 'text-red-400' : 'text-gray-600';
-      return <div className={`px-1.5 py-1 font-medium ${color}`}>{r || '—'}</div>;
-    }
-    if (key === 'achievement') {
-      const a = rowAchievement(cat);
-      return <div className="px-1.5 py-1 text-[#c8a951]">{a ? `${a}%` : '—'}</div>;
+  function validate() {
+    if (!values.weekEnd) return 'Week ending is required';
+    if (categoryNotes.some((note) => !note.categoryId)) return 'Choose a category for every category note';
+    if (new Set(categoryNotes.map((note) => note.categoryId)).size !== categoryNotes.length) return 'Each category can appear only once';
+    if (actions.some((action) => !action.action.trim() || (!action.ownerUserId && !action.ownerName.trim()))) {
+      return 'Every action needs an action description and owner';
     }
     return null;
-  };
+  }
+
+  async function save(status: 'draft' | 'submitted') {
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setSaving(status);
+    setError(null);
+    try {
+      const response = await fetch('/api/weekly-reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          weekEnd: values.weekEnd,
+          status,
+          summary: values.summary || undefined,
+          risks: values.risks || undefined,
+          opportunities: values.opportunities || undefined,
+          marketingAmplifyCategoryId: values.marketingAmplifyCategoryId ? Number(values.marketingAmplifyCategoryId) : undefined,
+          differentThisWeek: values.differentThisWeek || undefined,
+          firstThreeActions: values.firstThreeActions || undefined,
+          lockVersion: values.lockVersion,
+          categoryNotes: categoryNotes.map((note) => ({
+            categoryId: Number(note.categoryId),
+            performanceComment: note.performanceComment || undefined,
+            overstocked: note.overstocked,
+            slowMoving: note.slowMoving,
+            weeksWithoutMovement: note.weeksWithoutMovement ? Number(note.weeksWithoutMovement) : undefined,
+            valueAtRisk: note.valueAtRisk || undefined,
+            correctiveAction: note.correctiveAction || undefined,
+            managerComment: note.managerComment || undefined,
+          })),
+          actions: actions.map((action) => ({
+            categoryId: action.categoryId ? Number(action.categoryId) : undefined,
+            productId: action.productId ? Number(action.productId) : undefined,
+            action: action.action,
+            ownerUserId: action.ownerUserId ? Number(action.ownerUserId) : undefined,
+            ownerName: action.ownerName || undefined,
+            targetUnits: action.targetUnits ? Number(action.targetUnits) : undefined,
+            targetRevenue: action.targetRevenue || undefined,
+            dueDate: action.dueDate || undefined,
+            status: action.status,
+            managerComment: action.managerComment || undefined,
+          })),
+        }),
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+      const payload = (await response.json()) as { record: { id: number; status: string; lockVersion: number } };
+      setValues((current) => ({ ...current, lockVersion: payload.record.lockVersion }));
+      setReview((current) => current ? { ...current, status: payload.record.status as WeeklyReviewRecord['status'], lockVersion: payload.record.lockVersion } : current);
+      toast.success(status === 'submitted' ? 'Weekly review submitted' : 'Weekly review draft saved');
+    } catch (saveError) {
+      setError((saveError as Error).message);
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  if (!references) {
+    return (
+      <div className="page-shell flex flex-col gap-5"><Skeleton className="h-9 w-56" /><Skeleton className="h-[520px] w-full" /></div>
+    );
+  }
+
+  const locked = review?.status === 'approved';
+  const disabled = Boolean(loading || saving || locked);
 
   return (
-    <div className="space-y-5">
-      {msg && (
-        <div className={`text-sm p-3 rounded-lg border ${msg.ok ? 'border-green-500/30 bg-green-500/10 text-green-400' : 'border-red-500/30 bg-red-500/10 text-red-400'}`}>
-          {msg.text}
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <label className="text-xs text-gray-400">Store
-          {assignedStore ? (
-            <div className={`${headInputCls} w-full mt-1 opacity-70 cursor-not-allowed`}>
-              {org.stores.find((s) => s.value === assignedStore)?.label ?? assignedStore}
+    <div className="page-shell flex flex-col gap-6">
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <Button variant="outline" size="icon" asChild aria-label="Back to store workflows"><Link href="/forms/store-manager"><ArrowLeft /></Link></Button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-semibold leading-8">Weekly review</h1>
+              <Badge variant="outline" className="capitalize">{review?.status ?? 'new'}</Badge>
+              {locked ? <LockKeyhole className="text-muted-foreground" /> : null}
             </div>
-          ) : (
-            <select value={header.store} onChange={(e) => setHeader({ ...header, store: e.target.value })} className={`${headInputCls} w-full mt-1`}>
-              <option value="">Select…</option>
-              {org.stores.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
-          )}
-        </label>
-        <label className="text-xs text-gray-400">Manager
-          {managerName ? (
-            <div className={`${headInputCls} w-full mt-1 opacity-70 cursor-not-allowed`}>{managerName}</div>
-          ) : (
-            <input value={header.manager} onChange={(e) => setHeader({ ...header, manager: e.target.value })} className={`${headInputCls} w-full mt-1`} />
-          )}
-        </label>
-        <label className="text-xs text-gray-400">Week Ending
-          <input type="date" value={header.weekEnd} onChange={(e) => setHeader({ ...header, weekEnd: e.target.value })} className={`${headInputCls} w-full mt-1`} />
-        </label>
-        <div className="text-xs text-gray-400">Weekly Sales Target (GHC) — set by Commercial
-          <div className={`${headInputCls} w-full mt-1 opacity-70 cursor-not-allowed`}>
-            {weeklyTarget ? `GHS ${weeklyTarget.toLocaleString()}` : <span className="text-gray-600">Awaiting target</span>}
+            <p className="text-sm text-muted-foreground">{references.assignedStore?.name}</p>
           </div>
         </div>
-        <div className="text-xs text-gray-400">Actual Sales (GHC) — auto from daily sales
-          <div className={`${headInputCls} w-full mt-1 opacity-80`}>
-            {actualSales ? `GHS ${actualSales.toLocaleString()}` : <span className="text-gray-600">No daily sales this week</span>}
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            type="date"
+            aria-label="Week ending"
+            className="w-40"
+            value={values.weekEnd}
+            disabled={Boolean(saving)}
+            onChange={(event) => setValues(emptyValues(event.target.value))}
+          />
+          <Button variant="outline" disabled={disabled} onClick={() => void save('draft')}>
+            {saving === 'draft' ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Save data-icon="inline-start" />}Save draft
+          </Button>
+          <Button disabled={disabled} onClick={() => void save('submitted')}>
+            {saving === 'submitted' ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Send data-icon="inline-start" />}Submit
+          </Button>
         </div>
-        <div className="text-xs text-gray-400">Achievement %
-          <div className="mt-1 bg-[var(--c-card2)] border border-[#c8a951]/30 rounded px-3 py-2 text-sm font-bold text-[#c8a951]">
-            {headerAchievement ? `${headerAchievement}%` : '—'}
-          </div>
-        </div>
-      </div>
+      </header>
 
-      {/* Section switcher */}
-      <div className="flex gap-2 flex-wrap border-b border-[var(--c-border)] pb-2">
-        {SECTIONS.map((s) => (
-          <button key={s.id} type="button" onClick={() => setActiveSection(s.id)}
-            className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${activeSection === s.id ? 'bg-[#c8a951] text-black font-semibold' : 'bg-[var(--c-card)] border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
-            {s.title.split('·')[0].trim()}
-          </button>
-        ))}
-      </div>
+      {error ? <Alert variant="destructive"><AlertCircle /><AlertTitle>Check this review</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
+      {locked ? <Alert><LockKeyhole /><AlertTitle>Review approved</AlertTitle><AlertDescription>Commercial must reopen this review before it can be changed.</AlertDescription></Alert> : null}
 
-      {/* Active section grid */}
-      <div>
-        <div className="text-sm font-semibold mb-1">{section.title}</div>
-        {section.note && <div className="text-xs text-gray-500 mb-2">{section.note}</div>}
-        <div className="overflow-x-auto border border-[var(--c-border)] rounded-lg">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-[var(--c-card2)] text-gray-500">
-                <th className="text-left p-2 sticky left-0 bg-[var(--c-card2)] min-w-[9rem]">SKU Category</th>
-                {section.cols.map((c) => <th key={c.key} className="text-left p-2 font-medium min-w-[7rem]">{c.label}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {catOptions.length === 0 && (
-                <tr><td colSpan={section.cols.length + 1} className="p-3 text-gray-500">No categories for this store. Map Brand → Stores and Brand → Categories in Settings.</td></tr>
-              )}
-              <ShowMoreRows items={catOptions} limit={7} colSpan={section.cols.length + 1}>
-                {(opt) => {
-                const cat = opt.value;
-                return (
-                <tr key={cat} className="border-t border-[var(--c-hover)]">
-                  <td className="p-1.5 sticky left-0 bg-[var(--c-bg)] text-gray-300 whitespace-nowrap">{opt.label}</td>
-                  {section.cols.map((c) => (
-                    <td key={c.key} className="p-1">
-                      {c.auto ? (
-                        autoCell(cat, c.key)
-                      ) : c.options ? (
-                        <select value={cell(cat, c.key)} onChange={(e) => setCell(cat, c.key, e.target.value)} className={inputCls}>
-                          {c.options.map((o) => <option key={o} value={o}>{o || '—'}</option>)}
-                        </select>
-                      ) : (
-                        <input type={c.type === 'number' ? 'number' : 'text'} value={cell(cat, c.key)} onChange={(e) => setCell(cat, c.key, e.target.value)} className={inputCls} />
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ); }}
-              </ShowMoreRows>
-            </tbody>
-          </table>
-        </div>
+      <Tabs defaultValue="review" className="gap-5">
+        <TabsList>
+          <TabsTrigger value="review">Review</TabsTrigger>
+          <TabsTrigger value="categories">Category notes {categoryNotes.length ? `(${categoryNotes.length})` : ''}</TabsTrigger>
+          <TabsTrigger value="actions">Actions {actions.length ? `(${actions.length})` : ''}</TabsTrigger>
+        </TabsList>
 
-        {/* Section 1 also captures the manager's judgement questions. */}
-        {activeSection === 's1' && (
-          <div className="mt-4 space-y-3">
-            <div className="text-sm font-semibold">Manager Questions</div>
-            {CEO_QUESTIONS.map((q, i) => (
-              <div key={q.key}>
-                <label className="block text-xs text-gray-400 mb-1">{i + 1}. {q.text}</label>
-                <textarea value={ceo[q.key] ?? ''} onChange={(e) => setCeo({ ...ceo, [q.key]: e.target.value })} rows={2} className="w-full bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg px-3 py-2 text-sm text-[var(--c-fg)] resize-none focus:outline-none focus:border-[#c8a951]" />
+        <TabsContent value="review">
+          <section className="border-y bg-card px-4 py-5 sm:px-5">
+            <FieldGroup className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <Field className="md:col-span-2"><FieldLabel htmlFor="review-summary">Week summary</FieldLabel><Textarea id="review-summary" value={values.summary} disabled={disabled} onChange={(event) => setValues((current) => ({ ...current, summary: event.target.value }))} /></Field>
+              <Field><FieldLabel htmlFor="review-risks">Risks</FieldLabel><Textarea id="review-risks" value={values.risks} disabled={disabled} onChange={(event) => setValues((current) => ({ ...current, risks: event.target.value }))} /></Field>
+              <Field><FieldLabel htmlFor="review-opportunities">Opportunities</FieldLabel><Textarea id="review-opportunities" value={values.opportunities} disabled={disabled} onChange={(event) => setValues((current) => ({ ...current, opportunities: event.target.value }))} /></Field>
+              <Field>
+                <FieldLabel htmlFor="amplify-category">Marketing focus</FieldLabel>
+                <Select value={values.marketingAmplifyCategoryId} onValueChange={(value) => setValues((current) => ({ ...current, marketingAmplifyCategoryId: value }))} disabled={disabled}>
+                  <SelectTrigger id="amplify-category" className="w-full"><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectContent><SelectGroup>{references.categories.map((category) => <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>)}</SelectGroup></SelectContent>
+                </Select>
+              </Field>
+              <Field><FieldLabel htmlFor="different-this-week">What will you do differently?</FieldLabel><Textarea id="different-this-week" value={values.differentThisWeek} disabled={disabled} onChange={(event) => setValues((current) => ({ ...current, differentThisWeek: event.target.value }))} /></Field>
+              <Field className="md:col-span-2"><FieldLabel htmlFor="first-actions">First three actions</FieldLabel><Textarea id="first-actions" value={values.firstThreeActions} disabled={disabled} onChange={(event) => setValues((current) => ({ ...current, firstThreeActions: event.target.value }))} /></Field>
+            </FieldGroup>
+          </section>
+        </TabsContent>
+
+        <TabsContent value="categories" className="flex flex-col gap-4">
+          <div className="flex justify-end"><Button variant="outline" size="sm" disabled={disabled} onClick={() => setCategoryNotes((current) => [...current, emptyCategoryNote()])}><Plus data-icon="inline-start" />Add category note</Button></div>
+          {categoryNotes.map((note, index) => (
+            <section key={note.key} className="surface p-4">
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <h2 className="text-sm font-semibold">Category note {index + 1}</h2>
+                <Button variant="ghost" size="icon" aria-label="Remove category note" disabled={disabled} onClick={() => setCategoryNotes((current) => current.filter((item) => item.key !== note.key))}><Trash2 /></Button>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              <FieldGroup className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                <Field>
+                  <FieldLabel>Category</FieldLabel>
+                  <Select value={note.categoryId} onValueChange={(value) => updateCategoryNote(note.key, 'categoryId', value)} disabled={disabled}>
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Select category" /></SelectTrigger>
+                    <SelectContent><SelectGroup>{references.categories.map((category) => <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>)}</SelectGroup></SelectContent>
+                  </Select>
+                </Field>
+                <Field><FieldLabel>Weeks without movement</FieldLabel><Input type="number" min={0} step={1} value={note.weeksWithoutMovement} disabled={disabled} onChange={(event) => updateCategoryNote(note.key, 'weeksWithoutMovement', event.target.value)} /></Field>
+                <Field><FieldLabel>Value at risk</FieldLabel><Input type="number" min={0} step={0.01} value={note.valueAtRisk} disabled={disabled} onChange={(event) => updateCategoryNote(note.key, 'valueAtRisk', event.target.value)} /></Field>
+                <FieldGroup className="gap-3">
+                  <Field orientation="horizontal"><FieldLabel>Overstocked</FieldLabel><Switch checked={note.overstocked} disabled={disabled} onCheckedChange={(value) => updateCategoryNote(note.key, 'overstocked', value)} /></Field>
+                  <Field orientation="horizontal"><FieldLabel>Slow moving</FieldLabel><Switch checked={note.slowMoving} disabled={disabled} onCheckedChange={(value) => updateCategoryNote(note.key, 'slowMoving', value)} /></Field>
+                </FieldGroup>
+                <Field className="sm:col-span-2"><FieldLabel>Performance comment</FieldLabel><Textarea value={note.performanceComment} disabled={disabled} onChange={(event) => updateCategoryNote(note.key, 'performanceComment', event.target.value)} /></Field>
+                <Field className="sm:col-span-2"><FieldLabel>Corrective action</FieldLabel><Textarea value={note.correctiveAction} disabled={disabled} onChange={(event) => updateCategoryNote(note.key, 'correctiveAction', event.target.value)} /></Field>
+                <Field className="sm:col-span-2 lg:col-span-4"><FieldLabel>Manager comment</FieldLabel><Textarea value={note.managerComment} disabled={disabled} onChange={(event) => updateCategoryNote(note.key, 'managerComment', event.target.value)} /></Field>
+              </FieldGroup>
+            </section>
+          ))}
+        </TabsContent>
 
-      {/* Submit is available on every section. Each save keeps the header and all
-          entered data on screen; only the final section clears the form. */}
-      <div className="flex items-center gap-3">
-        <button type="button" onClick={submit} disabled={submitting}
-          className="bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-6 py-2.5 rounded-lg text-sm disabled:opacity-50">
-          {submitting ? <><Spinner /> Saving…</> : isFinalSection ? 'Submit Weekly Review' : 'Save Section'}
-        </button>
-        {!isFinalSection && <span className="text-xs text-gray-500">Your header and entries stay until you submit Section 4.</span>}
-      </div>
+        <TabsContent value="actions" className="flex flex-col gap-4">
+          <div className="flex justify-end"><Button variant="outline" size="sm" disabled={disabled} onClick={() => setActions((current) => [...current, emptyAction()])}><Plus data-icon="inline-start" />Add action</Button></div>
+          {actions.map((action, index) => (
+            <section key={action.key} className="surface p-4">
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <h2 className="text-sm font-semibold">Action {index + 1}</h2>
+                <Button variant="ghost" size="icon" aria-label="Remove action" disabled={disabled} onClick={() => setActions((current) => current.filter((item) => item.key !== action.key))}><Trash2 /></Button>
+              </div>
+              <FieldGroup className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                <Field className="sm:col-span-2 lg:col-span-4"><FieldLabel>Action</FieldLabel><Input value={action.action} disabled={disabled} onChange={(event) => updateAction(action.key, 'action', event.target.value)} /></Field>
+                <Field>
+                  <FieldLabel>Owner</FieldLabel>
+                  <Select value={action.ownerUserId} onValueChange={(value) => updateAction(action.key, 'ownerUserId', value)} disabled={disabled}>
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Select user" /></SelectTrigger>
+                    <SelectContent><SelectGroup>{references.users.map((user) => <SelectItem key={user.id} value={String(user.id)}>{user.name}</SelectItem>)}</SelectGroup></SelectContent>
+                  </Select>
+                </Field>
+                <Field><FieldLabel>External owner</FieldLabel><Input value={action.ownerName} disabled={disabled} onChange={(event) => updateAction(action.key, 'ownerName', event.target.value)} /></Field>
+                <Field>
+                  <FieldLabel>Category</FieldLabel>
+                  <Select value={action.categoryId} onValueChange={(value) => updateAction(action.key, 'categoryId', value)} disabled={disabled}>
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Optional" /></SelectTrigger>
+                    <SelectContent><SelectGroup>{references.categories.map((category) => <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>)}</SelectGroup></SelectContent>
+                  </Select>
+                </Field>
+                <Field><FieldLabel>Product</FieldLabel><ProductCombobox value={action.productId} onChange={(value) => updateAction(action.key, 'productId', value)} disabled={disabled} /></Field>
+                <Field><FieldLabel>Target units</FieldLabel><Input type="number" min={0} step={1} value={action.targetUnits} disabled={disabled} onChange={(event) => updateAction(action.key, 'targetUnits', event.target.value)} /></Field>
+                <Field><FieldLabel>Target revenue</FieldLabel><Input type="number" min={0} step={0.01} value={action.targetRevenue} disabled={disabled} onChange={(event) => updateAction(action.key, 'targetRevenue', event.target.value)} /></Field>
+                <Field><FieldLabel>Due date</FieldLabel><Input type="date" value={action.dueDate} disabled={disabled} onChange={(event) => updateAction(action.key, 'dueDate', event.target.value)} /></Field>
+                <Field>
+                  <FieldLabel>Status</FieldLabel>
+                  <Select value={action.status} onValueChange={(value) => updateAction(action.key, 'status', value)} disabled={disabled}>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectGroup><SelectItem value="open">Open</SelectItem><SelectItem value="in-progress">In progress</SelectItem><SelectItem value="completed">Completed</SelectItem><SelectItem value="cancelled">Cancelled</SelectItem></SelectGroup></SelectContent>
+                  </Select>
+                </Field>
+                <Field className="sm:col-span-2 lg:col-span-4"><FieldLabel>Manager comment</FieldLabel><Textarea value={action.managerComment} disabled={disabled} onChange={(event) => updateAction(action.key, 'managerComment', event.target.value)} /></Field>
+              </FieldGroup>
+            </section>
+          ))}
+        </TabsContent>
+      </Tabs>
+
+      <p className="sr-only">{review ? `Editing weekly review ${review.id}, version ${review.lockVersion}.` : 'Creating a new weekly review.'}</p>
     </div>
   );
 }

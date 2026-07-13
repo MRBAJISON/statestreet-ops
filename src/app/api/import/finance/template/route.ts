@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getOrgSettings } from '@/lib/org-server';
-import { buildFinanceTemplate } from '@/lib/import-finance';
+import { buildFinanceTemplate, loadFinanceImportReferences } from '@/lib/import-finance';
 
 export const runtime = 'nodejs';
 
@@ -12,8 +11,8 @@ export async function GET() {
   if (!session.departments.includes('finance')) {
     return NextResponse.json({ error: 'Finance access required' }, { status: 403 });
   }
-  const org = await getOrgSettings();
-  const buf = await buildFinanceTemplate(org);
+  const references = await loadFinanceImportReferences();
+  const buf = await buildFinanceTemplate(references);
   return new NextResponse(new Uint8Array(buf), {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

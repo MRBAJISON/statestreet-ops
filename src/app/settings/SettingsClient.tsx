@@ -1,483 +1,473 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Spinner } from '@/components/ui/BrandedLoader';
+import { useTheme } from 'next-themes';
+import {
+  Building2,
+  Check,
+  Eye,
+  EyeOff,
+  Laptop,
+  LoaderCircle,
+  LockKeyhole,
+  Moon,
+  Palette,
+  Save,
+  ShieldCheck,
+  Sun,
+  Upload,
+  UserRound,
+} from 'lucide-react';
+import { toast } from 'sonner';
 import { useOrg } from '@/components/providers/OrgProvider';
-import CategoryRecoder from './CategoryRecoder';
-import StoreReconcile from './StoreReconcile';
-import MoveSales from './MoveSales';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
-interface UserInfo { name: string; email: string; role: string; store: string }
-
-const inputCls =
-  'w-full bg-[var(--c-card2)] border border-[var(--c-border)] rounded px-3 py-2 text-sm text-[var(--c-fg)] focus:outline-none focus:border-[#c8a951]';
-const labelCls = 'block text-xs text-gray-400 mb-1';
-const btnCls = 'bg-[#c8a951] hover:bg-[#d4bf7a] text-black font-semibold px-5 py-2 rounded-lg text-sm disabled:opacity-50';
-const secBtnCls = 'border border-[var(--c-border2)] hover:border-[#c8a951] text-[var(--c-fg)] px-5 py-2 rounded-lg text-sm';
-const cancelBtnCls = 'text-gray-400 hover:text-[var(--c-fg)] px-4 py-2 rounded-lg text-sm';
-const cardCls = 'bg-[var(--c-card)] border border-[var(--c-border)] rounded-lg p-5';
-const h2Cls = 'text-sm font-bold uppercase tracking-wide mb-4 text-center';
-const formCls = 'space-y-3 max-w-sm mx-auto';
-
-function Msg({ m }: { m: { ok: boolean; text: string } | null }) {
-  if (!m) return null;
-  return (
-    <div className={`mb-3 text-sm p-3 rounded-lg border ${m.ok ? 'border-green-500/30 bg-green-500/10 text-green-400' : 'border-red-500/30 bg-red-500/10 text-red-400'}`}>{m.text}</div>
-  );
+interface UserInfo {
+  name: string;
+  email: string;
+  role: string;
+  store: string;
 }
 
-const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+type Message = { ok: boolean; text: string } | null;
 
-type Opt = { label: string; value: string };
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+}
 
-// Editable label/value list (Stores, Brands, Categories).
-// The `value` (code) is the stable identifier historical data points at. New items
-// derive it from the full name as you type (don't freeze on the first letter, or
-// "Dresses" would code as "d"); existing items (`locked`) keep their code on rename
-// so the rename flows through to the dashboards. With `editableCode` the code is
-// shown and editable — used for Stores so a drifted code can be pointed back at the
-// code its data actually uses (e.g. a Boulevard Women store back to `bw-labone`).
-function ListEditor({ title, items, onChange, locked, editableCode }: { title: string; items: Opt[]; onChange: (next: Opt[]) => void; locked?: Set<string>; editableCode?: boolean }) {
-  const setLabel = (i: number, label: string) =>
-    onChange(items.map((it, k) => (k === i ? { ...it, label, value: editableCode ? it.value : (locked?.has(it.value) ? it.value : slugify(label)) } : it)));
-  const setCode = (i: number, code: string) =>
-    onChange(items.map((it, k) => (k === i ? { ...it, value: slugify(code) } : it)));
-  const remove = (i: number) => onChange(items.filter((_, k) => k !== i));
-  const add = () => onChange([...items, { label: '', value: '' }]);
+function titleCase(value: string) {
+  return value.replaceAll('-', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function StatusMessage({ message }: { message: Message }) {
+  if (!message) return null;
   return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-xs text-gray-400">{title}{editableCode ? <span className="text-gray-600"> · code must match historical data</span> : null}</span>
-        <button type="button" onClick={add} className="text-xs text-[#c8a951] hover:underline">+ Add</button>
-      </div>
-      <div className="space-y-2">
-        {items.map((it, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <input className={inputCls} value={it.label} placeholder="Name" onChange={(e) => setLabel(i, e.target.value)} />
-            {editableCode && (
-              <input className={`${inputCls} w-40 font-mono text-xs`} value={it.value} placeholder="code" title="Internal code — change only to reconcile with existing data" onChange={(e) => setCode(i, e.target.value)} />
-            )}
-            <button type="button" onClick={() => remove(i)} className="text-gray-400 hover:text-red-400 text-sm px-1" aria-label="Remove">✕</button>
-          </div>
-        ))}
-        {items.length === 0 && <p className="text-xs text-gray-500">None yet — click “Add”.</p>}
-      </div>
+    <div
+      role={message.ok ? 'status' : 'alert'}
+      className={message.ok ? 'flex items-center gap-2 text-sm font-medium text-primary' : 'text-sm font-medium text-destructive'}
+    >
+      {message.ok ? <Check className="size-4" /> : null}
+      {message.text}
     </div>
   );
 }
 
-// Open/Closed status per store. Closed stores are stored as a list of values; a
-// store not in the list is open. Drives the executive Active Stores breakdown.
-function StoreStatusEditor({ stores, closed, onChange }: { stores: Opt[]; closed: string[]; onChange: (next: string[]) => void }) {
-  const isClosed = (v: string) => closed.includes(v);
-  const toggle = (v: string) => onChange(isClosed(v) ? closed.filter((x) => x !== v) : [...closed, v]);
-  const real = stores.filter((s) => s.label.trim() && s.value !== 'head-office');
-  return (
-    <div>
-      <div className="text-xs text-gray-400 mb-1">Store Status</div>
-      {real.length ? (
-        <div className="space-y-2">
-          {real.map((s) => (
-            <div key={s.value} className="flex items-center justify-between gap-2">
-              <span className="text-sm text-[var(--c-fg)] truncate">{s.label}</span>
-              <button
-                type="button"
-                onClick={() => toggle(s.value)}
-                className={`text-xs font-semibold px-3 py-1 rounded-lg border transition-colors ${isClosed(s.value) ? 'border-red-500/40 text-red-400 bg-red-500/10' : 'border-green-500/40 text-green-400 bg-green-500/10'}`}
-              >
-                {isClosed(s.value) ? 'Closed' : 'Open'}
-              </button>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-xs text-gray-500">Add stores above first.</p>
-      )}
-    </div>
-  );
-}
-
-type ExpOpt = { label: string; value: string; group: 'operating' | 'capital' | 'below-line' };
-function ExpenseEditor({ items, onChange, locked }: { items: ExpOpt[]; onChange: (next: ExpOpt[]) => void; locked?: Set<string> }) {
-  const set = (i: number, patch: Partial<ExpOpt>) => onChange(items.map((it, k) => (k === i ? { ...it, ...patch, value: locked?.has(it.value) ? it.value : (patch.label !== undefined ? slugify(patch.label) : it.value) } : it)));
-  const remove = (i: number) => onChange(items.filter((_, k) => k !== i));
-  const add = () => onChange([...items, { label: '', value: '', group: 'operating' }]);
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-xs text-gray-400">Expense Items</span>
-        <button type="button" onClick={add} className="text-xs text-[#c8a951] hover:underline">+ Add</button>
-      </div>
-      <div className="space-y-2">
-        {items.map((it, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <input className={inputCls} value={it.label} placeholder="Name" onChange={(e) => set(i, { label: e.target.value })} />
-            <select className={`${inputCls} w-40`} value={it.group} onChange={(e) => set(i, { group: e.target.value as ExpOpt['group'] })}>
-              <option value="operating">Operating</option>
-              <option value="capital">Capital</option>
-              <option value="below-line">Below-line</option>
-            </select>
-            <button type="button" onClick={() => remove(i)} className="text-gray-400 hover:text-red-400 text-sm px-1" aria-label="Remove">✕</button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// Maps each brand to a subset of items (categories or stores) via checkboxes.
-// value is Record<brandValue, itemValue[]>; onChange returns the next map.
-function MappingEditor({ title, hint, brands, items, value, onChange }: {
-  title: string; hint: string; brands: Opt[]; items: Opt[];
-  value: Record<string, string[]>; onChange: (next: Record<string, string[]>) => void;
+function PasswordInput({
+  id,
+  value,
+  onChange,
+  autoComplete,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  autoComplete: string;
 }) {
-  const toggle = (brand: string, item: string) => {
-    const cur = value[brand] ?? [];
-    const next = cur.includes(item) ? cur.filter((v) => v !== item) : [...cur, item];
-    onChange({ ...value, [brand]: next });
-  };
+  const [visible, setVisible] = useState(false);
   return (
-    <div>
-      <div className="mb-1">
-        <span className="text-xs text-gray-400">{title}</span>
-        <p className="text-[0.65rem] text-gray-500">{hint}</p>
-      </div>
-      <div className="space-y-3">
-        {brands.filter((b) => b.label.trim()).map((b) => (
-          <div key={b.value} className="border border-[var(--c-border)] rounded-lg p-2.5">
-            <div className="text-xs font-semibold text-[var(--c-fg)] mb-1.5">{b.label}</div>
-            <div className="flex flex-wrap gap-1.5">
-              {items.filter((it) => it.label.trim()).map((it) => {
-                const on = (value[b.value] ?? []).includes(it.value);
-                return (
-                  <button type="button" key={it.value} onClick={() => toggle(b.value, it.value)}
-                    className={`text-[0.7rem] px-2 py-1 rounded border transition-colors ${on ? 'bg-[#c8a951] text-black border-[#c8a951] font-medium' : 'border-[var(--c-border2)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
-                    {it.label}
-                  </button>
-                );
-              })}
-              {items.filter((it) => it.label.trim()).length === 0 && <span className="text-[0.65rem] text-gray-500">No items yet.</span>}
-            </div>
-          </div>
-        ))}
-        {brands.filter((b) => b.label.trim()).length === 0 && <p className="text-xs text-gray-500">Add brands above first.</p>}
-      </div>
+    <div className="relative">
+      <Input
+        id={id}
+        type={visible ? 'text' : 'password'}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        autoComplete={autoComplete}
+        className="h-10 pr-10"
+        required
+      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        className="absolute right-1.5 top-1.5 text-muted-foreground"
+        onClick={() => setVisible((current) => !current)}
+        aria-label={visible ? 'Hide password' : 'Show password'}
+      >
+        {visible ? <EyeOff /> : <Eye />}
+      </Button>
     </div>
   );
 }
 
-export default function SettingsClient({ user, isOwner, canEditOrg }: { user: UserInfo; isOwner: boolean; canEditOrg: boolean }) {
+export default function SettingsClient({ user, isOwner }: { user: UserInfo; isOwner: boolean }) {
   const router = useRouter();
   const { org, refresh: refreshOrg } = useOrg();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
-  // Page split into tabs so each form opens on its own instead of one long scroll.
-  const TABS = [
-    { id: 'profile', label: 'Profile', show: !isOwner },
-    { id: 'password', label: 'Password', show: !isOwner },
-    { id: 'organization', label: 'Organization', show: canEditOrg },
-    { id: 'appearance', label: 'Appearance', show: true },
-  ].filter((t) => t.show);
-  const [tab, setTab] = useState(TABS[0]?.id ?? 'appearance');
-  // Organization is itself large, so it gets its own sub-tabs (one shared Save).
-  const [orgTab, setOrgTab] = useState<'general' | 'catalog' | 'mappings'>('general');
-
-  // Profile
   const [name, setName] = useState(user.name);
   const [savingName, setSavingName] = useState(false);
-  const [nameMsg, setNameMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [nameMessage, setNameMessage] = useState<Message>(null);
 
-  // Password
-  const [current, setCurrent] = useState('');
-  const [next, setNext] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [savingPw, setSavingPw] = useState(false);
-  const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [showPw, setShowPw] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<Message>(null);
 
-  // Theme
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [workspace, setWorkspace] = useState({
+    companyName: org.companyName,
+    tagline: org.tagline,
+    currency: org.currency,
+    logo: org.logo,
+    weekStart: org.weekStart,
+    security: { ...org.security },
+  });
+  const [savingWorkspace, setSavingWorkspace] = useState(false);
+  const [workspaceMessage, setWorkspaceMessage] = useState<Message>(null);
+
+  useEffect(() => setMounted(true), []);
   useEffect(() => {
-    setTheme((document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark');
-  }, []);
-  function applyTheme(t: 'dark' | 'light') {
-    setTheme(t);
-    document.documentElement.setAttribute('data-theme', t);
-    try { localStorage.setItem('theme', t); } catch {}
-  }
+    setWorkspace({
+      companyName: org.companyName,
+      tagline: org.tagline,
+      currency: org.currency,
+      logo: org.logo,
+      weekStart: org.weekStart,
+      security: { ...org.security },
+    });
+  }, [org]);
 
-  async function saveName(e: React.FormEvent) {
-    e.preventDefault();
-    setSavingName(true); setNameMsg(null);
+  const availableTabs = useMemo(() => (isOwner ? ['account', 'workspace', 'appearance'] : ['account', 'appearance']), [isOwner]);
+
+  async function saveProfile(event: React.FormEvent) {
+    event.preventDefault();
+    setSavingName(true);
+    setNameMessage(null);
     try {
-      const res = await fetch('/api/account', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not save');
-      setNameMsg({ ok: true, text: 'Profile updated.' });
-      router.refresh(); // refresh sidebar/header name
-    } catch (err) {
-      setNameMsg({ ok: false, text: (err as Error).message });
+      const response = await fetch('/api/account', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Could not update profile');
+      setNameMessage({ ok: true, text: 'Profile updated' });
+      toast.success('Profile updated');
+      router.refresh();
+    } catch (error) {
+      setNameMessage({ ok: false, text: (error as Error).message });
+    } finally {
+      setSavingName(false);
     }
-    setSavingName(false);
   }
 
-  async function changePassword(e: React.FormEvent) {
-    e.preventDefault();
-    setPwMsg(null);
-    if (next !== confirm) { setPwMsg({ ok: false, text: 'New password and confirmation do not match.' }); return; }
-    setSavingPw(true);
+  async function changePassword(event: React.FormEvent) {
+    event.preventDefault();
+    setPasswordMessage(null);
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage({ ok: false, text: 'New passwords do not match' });
+      return;
+    }
+    setSavingPassword(true);
     try {
-      const res = await fetch('/api/account/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword: current, newPassword: next }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not change password');
-      setPwMsg({ ok: true, text: 'Password changed.' });
-      setCurrent(''); setNext(''); setConfirm('');
-    } catch (err) {
-      setPwMsg({ ok: false, text: (err as Error).message });
+      const response = await fetch('/api/account/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Could not update password');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordMessage({ ok: true, text: 'Password updated' });
+      toast.success('Password updated');
+    } catch (error) {
+      setPasswordMessage({ ok: false, text: (error as Error).message });
+    } finally {
+      setSavingPassword(false);
     }
-    setSavingPw(false);
   }
 
-  // Organization (owner only)
-  const [orgDraft, setOrgDraft] = useState(org);
-  // Values already persisted in the saved catalog are stable identifiers: renaming
-  // such an item keeps its value (only the label changes) so existing data stays linked.
-  const lockedStores = new Set(org.stores.map((s) => s.value));
-  const lockedBrands = new Set(org.brands.map((s) => s.value));
-  const lockedCategories = new Set(org.categories.map((s) => s.value));
-  const lockedSubCategories = new Set(org.subCategories.map((s) => s.value));
-  const lockedExpenses = new Set(org.expenseItems.map((s) => s.value));
-  useEffect(() => { setOrgDraft(org); }, [org]);
-  const [savingOrg, setSavingOrg] = useState(false);
-  const [orgMsg, setOrgMsg] = useState<{ ok: boolean; text: string } | null>(null);
-
-  function onLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  function selectLogo(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
     if (!file) return;
-    if (file.size > 200_000) { setOrgMsg({ ok: false, text: 'Logo too large (max ~200 KB). Use a smaller PNG/SVG.' }); return; }
+    if (file.size > 200_000) {
+      setWorkspaceMessage({ ok: false, text: 'Logo must be smaller than 200 KB' });
+      return;
+    }
     const reader = new FileReader();
-    reader.onload = () => setOrgDraft((d) => ({ ...d, logo: String(reader.result) }));
+    reader.onload = () => setWorkspace((current) => ({ ...current, logo: String(reader.result) }));
     reader.readAsDataURL(file);
   }
 
-  async function saveOrg(e: React.FormEvent) {
-    e.preventDefault();
-    setSavingOrg(true); setOrgMsg(null);
+  async function saveWorkspace(event: React.FormEvent) {
+    event.preventDefault();
+    setSavingWorkspace(true);
+    setWorkspaceMessage(null);
     try {
-      const res = await fetch('/api/org', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyName: orgDraft.companyName, tagline: orgDraft.tagline, currency: orgDraft.currency,
-          logo: orgDraft.logo, weekStart: orgDraft.weekStart, security: orgDraft.security,
-          stores: orgDraft.stores.filter((s) => s.label.trim()).map((s) => ({ ...s, value: s.value?.trim() ? s.value : slugify(s.label) })),
-          brands: orgDraft.brands.filter((s) => s.label.trim()),
-          categories: orgDraft.categories.filter((s) => s.label.trim()),
-          expenseItems: orgDraft.expenseItems.filter((s) => s.label.trim()),
-          subCategories: orgDraft.subCategories.filter((s) => s.label.trim()),
-          brandCategories: orgDraft.brandCategories,
-          brandStores: orgDraft.brandStores,
-          categorySubcategories: orgDraft.categorySubcategories,
-          closedStores: orgDraft.closedStores,
-        }),
+      const response = await fetch('/api/org', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(workspace),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not save');
-      setOrgMsg({ ok: true, text: 'Organization settings saved.' });
-      refreshOrg(); router.refresh();
-    } catch (err) {
-      setOrgMsg({ ok: false, text: (err as Error).message });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Could not update workspace');
+      await refreshOrg();
+      setWorkspaceMessage({ ok: true, text: 'Workspace updated' });
+      toast.success('Workspace updated');
+      router.refresh();
+    } catch (error) {
+      setWorkspaceMessage({ ok: false, text: (error as Error).message });
+    } finally {
+      setSavingWorkspace(false);
     }
-    setSavingOrg(false);
   }
 
   return (
-    <div className="bg-[var(--c-bg)] min-h-screen text-[var(--c-fg)] p-6">
-      <div className="max-w-xl mx-auto space-y-6">
-      <div className="text-center">
-        <h1 className="text-xl font-bold">Settings</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage your profile, password and appearance.</p>
+    <div className="page-shell">
+      <div className="mb-7 flex items-center gap-3">
+        <span className="flex size-10 items-center justify-center rounded-md bg-primary/12 text-primary">
+          <ShieldCheck className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold">Settings</h1>
+          <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+        </div>
       </div>
 
-      {TABS.length > 1 && (
-        <div className="flex gap-2 flex-wrap justify-center">
-          {TABS.map((t) => (
-            <button key={t.id} type="button" onClick={() => setTab(t.id)}
-              className={`px-4 py-2 rounded-lg text-sm transition-colors ${tab === t.id ? 'bg-[#c8a951] text-black font-semibold' : 'bg-[var(--c-card)] border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-      )}
+      <Tabs defaultValue={availableTabs[0]} className="gap-6">
+        <TabsList variant="line" className="w-full justify-start overflow-x-auto border-b pb-3">
+          <TabsTrigger value="account" className="flex-none px-3">
+            <UserRound /> Account
+          </TabsTrigger>
+          {isOwner ? (
+            <TabsTrigger value="workspace" className="flex-none px-3">
+              <Building2 /> Workspace
+            </TabsTrigger>
+          ) : null}
+          <TabsTrigger value="appearance" className="flex-none px-3">
+            <Palette /> Appearance
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Profile (hidden for owner) */}
-      {!isOwner && tab === 'profile' && (
-      <section className={cardCls}>
-        <h2 className={h2Cls}>Profile</h2>
-        <Msg m={nameMsg} />
-        <form onSubmit={saveName} className={formCls}>
-          <div>
-            <label className={labelCls}>Display Name</label>
-            <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} required />
-          </div>
-          <div>
-            <label className={labelCls}>Email</label>
-            <input className={`${inputCls} opacity-70`} value={user.email} readOnly />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Role</label>
-              <input className={`${inputCls} opacity-70 capitalize`} value={user.role} readOnly />
-            </div>
-            <div>
-              <label className={labelCls}>Store</label>
-              <input className={`${inputCls} opacity-70`} value={user.store || '—'} readOnly />
-            </div>
-          </div>
-          <div className="flex justify-center pt-1">
-            <button type="submit" disabled={savingName} className={btnCls}>{savingName ? <><Spinner /> Saving…</> : 'Save Profile'}</button>
-          </div>
-        </form>
-      </section>
-      )}
+        <TabsContent value="account">
+          <div className="grid gap-5 lg:grid-cols-2">
+            <Card className="shadow-[var(--shadow-surface)]">
+              <CardHeader className="border-b">
+                <CardTitle>Profile</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={saveProfile}>
+                  <FieldGroup>
+                    <div className="flex items-center gap-3">
+                      <Avatar size="lg" className="size-12">
+                        <AvatarFallback className="bg-chart-1/12 font-semibold text-chart-1">{initials(name)}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{name || 'StateStreet user'}</p>
+                        <p className="truncate text-xs text-muted-foreground">{titleCase(user.role)}</p>
+                      </div>
+                    </div>
+                    <Field>
+                      <FieldLabel htmlFor="display-name">Display name</FieldLabel>
+                      <Input id="display-name" value={name} onChange={(event) => setName(event.target.value)} className="h-10" required />
+                    </Field>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field>
+                        <FieldLabel htmlFor="account-email">Email</FieldLabel>
+                        <Input id="account-email" value={user.email} className="h-10" readOnly />
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="account-store">Store</FieldLabel>
+                        <Input id="account-store" value={user.store || 'All stores'} className="h-10" readOnly />
+                      </Field>
+                    </div>
+                    <StatusMessage message={nameMessage} />
+                    <div>
+                      <Button type="submit" size="lg" disabled={savingName || !name.trim()}>
+                        {savingName ? <LoaderCircle className="animate-spin" /> : <Save />}
+                        Save profile
+                      </Button>
+                    </div>
+                  </FieldGroup>
+                </form>
+              </CardContent>
+            </Card>
 
-      {/* Password (hidden for owner) — collapsed until the user chooses to change it */}
-      {!isOwner && tab === 'password' && (
-      <section className={cardCls}>
-        <h2 className={h2Cls}>Change Password</h2>
-        {!showPw ? (
-          <div className="flex justify-center">
-            <button type="button" onClick={() => { setShowPw(true); setPwMsg(null); }} className={secBtnCls}>Change Password</button>
+            <Card className="shadow-[var(--shadow-surface)]">
+              <CardHeader className="border-b">
+                <CardTitle>Password</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={changePassword}>
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="current-password">Current password</FieldLabel>
+                      <PasswordInput id="current-password" value={currentPassword} onChange={setCurrentPassword} autoComplete="current-password" />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="new-password">New password</FieldLabel>
+                      <PasswordInput id="new-password" value={newPassword} onChange={setNewPassword} autoComplete="new-password" />
+                      <FieldDescription>At least {org.security.minPasswordLen} characters.</FieldDescription>
+                    </Field>
+                    <Field data-invalid={Boolean(confirmPassword && confirmPassword !== newPassword)}>
+                      <FieldLabel htmlFor="confirm-password">Confirm new password</FieldLabel>
+                      <PasswordInput id="confirm-password" value={confirmPassword} onChange={setConfirmPassword} autoComplete="new-password" />
+                      {confirmPassword && confirmPassword !== newPassword ? <FieldError>Passwords do not match.</FieldError> : null}
+                    </Field>
+                    <StatusMessage message={passwordMessage} />
+                    <div>
+                      <Button
+                        type="submit"
+                        size="lg"
+                        disabled={savingPassword || !currentPassword || newPassword.length < org.security.minPasswordLen || newPassword !== confirmPassword}
+                      >
+                        {savingPassword ? <LoaderCircle className="animate-spin" /> : <LockKeyhole />}
+                        Update password
+                      </Button>
+                    </div>
+                  </FieldGroup>
+                </form>
+              </CardContent>
+            </Card>
           </div>
-        ) : (
-          <>
-            <Msg m={pwMsg} />
-            <form onSubmit={changePassword} className={formCls}>
-              <div>
-                <label className={labelCls}>Current Password</label>
-                <input type="password" className={inputCls} value={current} onChange={(e) => setCurrent(e.target.value)} required />
-              </div>
-              <div>
-                <label className={labelCls}>New Password</label>
-                <input type="password" className={inputCls} value={next} onChange={(e) => setNext(e.target.value)} required minLength={6} />
-              </div>
-              <div>
-                <label className={labelCls}>Confirm New Password</label>
-                <input type="password" className={inputCls} value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={6} />
-              </div>
-              <div className="flex justify-center items-center gap-2 pt-1">
-                <button type="submit" disabled={savingPw} className={btnCls}>{savingPw ? <><Spinner /> Saving…</> : 'Update Password'}</button>
-                <button type="button" onClick={() => { setShowPw(false); setCurrent(''); setNext(''); setConfirm(''); setPwMsg(null); }} className={cancelBtnCls}>Cancel</button>
-              </div>
+        </TabsContent>
+
+        {isOwner ? (
+          <TabsContent value="workspace">
+            <form onSubmit={saveWorkspace} className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+              <Card className="shadow-[var(--shadow-surface)]">
+                <CardHeader className="border-b">
+                  <CardTitle>Workspace identity</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <FieldGroup>
+                    <div className="flex flex-wrap items-center gap-4">
+                      {workspace.logo ? (
+                        <Image src={workspace.logo} alt="Workspace logo" width={64} height={64} className="size-16 rounded-md border bg-background object-contain p-1" unoptimized />
+                      ) : (
+                        <span className="flex size-16 items-center justify-center rounded-md bg-primary/12 text-primary">
+                          <Building2 className="size-7" />
+                        </span>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" asChild>
+                          <label>
+                            <Upload /> Upload logo
+                            <input className="sr-only" type="file" accept="image/png,image/jpeg,image/svg+xml" onChange={selectLogo} />
+                          </label>
+                        </Button>
+                        {workspace.logo ? (
+                          <Button type="button" variant="ghost" onClick={() => setWorkspace((current) => ({ ...current, logo: '' }))}>
+                            Remove
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field>
+                        <FieldLabel htmlFor="company-name">Company name</FieldLabel>
+                        <Input id="company-name" value={workspace.companyName} onChange={(event) => setWorkspace((current) => ({ ...current, companyName: event.target.value }))} className="h-10" required />
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="tagline">Tagline</FieldLabel>
+                        <Input id="tagline" value={workspace.tagline} onChange={(event) => setWorkspace((current) => ({ ...current, tagline: event.target.value }))} className="h-10" />
+                      </Field>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field>
+                        <FieldLabel htmlFor="currency">Currency</FieldLabel>
+                        <Input id="currency" value={workspace.currency} onChange={(event) => setWorkspace((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} className="h-10 uppercase" maxLength={8} required />
+                      </Field>
+                      <Field>
+                        <FieldLabel>Week starts on</FieldLabel>
+                        <Select value={workspace.weekStart} onValueChange={(value) => setWorkspace((current) => ({ ...current, weekStart: value === 'sunday' ? 'sunday' : 'monday' }))}>
+                          <SelectTrigger className="h-10 w-full"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectItem value="monday">Monday</SelectItem>
+                              <SelectItem value="sunday">Sunday</SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                    </div>
+                  </FieldGroup>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-[var(--shadow-surface)]">
+                <CardHeader className="border-b">
+                  <CardTitle>Security policy</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="password-length">Minimum password length</FieldLabel>
+                      <Input id="password-length" type="number" min={8} max={128} value={workspace.security.minPasswordLen} onChange={(event) => setWorkspace((current) => ({ ...current, security: { ...current.security, minPasswordLen: Number(event.target.value) || 8 } }))} className="h-10" />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="session-days">Session length</FieldLabel>
+                      <div className="relative">
+                        <Input id="session-days" type="number" min={1} max={90} value={workspace.security.sessionDays} onChange={(event) => setWorkspace((current) => ({ ...current, security: { ...current.security, sessionDays: Number(event.target.value) || 1 } }))} className="h-10 pr-14" />
+                        <span className="pointer-events-none absolute right-3 top-2.5 text-sm text-muted-foreground">days</span>
+                      </div>
+                    </Field>
+                    <StatusMessage message={workspaceMessage} />
+                    <div>
+                      <Button type="submit" size="lg" disabled={savingWorkspace || !workspace.companyName.trim()}>
+                        {savingWorkspace ? <LoaderCircle className="animate-spin" /> : <Save />}
+                        Save workspace
+                      </Button>
+                    </div>
+                  </FieldGroup>
+                </CardContent>
+              </Card>
             </form>
-          </>
-        )}
-      </section>
-      )}
+          </TabsContent>
+        ) : null}
 
-      {/* Organization (owner + commercial + operations) */}
-      {canEditOrg && tab === 'organization' && (
-        <section className={cardCls}>
-          <h2 className={h2Cls}>Organization</h2>
-          <div className="flex gap-2 flex-wrap justify-center mb-4">
-            {([{ id: 'general', label: 'General' }, { id: 'catalog', label: 'Catalog' }, { id: 'mappings', label: 'Mappings' }] as const).map((t) => (
-              <button key={t.id} type="button" onClick={() => setOrgTab(t.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${orgTab === t.id ? 'bg-[#c8a951] text-black font-semibold' : 'bg-[var(--c-card2)] border border-[var(--c-border)] text-gray-400 hover:text-[var(--c-fg)]'}`}>
-                {t.label}
-              </button>
-            ))}
-          </div>
-          <Msg m={orgMsg} />
-          <form onSubmit={saveOrg} className="space-y-4 max-w-md mx-auto">
-            {orgTab === 'general' && (
-            <div className="space-y-4">
-            <div className="flex flex-col items-center gap-2">
-              {orgDraft.logo ? (
-                <img src={orgDraft.logo} alt="Logo" className="w-16 h-16 rounded object-contain border border-[var(--c-border)] bg-[var(--c-card2)]" />
+        <TabsContent value="appearance">
+          <Card className="max-w-3xl shadow-[var(--shadow-surface)]">
+            <CardHeader className="border-b">
+              <CardTitle>Color mode</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {mounted ? (
+                <ToggleGroup
+                  type="single"
+                  value={theme ?? 'light'}
+                  onValueChange={(value) => value && setTheme(value)}
+                  variant="outline"
+                  spacing={2}
+                  className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3"
+                >
+                  <ToggleGroupItem value="light" className="h-auto justify-start gap-3 border px-4 py-4 data-[state=on]:border-primary data-[state=on]:bg-primary/8">
+                    <span className="flex size-9 items-center justify-center rounded-md bg-chart-2/18 text-amber-700"><Sun /></span>
+                    <span className="text-left"><span className="block font-medium">Light</span><span className="block text-xs text-muted-foreground">Bright workspace</span></span>
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="dark" className="h-auto justify-start gap-3 border px-4 py-4 data-[state=on]:border-primary data-[state=on]:bg-primary/8">
+                    <span className="flex size-9 items-center justify-center rounded-md bg-chart-1/14 text-chart-1"><Moon /></span>
+                    <span className="text-left"><span className="block font-medium">Dark</span><span className="block text-xs text-muted-foreground">Low-light workspace</span></span>
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="system" className="h-auto justify-start gap-3 border px-4 py-4 data-[state=on]:border-primary data-[state=on]:bg-primary/8">
+                    <span className="flex size-9 items-center justify-center rounded-md bg-chart-4/14 text-chart-4"><Laptop /></span>
+                    <span className="text-left"><span className="block font-medium">System</span><span className="block text-xs text-muted-foreground">Match this device</span></span>
+                  </ToggleGroupItem>
+                </ToggleGroup>
               ) : (
-                <div className="w-16 h-16 bg-[#c8a951] rounded flex items-center justify-center text-black text-[0.6rem] font-bold">LOGO</div>
+                <div className="h-[74px] rounded-md bg-muted" />
               )}
-              <label className="text-xs text-[#c8a951] cursor-pointer hover:underline">
-                Upload logo
-                <input type="file" accept="image/*" className="hidden" onChange={onLogoFile} />
-              </label>
-              {orgDraft.logo && (
-                <button type="button" onClick={() => setOrgDraft((d) => ({ ...d, logo: '' }))} className="text-[0.6rem] text-gray-400 hover:text-red-400">Remove logo</button>
-              )}
-            </div>
-            <div>
-              <label className={labelCls}>Company Name</label>
-              <input className={inputCls} value={orgDraft.companyName} onChange={(e) => setOrgDraft((d) => ({ ...d, companyName: e.target.value }))} required />
-            </div>
-            <div>
-              <label className={labelCls}>Tagline</label>
-              <input className={inputCls} value={orgDraft.tagline} onChange={(e) => setOrgDraft((d) => ({ ...d, tagline: e.target.value }))} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>Currency</label>
-                <input className={inputCls} value={orgDraft.currency} onChange={(e) => setOrgDraft((d) => ({ ...d, currency: e.target.value }))} />
-              </div>
-              <div>
-                <label className={labelCls}>Week Starts On</label>
-                <select className={inputCls} value={orgDraft.weekStart} onChange={(e) => setOrgDraft((d) => ({ ...d, weekStart: e.target.value === 'sunday' ? 'sunday' : 'monday' }))}>
-                  <option value="monday">Monday</option>
-                  <option value="sunday">Sunday</option>
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>Min Password Length</label>
-                <input type="number" min={6} className={inputCls} value={orgDraft.security.minPasswordLen} onChange={(e) => setOrgDraft((d) => ({ ...d, security: { ...d.security, minPasswordLen: Number(e.target.value) || 6 } }))} />
-              </div>
-              <div>
-                <label className={labelCls}>Session Length (days)</label>
-                <input type="number" min={1} className={inputCls} value={orgDraft.security.sessionDays} onChange={(e) => setOrgDraft((d) => ({ ...d, security: { ...d.security, sessionDays: Number(e.target.value) || 7 } }))} />
-              </div>
-            </div>
-            </div>
-            )}
-            {orgTab === 'catalog' && (
-            <div className="space-y-4">
-              <ListEditor title="Stores / Locations" items={orgDraft.stores} locked={lockedStores} editableCode onChange={(stores) => setOrgDraft((d) => ({ ...d, stores }))} />
-              <StoreStatusEditor stores={orgDraft.stores} closed={orgDraft.closedStores} onChange={(closedStores) => setOrgDraft((d) => ({ ...d, closedStores }))} />
-              <ListEditor title="Brands" items={orgDraft.brands} locked={lockedBrands} onChange={(brands) => setOrgDraft((d) => ({ ...d, brands }))} />
-              <ListEditor title="Product Categories" items={orgDraft.categories} locked={lockedCategories} onChange={(categories) => setOrgDraft((d) => ({ ...d, categories }))} />
-              <ListEditor title="Sub-categories" items={orgDraft.subCategories} locked={lockedSubCategories} onChange={(subCategories) => setOrgDraft((d) => ({ ...d, subCategories }))} />
-              <ExpenseEditor items={orgDraft.expenseItems} locked={lockedExpenses} onChange={(expenseItems) => setOrgDraft((d) => ({ ...d, expenseItems }))} />
-            </div>
-            )}
-            {orgTab === 'mappings' && (
-            <div className="space-y-4">
-              <MappingEditor title="Brand → Categories" hint="Tap to assign categories to each brand. Sales forms show only a brand's categories once mapped." brands={orgDraft.brands} items={orgDraft.categories} value={orgDraft.brandCategories} onChange={(brandCategories) => setOrgDraft((d) => ({ ...d, brandCategories }))} />
-              <MappingEditor title="Brand → Stores" hint="Group stores under a brand. Stock transfers are allowed only between stores of the same brand (Head Office reaches all)." brands={orgDraft.brands} items={orgDraft.stores} value={orgDraft.brandStores} onChange={(brandStores) => setOrgDraft((d) => ({ ...d, brandStores }))} />
-              <MappingEditor title="Category → Sub-categories" hint="Tap to assign sub-categories to each category. Goods Received lets you pick a category's sub-categories once mapped." brands={orgDraft.categories} items={orgDraft.subCategories} value={orgDraft.categorySubcategories} onChange={(categorySubcategories) => setOrgDraft((d) => ({ ...d, categorySubcategories }))} />
-            </div>
-            )}
-            <div className="flex justify-center pt-1">
-              <button type="submit" disabled={savingOrg} className={btnCls}>{savingOrg ? <><Spinner /> Saving…</> : 'Save Organization'}</button>
-            </div>
-          </form>
-        </section>
-      )}
-
-      {/* Owner-only data cleanup tools */}
-      {isOwner && tab === 'organization' && <div className="space-y-4"><MoveSales /><StoreReconcile /><CategoryRecoder /></div>}
-
-      {/* Appearance */}
-      {tab === 'appearance' && (
-      <section className={cardCls}>
-        <h2 className={h2Cls}>Appearance</h2>
-        <div className="max-w-sm mx-auto">
-          <label className={labelCls}>Theme</label>
-          <select className={inputCls} value={theme} onChange={(e) => applyTheme(e.target.value === 'light' ? 'light' : 'dark')}>
-            <option value="light">☀️ Light</option>
-            <option value="dark">🌙 Dark</option>
-          </select>
-        </div>
-      </section>
-      )}
-      </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
