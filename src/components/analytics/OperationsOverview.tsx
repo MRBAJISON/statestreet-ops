@@ -2,7 +2,7 @@ import { AlertTriangle, ClipboardCheck, Gauge, Hammer, UserCheck } from 'lucide-
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { AnalyticsMeta, OperationsDomain, TradingOverview } from '@/lib/contracts/analytics';
-import { MetricRail, SectionHeading, StatusBadge } from './DashboardPrimitives';
+import { EmptyPanel, EmptyTableRow, MetricRail, SectionHeading, StatusBadge } from './DashboardPrimitives';
 import { ComparisonBarChart, HorizontalBarChart, NamedBarChart } from './Charts';
 import { formatCurrency, formatPercent } from './format';
 import { TradingSnapshot } from './TradingSnapshot';
@@ -37,7 +37,7 @@ export function OperationsOverview({ meta, trading, domain }: { meta: AnalyticsM
         <div className="p-5 pb-3"><SectionHeading title="Store Standards Scores" description="Operations, visual merchandising, readiness, CX, cleanliness, safety, and attendance" /></div>
         <Table>
           <TableHeader><TableRow><TableHead>Store</TableHead><TableHead className="text-right">Overall</TableHead><TableHead className="text-right">Operations</TableHead><TableHead className="text-right">VM</TableHead><TableHead className="text-right">Readiness</TableHead><TableHead className="text-right">CX</TableHead><TableHead className="text-right">Cleanliness</TableHead><TableHead className="text-right">Safety</TableHead><TableHead className="text-right">Attendance</TableHead></TableRow></TableHeader>
-          <TableBody>{domain.stores.map((store) => <TableRow key={store.id}><TableCell className="font-medium">{store.name}</TableCell><TableCell className="text-right font-semibold">{formatPercent(store.overall)}</TableCell><TableCell className="text-right">{formatPercent(store.operations)}</TableCell><TableCell className="text-right">{formatPercent(store.visualMerchandising)}</TableCell><TableCell className="text-right">{formatPercent(store.readiness)}</TableCell><TableCell className="text-right">{formatPercent(store.customerExperience)}</TableCell><TableCell className="text-right">{formatPercent(store.cleanliness)}</TableCell><TableCell className="text-right">{formatPercent(store.safety)}</TableCell><TableCell className="text-right">{formatPercent(store.attendance)}</TableCell></TableRow>)}</TableBody>
+          <TableBody>{domain.stores.length ? domain.stores.map((store) => <TableRow key={store.id}><TableCell className="font-medium">{store.name}</TableCell><TableCell className="text-right font-semibold">{formatPercent(store.overall)}</TableCell><TableCell className="text-right">{formatPercent(store.operations)}</TableCell><TableCell className="text-right">{formatPercent(store.visualMerchandising)}</TableCell><TableCell className="text-right">{formatPercent(store.readiness)}</TableCell><TableCell className="text-right">{formatPercent(store.customerExperience)}</TableCell><TableCell className="text-right">{formatPercent(store.cleanliness)}</TableCell><TableCell className="text-right">{formatPercent(store.safety)}</TableCell><TableCell className="text-right">{formatPercent(store.attendance)}</TableCell></TableRow>) : <EmptyTableRow colSpan={9} message="No store-standard assessments have been submitted" />}</TableBody>
         </Table>
       </section>
 
@@ -65,7 +65,7 @@ export function OperationsOverview({ meta, trading, domain }: { meta: AnalyticsM
           <div className="p-5 pb-3"><SectionHeading title="Priority Actions & Maintenance Backlog" description="Operational work requiring follow-through" /></div>
           <Table>
             <TableHeader><TableRow><TableHead>Store / Category</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Cost</TableHead><TableHead>Priority</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-            <TableBody>{domain.maintenance.slice(0, 14).map((item) => <TableRow key={item.id}><TableCell className="font-medium">{item.storeName} / {item.category}</TableCell><TableCell>{item.dueDate ?? 'No due date'}</TableCell><TableCell className="text-right">{formatCurrency(item.cost, meta.currency)}</TableCell><TableCell><StatusBadge value={item.priority} /></TableCell><TableCell><StatusBadge value={item.status} /></TableCell></TableRow>)}</TableBody>
+            <TableBody>{domain.maintenance.length ? domain.maintenance.slice(0, 14).map((item) => <TableRow key={item.id}><TableCell className="font-medium">{item.storeName} / {item.category}</TableCell><TableCell>{item.dueDate ?? 'No due date'}</TableCell><TableCell className="text-right">{formatCurrency(item.cost, meta.currency)}</TableCell><TableCell><StatusBadge value={item.priority} /></TableCell><TableCell><StatusBadge value={item.status} /></TableCell></TableRow>) : <EmptyTableRow colSpan={5} message="No maintenance work is open" />}</TableBody>
           </Table>
         </section>
         <section className="surface min-w-0 p-5 xl:col-span-4">
@@ -77,11 +77,11 @@ export function OperationsOverview({ meta, trading, domain }: { meta: AnalyticsM
       <div className="grid gap-5 xl:grid-cols-2">
         <section className="surface p-5">
           <SectionHeading title="Incident Queue & Recent Entries" description="Recent incidents ordered by severity" />
-          <div className="mt-4 divide-y">{domain.incidents.slice(0, 10).map((item) => <div key={item.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"><span className="flex size-8 items-center justify-center rounded-md bg-chart-3/10 text-destructive"><AlertTriangle className="size-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{item.storeName} / {item.type}</span><span className="text-xs text-muted-foreground">{new Date(item.occurredAt).toLocaleDateString('en-GB')}</span></span><StatusBadge value={item.severity} /><StatusBadge value={item.status} /></div>)}</div>
+          {domain.incidents.length ? <div className="mt-4 divide-y">{domain.incidents.slice(0, 10).map((item) => <div key={item.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"><span className="flex size-8 items-center justify-center rounded-md bg-chart-3/10 text-destructive"><AlertTriangle className="size-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{item.storeName} / {item.type}</span><span className="text-xs text-muted-foreground">{new Date(item.occurredAt).toLocaleDateString('en-GB')}</span></span><StatusBadge value={item.severity} /><StatusBadge value={item.status} /></div>)}</div> : <EmptyPanel message="No incidents recorded for this period" />}
         </section>
         <section className="surface p-5">
           <SectionHeading title="Key Issues" description="Store-standard observations recorded in the period" />
-          <div className="mt-4 divide-y">{domain.keyIssues.slice(0, 10).map((item) => <div key={item.id} className="flex gap-3 py-3 first:pt-0 last:pb-0"><span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-chart-2/12 text-amber-800"><Gauge className="size-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{item.storeName} / {item.date}</span><span className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.issues}</span></span></div>)}</div>
+          {domain.keyIssues.length ? <div className="mt-4 divide-y">{domain.keyIssues.slice(0, 10).map((item) => <div key={item.id} className="flex gap-3 py-3 first:pt-0 last:pb-0"><span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-chart-2/12 text-amber-800"><Gauge className="size-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{item.storeName} / {item.date}</span><span className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.issues}</span></span></div>)}</div> : <EmptyPanel message="No store-standard issues recorded" />}
         </section>
       </div>
 
@@ -92,13 +92,13 @@ export function OperationsOverview({ meta, trading, domain }: { meta: AnalyticsM
         </section>
         <section className="surface min-w-0 overflow-hidden xl:col-span-8">
           <div className="p-5 pb-3"><SectionHeading title="Corrective Action Register" description="SOP deviations and corrective commitments" /></div>
-          <Table><TableHeader><TableRow><TableHead>Store</TableHead><TableHead>Area</TableHead><TableHead>Deviation</TableHead><TableHead>Corrective action</TableHead></TableRow></TableHeader><TableBody>{domain.sopDeviations.slice(0, 12).map((item) => <TableRow key={item.id}><TableCell className="font-medium">{item.storeName}</TableCell><TableCell>{item.area}</TableCell><TableCell className="max-w-64 truncate text-muted-foreground">{item.deviations}</TableCell><TableCell className="max-w-64 truncate">{item.correctiveAction ?? 'Not recorded'}</TableCell></TableRow>)}</TableBody></Table>
+          <Table><TableHeader><TableRow><TableHead>Store</TableHead><TableHead>Area</TableHead><TableHead>Deviation</TableHead><TableHead>Corrective action</TableHead></TableRow></TableHeader><TableBody>{domain.sopDeviations.length ? domain.sopDeviations.slice(0, 12).map((item) => <TableRow key={item.id}><TableCell className="font-medium">{item.storeName}</TableCell><TableCell>{item.area}</TableCell><TableCell className="max-w-64 truncate text-muted-foreground">{item.deviations}</TableCell><TableCell className="max-w-64 truncate">{item.correctiveAction ?? 'Not recorded'}</TableCell></TableRow>) : <EmptyTableRow colSpan={4} message="No SOP deviations recorded for this period" />}</TableBody></Table>
         </section>
       </div>
 
       <section className="surface p-5">
         <SectionHeading title="Corrective Actions" description="Owners, priorities, deadlines, and progress" />
-        <div className="mt-4 grid gap-x-6 md:grid-cols-2">{domain.correctiveActions.slice(0, 12).map((item) => <div key={item.id} className="flex gap-3 border-b py-3 first:pt-0 md:[&:nth-last-child(-n+2)]:border-b-0"><span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"><ClipboardCheck className="size-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{item.title}</span><span className="block truncate text-xs text-muted-foreground">{item.ownerName} / {item.storeName ?? 'Group'}</span></span><StatusBadge value={item.status} /></div>)}</div>
+        {domain.correctiveActions.length ? <div className="mt-4 grid gap-x-6 md:grid-cols-2">{domain.correctiveActions.slice(0, 12).map((item) => <div key={item.id} className="flex gap-3 border-b py-3 first:pt-0 md:[&:nth-last-child(-n+2)]:border-b-0"><span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"><ClipboardCheck className="size-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{item.title}</span><span className="block truncate text-xs text-muted-foreground">{item.ownerName} / {item.storeName ?? 'Group'}</span></span><StatusBadge value={item.status} /></div>)}</div> : <EmptyPanel message="No corrective actions recorded" />}
       </section>
 
       <TradingSnapshot meta={meta} trading={trading} showStores={false} />

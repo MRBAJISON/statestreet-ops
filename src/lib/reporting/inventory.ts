@@ -77,6 +77,31 @@ export async function getInventoryDomain(scope: AnalyticsScope): Promise<Invento
       select stock.*
       from stock_rows stock
       where not exists (select 1 from latest_summary_rows snapshot where snapshot.store_id = stock.store_id)
+    ), store_brand_rows as (
+      select
+        store.id as store_id,
+        case when count(brand.id) = 1 then min(brand.name) else 'Unassigned' end as brand_name
+      from stores store
+      left join brand_stores brand_store on brand_store.store_id = store.id
+      left join brands brand on brand.id = brand_store.brand_id and brand.active = true
+      where store.type = 'store'
+      group by store.id
+    ), inventory_value_components as (
+      select brand.name, sum(stock.value) as value
+      from movement_only_stock_rows stock
+      join products product on product.id = stock.product_id
+      join brands brand on brand.id = product.brand_id
+      group by brand.id, brand.name
+      union all
+      select coalesce(store_brand.brand_name, 'Unassigned') as name, sum(snapshot.value) as value
+      from summary_stock_rows snapshot
+      left join store_brand_rows store_brand on store_brand.store_id = snapshot.store_id
+      group by coalesce(store_brand.brand_name, 'Unassigned')
+    ), inventory_value_by_brand as (
+      select component.name, sum(component.value) as value
+      from inventory_value_components component
+      group by component.name
+      having sum(component.value) <> 0
     ), latest_accuracy_summary_rows as (
       select distinct on (snapshot.store_id)
         snapshot.store_id, snapshot.system_quantity, snapshot.physical_quantity
@@ -144,15 +169,6 @@ export async function getInventoryDomain(scope: AnalyticsScope): Promise<Invento
         case request.status when 'requested' then 1 when 'approved' then 2 else 3 end,
         request.business_date
       limit 15
-    ), receipt_brand_rows as (
-      select brand.name, sum(line.quantity * coalesce(line.unit_cost, product.unit_cost, 0)) as value
-      from goods_receipts receipt
-      join goods_receipt_lines line on line.goods_receipt_id = receipt.id
-      join products product on product.id = line.product_id
-      join brands brand on brand.id = product.brand_id
-      where receipt.status = 'received'
-        and receipt.business_date between ${scope.from}::date and ${scope.to}::date ${receiptStore}
-      group by brand.id, brand.name
     ), receipt_trend_rows as (
       select date_trunc('month', receipt.business_date)::date as date,
         sum(line.quantity * coalesce(line.unit_cost, product.unit_cost, 0)) as value
@@ -173,6 +189,16 @@ export async function getInventoryDomain(scope: AnalyticsScope): Promise<Invento
       where count.status = 'approved'
         and count.business_date between ${scope.from}::date and ${scope.to}::date ${countStore}
       group by count.store_id
+    ), accuracy_rows as (
+      select count.store_id, line.system_quantity, line.physical_quantity
+      from stock_counts count
+      join stock_count_lines line on line.stock_count_id = count.id
+      where count.status = 'approved'
+        and count.business_date between ${scope.from}::date and ${scope.to}::date ${countStore}
+      union all
+      select snapshot.store_id, snapshot.system_quantity, snapshot.physical_quantity
+      from latest_accuracy_summary_rows snapshot
+      where not exists (select 1 from typed_count_accuracy typed where typed.store_id = snapshot.store_id)
     ), accuracy_components as (
       select typed.store_id, typed.variance, typed.baseline, typed.line_count
       from typed_count_accuracy typed
@@ -204,10 +230,7 @@ export async function getInventoryDomain(scope: AnalyticsScope): Promise<Invento
             when abs(line.physical_quantity - line.system_quantity) <= greatest(1, round(line.system_quantity * 0.05)) then 3
             else 4
           end as sort
-        from stock_counts count
-        join stock_count_lines line on line.stock_count_id = count.id
-        where count.status = 'approved'
-          and count.business_date between ${scope.from}::date and ${scope.to}::date ${countStore}
+        from accuracy_rows line
       ) bucket
       group by bucket.name, bucket.sort
     ), movement_summary as (
@@ -347,7 +370,7 @@ export async function getInventoryDomain(scope: AnalyticsScope): Promise<Invento
           'status', item.status
         )) from replenishment_rows item
       ), '[]'::jsonb),
-      'valueByBrand', coalesce((select jsonb_agg(jsonb_build_object('name', item.name, 'value', round(item.value, 2)::float8) order by item.value desc) from receipt_brand_rows item), '[]'::jsonb),
+      'valueByBrand', coalesce((select jsonb_agg(jsonb_build_object('name', item.name, 'value', round(item.value, 2)::float8) order by item.value desc) from inventory_value_by_brand item), '[]'::jsonb),
       'receiptValueTrend', coalesce((select jsonb_agg(jsonb_build_object('date', item.date, 'value', round(item.value, 2)::float8) order by item.date) from receipt_trend_rows item), '[]'::jsonb),
       'accuracyDistribution', coalesce((select jsonb_agg(jsonb_build_object('name', item.name, 'value', item.value) order by item.sort) from accuracy_distribution item), '[]'::jsonb),
       'movement', jsonb_build_object(
