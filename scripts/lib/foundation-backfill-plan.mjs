@@ -7,6 +7,15 @@ const PAYMENT_FIELDS = [
   ['pos-omnibsic', 'pay_pos_omnibsic', 'POS OmniBSIC'],
 ];
 
+// Historical organization settings contain two retired store aliases and two
+// values that were accidentally saved as category relationships. Normalize the
+// aliases for migration input only; the legacy settings row remains unchanged.
+const LEGACY_STORE_ALIASES = new Map([
+  ['bw-dzorwulu', 'dzorwulu-women'],
+  ['bw-labone', 'labone-women'],
+]);
+const LEGACY_IGNORED_RELATIONSHIP_CODES = new Set(['a', 'd']);
+
 const clean = (value) => String(value ?? '').trim();
 
 function validDate(value) {
@@ -96,14 +105,19 @@ export function buildFoundationCatalog(org) {
     if (!code || !name) masterDataBlockers.push(`expense:${code || '(blank)'}`);
     return [{ code, name, group, sort_order: sortOrder }];
   });
-  const brandStores = Object.entries(org?.brandStores ?? {}).flatMap(([brandCode, storeCodes]) =>
-    (Array.isArray(storeCodes) ? storeCodes : []).map((storeCode) => ({ brandCode: clean(brandCode), storeCode: clean(storeCode) }))
+  const brandStores = Object.entries(org?.brandStores ?? {}).flatMap(([brandCode, relatedStoreCodes]) =>
+    (Array.isArray(relatedStoreCodes) ? relatedStoreCodes : []).flatMap((storeCode) => {
+      const rawCode = clean(storeCode);
+      if (LEGACY_IGNORED_RELATIONSHIP_CODES.has(rawCode)) return [];
+      return [{ brandCode: clean(brandCode), storeCode: LEGACY_STORE_ALIASES.get(rawCode) ?? rawCode }];
+    })
   );
   const brandCategories = Object.entries(org?.brandCategories ?? {}).flatMap(([brandCode, categoryCodes]) =>
-    (Array.isArray(categoryCodes) ? categoryCodes : []).map((categoryCode) => ({
-      brandCode: clean(brandCode),
-      categoryCode: clean(categoryCode),
-    }))
+    (Array.isArray(categoryCodes) ? categoryCodes : []).flatMap((categoryCode) => {
+      const rawCode = clean(categoryCode);
+      if (LEGACY_IGNORED_RELATIONSHIP_CODES.has(rawCode)) return [];
+      return [{ brandCode: clean(brandCode), categoryCode: rawCode }];
+    })
   );
   const relationshipBlockers = [
     ...brandStores

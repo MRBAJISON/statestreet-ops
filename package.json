@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:local": "agent-secret run AUTH_SECRET statestreet.local.auth_secret -- node scripts/run-local.mjs",
-    "vercel-build": "node scripts/vercel-release-probe.mjs && next build",
+    "vercel-build": "node scripts/vercel-release-runner.mjs && node scripts/vercel-release-probe.mjs && next build",
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings=0",
@@ -24,6 +24,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:plan-backfill": "node scripts/plan-foundation-backfill.mjs",
     "db:backfill:daily": "node scripts/backfill-daily-reports.mjs",
+    "db:backfill:legacy": "node scripts/backfill-legacy-workflows.mjs",
     "db:seed:foundation": "node scripts/seed-foundation-catalog.mjs",
     "db:seed:foundation:apply": "node scripts/seed-foundation-catalog.mjs --apply",
     "db:push": "drizzle-kit push",

@@ -12,7 +12,7 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import { users } from './schema';
+import { entries, users } from './schema';
 import {
   brands,
   categories,
@@ -140,6 +140,11 @@ export const productInsights = pgTable(
     performance: text('performance'),
     campaign: text('campaign'),
     insight: text('insight'),
+    unitsSold: integer('units_sold'),
+    currentStock: integer('current_stock'),
+    sellThroughPercent: percentage('sell_through_percent'),
+    salesValue: money('sales_value'),
+    daysInStock: integer('days_in_stock'),
     ...actors(),
     ...timestamps(),
   },
@@ -151,6 +156,67 @@ export const productInsights = pgTable(
     check(
       'product_insights_performance_check',
       sql`${t.performance} is null or ${t.performance} in ('strong', 'steady', 'underperforming')`
+    ),
+    check(
+      'product_insights_metrics_check',
+      sql`(${t.unitsSold} is null or ${t.unitsSold} >= 0) and (${t.currentStock} is null or ${t.currentStock} >= 0) and (${t.sellThroughPercent} is null or ${t.sellThroughPercent} between 0 and 100) and (${t.salesValue} is null or ${t.salesValue} >= 0) and (${t.daysInStock} is null or ${t.daysInStock} >= 0)`
+    ),
+  ]
+);
+
+export const inventorySummarySnapshots = pgTable(
+  'inventory_summary_snapshots',
+  {
+    id: id(),
+    businessDate: date('business_date').notNull(),
+    storeId: bigint('store_id', { mode: 'number' })
+      .notNull()
+      .references(() => stores.id, { onDelete: 'restrict' }),
+    systemQuantity: integer('system_quantity').notNull(),
+    physicalQuantity: integer('physical_quantity').notNull(),
+    stockValue: money('stock_value').notNull().default('0'),
+    countedByName: text('counted_by_name'),
+    notes: text('notes'),
+    ...actors(),
+    ...timestamps(),
+  },
+  (t) => [
+    uniqueIndex('inventory_summary_snapshots_store_date_uidx').on(t.storeId, t.businessDate),
+    index('inventory_summary_snapshots_date_idx').on(t.businessDate),
+    check(
+      'inventory_summary_snapshots_values_check',
+      sql`${t.systemQuantity} >= 0 and ${t.physicalQuantity} >= 0 and ${t.stockValue} >= 0`
+    ),
+  ]
+);
+
+export const legacyMigrationRecords = pgTable(
+  'legacy_migration_records',
+  {
+    entryId: integer('entry_id')
+      .primaryKey()
+      .references(() => entries.id, { onDelete: 'restrict' }),
+    disposition: text('disposition').notNull(),
+    targetType: text('target_type'),
+    targetId: bigint('target_id', { mode: 'number' }),
+    sourceCreatedAt: timestamp('source_created_at', { withTimezone: true }).notNull(),
+    sourcePayloadHash: text('source_payload_hash').notNull(),
+    note: text('note'),
+    migratedByUserId: integer('migrated_by_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    migratedAt: timestamp('migrated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('legacy_migration_records_disposition_idx').on(t.disposition, t.targetType),
+    index('legacy_migration_records_target_idx').on(t.targetType, t.targetId),
+    check(
+      'legacy_migration_records_disposition_check',
+      sql`${t.disposition} in ('converted', 'derived', 'retained', 'blocked')`
+    ),
+    check(
+      'legacy_migration_records_target_check',
+      sql`(${t.disposition} = 'converted' and ${t.targetType} is not null and ${t.targetId} is not null) or ${t.disposition} <> 'converted'`
     ),
   ]
 );

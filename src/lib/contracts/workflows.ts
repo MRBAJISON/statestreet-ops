@@ -13,6 +13,14 @@ const optionalDate = z.preprocess(
   (value) => (value === '' || value === null ? undefined : value),
   dateSchema.optional()
 );
+const optionalCount = z.preprocess(
+  (value) => (value === '' || value === null ? undefined : value),
+  z.number().int().min(0).max(100_000_000).optional()
+);
+const optionalPercent = z.preprocess(
+  (value) => (value === '' || value === null ? undefined : value),
+  z.number().min(0).max(100).optional()
+);
 const count = z.number().int().min(0).max(100_000_000);
 const score100 = z.number().int().min(0).max(100);
 
@@ -128,6 +136,11 @@ export const productInsightSchema = z.object({
   performance: z.enum(['strong', 'steady', 'underperforming']).optional(),
   campaign: optionalText(500),
   insight: optionalText(2000),
+  unitsSold: optionalCount,
+  currentStock: optionalCount,
+  sellThroughPercent: optionalPercent,
+  salesValue: optionalMoneySchema,
+  daysInStock: optionalCount,
 }).refine((value) => value.periodEnd >= value.periodStart, {
   path: ['periodEnd'],
   message: 'Period end cannot be before period start',

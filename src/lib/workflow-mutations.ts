@@ -301,7 +301,10 @@ export const WORKFLOW_HANDLERS: Record<WorkflowName, WorkflowHandler> = {
       values: {
         product_id: input.productId, period_start: input.periodStart, period_end: input.periodEnd,
         status: input.status, performance: input.performance ?? null, campaign: input.campaign ?? null,
-        insight: input.insight ?? null, ...upsertActors(actorUserId),
+        insight: input.insight ?? null, units_sold: input.unitsSold ?? null,
+        current_stock: input.currentStock ?? null, sell_through_percent: input.sellThroughPercent ?? null,
+        sales_value: input.salesValue ?? null, days_in_stock: input.daysInStock ?? null,
+        ...upsertActors(actorUserId),
       },
       preserveOnUpdate: ['created_by_user_id'],
     });

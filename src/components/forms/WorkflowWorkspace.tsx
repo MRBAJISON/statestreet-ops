@@ -24,12 +24,15 @@ import type {
   WorkflowOption,
   WorkflowShortcut,
 } from './workflow-config';
+import {
+  buildWorkflowPayload,
+  workflowFieldIsVisible,
+  type FormValue,
+  type FormValues,
+} from './workflow-payload';
 import { WorkflowLifecycle } from './WorkflowLifecycle';
 import { ProductCombobox } from './ProductCombobox';
 import { customerContactRetentionWindow } from '@/lib/customer-contact-retention';
-
-type FormValue = string | boolean;
-type FormValues = Record<string, FormValue>;
 
 const TONE_STYLES: Record<WorkflowDefinition['tone'], string> = {
   blue: 'bg-chart-1/12 text-chart-1',
@@ -98,37 +101,6 @@ function referenceOptions(source: ReferenceSource, references: ReferenceDataResp
   }
 }
 
-function fieldIsVisible(field: WorkflowFieldDefinition, values: FormValues) {
-  if (!field.showWhen) return true;
-  const current = values[field.showWhen.field];
-  if (field.showWhen.equals !== undefined) return current === field.showWhen.equals;
-  if (field.showWhen.truthy) return Boolean(current);
-  return true;
-}
-
-function buildPayload(definition: WorkflowDefinition, values: FormValues) {
-  const payload: Record<string, unknown> = {};
-  for (const field of definition.fields) {
-    if (!fieldIsVisible(field, values)) continue;
-    const value = values[field.name];
-    if (field.type === 'switch') {
-      payload[field.name] = Boolean(value);
-      continue;
-    }
-    if (value === '' || value === undefined) continue;
-    if (['number', 'money', 'score', 'product'].includes(field.type) || field.reference) {
-      payload[field.name] = Number(value);
-      continue;
-    }
-    if (field.type === 'datetime') {
-      payload[field.name] = new Date(String(value)).toISOString();
-      continue;
-    }
-    payload[field.name] = value;
-  }
-  return payload;
-}
-
 async function responseError(response: Response) {
   const payload = (await response.json().catch(() => null)) as { error?: string } | null;
   return payload?.error ?? 'The record could not be saved';
@@ -151,7 +123,7 @@ function WorkflowField({
   error?: string;
   onChange: (value: FormValue) => void;
 }) {
-  if (!fieldIsVisible(field, values) || field.hidden) return null;
+  if (!workflowFieldIsVisible(field, values) || field.hidden) return null;
   const id = `workflow-${field.name}`;
   const invalid = Boolean(error);
 
@@ -263,7 +235,7 @@ function WorkflowSheet({
     event.preventDefault();
     const nextErrors: Record<string, string> = {};
     for (const field of definition!.fields) {
-      if (field.required && fieldIsVisible(field, values) && values[field.name] === '') {
+      if (field.required && workflowFieldIsVisible(field, values) && values[field.name] === '') {
         nextErrors[field.name] = `${field.label} is required`;
       }
     }
@@ -279,7 +251,7 @@ function WorkflowSheet({
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildPayload(definition!, values)),
+        body: JSON.stringify(buildWorkflowPayload(definition!, values)),
       });
       if (!response.ok) throw new Error(await responseError(response));
       toast.success(definition!.successMessage ?? `${definition!.title} saved`);

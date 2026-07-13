@@ -43,6 +43,11 @@ async function deactivateMissing(table, codes) {
 try {
   await client.connect();
   await client.query('set statement_timeout = 30000');
+  if (apply) {
+    await client.query('begin');
+    await client.query(`select pg_advisory_xact_lock(hashtext('statestreet-foundation-catalog-v1'))`);
+    await client.query('lock table entries in share mode');
+  }
   const orgResult = await client.query(
     `select payload from entries
      where department = 'admin' and form_type = 'org-settings'
@@ -68,8 +73,6 @@ try {
     console.log('Preview only. Re-run with --apply after reviewing this output.');
   } else {
     if (blockerCount) throw new Error('Catalog contains unresolved mappings; apply was refused.');
-    await client.query('begin');
-    await client.query(`select pg_advisory_xact_lock(hashtext('statestreet-foundation-catalog-v1'))`);
     await upsertSimple('stores', catalog.stores, ['code', 'name', 'active'], 'name = excluded.name, active = excluded.active');
     await upsertSimple('brands', catalog.brands, ['code', 'name'], 'name = excluded.name, active = true');
     await upsertSimple(

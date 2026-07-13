@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { entries } from '@/lib/db/schema';
+import { legacyMigrationRecords } from '@/lib/db/operational-schema';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { isAudited, recordAudit } from '@/lib/audit';
 import { getSession } from '@/lib/auth';
@@ -19,6 +20,13 @@ export async function POST(req: NextRequest) {
     const session = await getSession();
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const [migration] = await db
+      .select({ entryId: legacyMigrationRecords.entryId })
+      .from(legacyMigrationRecords)
+      .limit(1);
+    if (migration) {
+      return NextResponse.json({ error: 'Legacy entry writes are closed after migration' }, { status: 409 });
     }
     const body = await req.json();
     const { department, formType, payload } = body ?? {};

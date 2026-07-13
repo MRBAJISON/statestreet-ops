@@ -322,7 +322,10 @@ const SHEETS: Record<ExportSheetKey, Omit<ExportSheetDefinition, 'key'>> = {
     columns: [
       col('periodStart', 'Period Start', 14), col('periodEnd', 'Period End', 14), col('sku', 'SKU', 16),
       col('product', 'Product', 26), col('brand', 'Brand', 20), col('category', 'Category', 20),
-      col('status', 'Status', 14), col('performance', 'Performance', 16), col('campaign', 'Campaign', 24), col('insight', 'Insight', 38),
+      col('status', 'Status', 14), col('performance', 'Performance', 16), col('unitsSold', 'Units Sold', 12, 'integer'),
+      col('currentStock', 'Current Stock', 14, 'integer'), col('sellThroughPercent', 'Sell-through %', 16, 'decimal'),
+      col('salesValue', 'Sales Value', 16, 'currency'), col('daysInStock', 'Days in Stock', 14, 'integer'),
+      col('campaign', 'Campaign', 24), col('insight', 'Insight', 38),
     ],
   },
   targets: {
@@ -1052,6 +1055,11 @@ export async function loadTypedExportRows(
         category: categories.name,
         status: productInsights.status,
         performance: productInsights.performance,
+        unitsSold: productInsights.unitsSold,
+        currentStock: productInsights.currentStock,
+        sellThroughPercent: sql<number | null>`${productInsights.sellThroughPercent}::float8`,
+        salesValue: sql<number | null>`${productInsights.salesValue}::float8`,
+        daysInStock: productInsights.daysInStock,
         campaign: productInsights.campaign,
         insight: productInsights.insight,
       })

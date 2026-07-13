@@ -10,6 +10,7 @@ export async function getCommercialDomain(scope: AnalyticsScope): Promise<Commer
   const interactionStore = scope.store ? sql`and interaction.store_id = ${scope.store.id}` : sql``;
   const actionStore = scope.store ? sql`and action.store_id = ${scope.store.id}` : sql``;
   const receiptStore = scope.store ? sql`and receipt.receiving_store_id = ${scope.store.id}` : sql``;
+  const useGroupInsights = scope.store ? sql`false` : sql`true`;
 
   const result = await db.execute(sql`
     with product_balance as (
@@ -33,10 +34,10 @@ export async function getCommercialDomain(scope: AnalyticsScope): Promise<Commer
         product.name,
         brand.name as brand_name,
         category.name as category_name,
-        coalesce(sales.units_sold, 0) as units_sold,
-        coalesce(balance.units, 0) as stock,
-        coalesce(balance.units, 0) * coalesce(product.unit_cost, 0) as stock_value,
-        (${scope.to}::date - balance.last_movement)::integer as days_since_movement,
+        coalesce(sales.units_sold, insight_metrics.units_sold, 0) as units_sold,
+        coalesce(balance.units, insight_metrics.current_stock, 0) as stock,
+        coalesce(balance.units, insight_metrics.current_stock, 0) * coalesce(product.unit_cost, 0) as stock_value,
+        coalesce((${scope.to}::date - balance.last_movement)::integer, insight_metrics.days_in_stock) as days_since_movement,
         insight.status,
         insight.performance,
         insight.campaign,
@@ -52,9 +53,21 @@ export async function getCommercialDomain(scope: AnalyticsScope): Promise<Commer
         where product_insight.product_id = product.id and product_insight.period_start <= ${scope.to}::date
         order by product_insight.period_end desc, product_insight.id desc
         limit 1
-      ) insight on true
-      where product.active = true and (coalesce(sales.units_sold, 0) > 0 or coalesce(balance.units, 0) > 0)
-      order by coalesce(sales.units_sold, 0) desc, stock_value desc
+      ) insight on ${useGroupInsights}
+      left join lateral (
+        select product_insight.units_sold, product_insight.current_stock, product_insight.days_in_stock
+        from product_insights product_insight
+        where product_insight.product_id = product.id
+          and product_insight.period_start <= ${scope.to}::date
+          and product_insight.period_end >= ${scope.from}::date
+        order by product_insight.period_end desc, product_insight.id desc
+        limit 1
+      ) insight_metrics on ${useGroupInsights}
+      where product.active = true and (
+        coalesce(sales.units_sold, insight_metrics.units_sold, 0) > 0 or
+        coalesce(balance.units, insight_metrics.current_stock, 0) > 0 or insight.status is not null
+      )
+      order by coalesce(sales.units_sold, insight_metrics.units_sold, 0) desc, stock_value desc
       limit 15
     ), review_rows as (
       select

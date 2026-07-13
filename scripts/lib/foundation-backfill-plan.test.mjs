@@ -110,4 +110,21 @@ describe('foundation backfill planner', () => {
       relationships: [],
     });
   });
+
+  it('normalizes the known historical relationship aliases without changing master codes', () => {
+    const plan = buildFoundationBackfillPlan({
+      ...org,
+      stores: [
+        ...org.stores,
+        { value: 'dzorwulu-women', label: 'Dzorwulu Women' },
+        { value: 'labone-women', label: 'Labone Women' },
+      ],
+      brandStores: { 'boulevard-men': ['a'], 'boulevard-women': ['bw-dzorwulu', 'bw-labone'] },
+      brandCategories: { 'boulevard-men': ['a'], 'boulevard-women': ['formal-shirts', 'd'] },
+      brands: [...org.brands, { value: 'boulevard-women', label: 'Boulevard Women' }],
+    }, []);
+
+    expect(plan.blockers.relationships).toEqual([]);
+    expect(plan.masters).toMatchObject({ stores: 3, brands: 2, categories: 1 });
+  });
 });

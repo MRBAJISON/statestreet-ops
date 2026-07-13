@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { entries } from '@/lib/db/schema';
+import { legacyMigrationRecords } from '@/lib/db/operational-schema';
 import { eq } from 'drizzle-orm';
 import { isAudited, recordAudit, diffPayload } from '@/lib/audit';
 import { getSession } from '@/lib/auth';
@@ -9,6 +10,15 @@ import { canMutateLegacyEntry } from '@/lib/entry-permissions';
 function parseId(v: string): number | null {
   const n = Number(v);
   return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+async function isMigratedEntry(entryId: number) {
+  const [migration] = await db
+    .select({ entryId: legacyMigrationRecords.entryId })
+    .from(legacyMigrationRecords)
+    .where(eq(legacyMigrationRecords.entryId, entryId))
+    .limit(1);
+  return Boolean(migration);
 }
 
 // Update an entry's payload.
@@ -26,6 +36,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     const [before] = await db.select().from(entries).where(eq(entries.id, numId));
     if (!before) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (await isMigratedEntry(numId)) {
+      return NextResponse.json({ error: 'Migrated legacy entries are immutable' }, { status: 409 });
+    }
     if (!canMutateLegacyEntry(session.user, before, 'update')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -53,6 +66,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     if (!numId) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
     const [before] = await db.select().from(entries).where(eq(entries.id, numId));
     if (!before) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (await isMigratedEntry(numId)) {
+      return NextResponse.json({ error: 'Migrated legacy entries are immutable' }, { status: 409 });
+    }
     if (!canMutateLegacyEntry(session.user, before, 'delete')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

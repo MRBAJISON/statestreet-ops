@@ -42,6 +42,7 @@ npm run build
 npm run verify:fast
 npm test
 npm run db:generate
+npm run db:backfill:legacy
 ```
 
 Database setup:

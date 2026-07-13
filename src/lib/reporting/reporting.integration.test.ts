@@ -203,6 +203,39 @@ describeWithDatabase('reporting SQL integration', () => {
     await expect(getLegacyBackfillStatus()).resolves.toEqual({ ready: true, remainingEntries: 0 });
   });
 
+  it('makes ledgered legacy source rows immutable', async () => {
+    const entryId = Number(
+      (await client.query(
+        `insert into entries (department, form_type, payload)
+         values ('marketing', 'campaign', '{"name":"Frozen source"}'::jsonb)
+         returning id`
+      )).rows[0].id
+    );
+    await client.query(
+      `insert into legacy_migration_records (
+         entry_id, disposition, source_created_at, source_payload_hash, migrated_by_user_id
+       ) select id, 'retained', created_at, repeat('0', 64), $2 from entries where id = $1`,
+      [entryId, userId]
+    );
+
+    await expect(client.query(`update entries set payload = '{"name":"Changed"}'::jsonb where id = $1`, [entryId]))
+      .rejects.toMatchObject({ code: '55000' });
+    await expect(client.query('delete from entries where id = $1', [entryId]))
+      .rejects.toMatchObject({ code: '55000' });
+    await expect(client.query(
+      `update legacy_migration_records set note = 'Changed' where entry_id = $1`,
+      [entryId]
+    )).rejects.toMatchObject({ code: '55000' });
+    await expect(client.query('delete from legacy_migration_records where entry_id = $1', [entryId]))
+      .rejects.toMatchObject({ code: '55000' });
+    await expect(client.query(
+      `insert into entries (department, form_type, payload)
+       values ('marketing', 'campaign', '{"name":"Late source"}'::jsonb)`
+    )).rejects.toMatchObject({ code: '55000' });
+    await expect(client.query('select id from entries where id = $1', [entryId]))
+      .resolves.toMatchObject({ rowCount: 1 });
+  });
+
   it('scopes activity to events associated with the selected store', async () => {
     const otherStoreId = Number(
       (await client.query(`insert into stores (code, name) values ('other-store', 'Other Store') returning id`)).rows[0].id
@@ -234,5 +267,126 @@ describeWithDatabase('reporting SQL integration', () => {
     });
 
     expect(activity.map((event) => event.entityId)).toEqual([904, 902, 901]);
+  });
+
+  it('uses the latest aggregate inventory snapshot when product movements do not exist', async () => {
+    const snapshotOnlyStoreId = Number(
+      (await client.query(`insert into stores (code, name) values ('snapshot-only', 'Snapshot Only') returning id`)).rows[0].id
+    );
+    await client.query(
+      `insert into inventory_summary_snapshots (
+         business_date, store_id, system_quantity, physical_quantity, stock_value,
+         created_by_user_id, updated_by_user_id
+       ) values
+         ('2026-07-12', $1, 100, 98, 15000, $3, $3),
+         ('2026-07-12', $2, 50, 50, 5000, $3, $3)`,
+      [storeId, snapshotOnlyStoreId, userId]
+    );
+    const { getInventoryDomain } = await import('./inventory');
+    const inventory = await getInventoryDomain({
+      preset: 'custom',
+      from: '2026-07-01',
+      to: '2026-07-31',
+      compareFrom: '2026-06-01',
+      compareTo: '2026-06-30',
+      store: { id: storeId, code: 'multi-brand', name: 'Multi Brand Store' },
+    });
+
+    expect(inventory.summary).toMatchObject({ unitsOnHand: 98, inventoryValue: 15000, stockAccuracy: 98 });
+    expect(inventory.stock).toEqual([]);
+
+    const productId = Number(
+      (await client.query(
+        `insert into products (sku, name, brand_id, category_id, unit_cost, created_by_user_id, updated_by_user_id)
+         values ('INV-MIXED', 'Mixed Coverage', (select min(id) from brands),
+           (select min(id) from categories), 10, $1, $1)
+         returning id`,
+        [userId]
+      )).rows[0].id
+    );
+    await client.query(
+      `insert into inventory_movements (
+         business_date, product_id, store_id, movement_type, quantity, unit_cost,
+         source_type, created_by_user_id
+       ) values
+         ('2026-07-11', $1, $2, 'opening-balance', 100, 10, 'test', $3),
+         ('2026-07-12', $1, $2, 'count-adjustment', 2, 10, 'test', $3),
+         ('2026-07-13', $1, $2, 'receipt', 3, 10, 'test', $3)`,
+      [productId, storeId, userId]
+    );
+    const mixed = await getInventoryDomain({
+      preset: 'custom', from: '2026-07-01', to: '2026-07-31',
+      compareFrom: '2026-06-01', compareTo: '2026-06-30', store: null,
+    });
+    expect(mixed.summary).toMatchObject({ unitsOnHand: 153, inventoryValue: 20050 });
+    expect(mixed.stock).toEqual([]);
+
+    const scopedMixed = await getInventoryDomain({
+      preset: 'custom', from: '2026-07-01', to: '2026-07-31',
+      compareFrom: '2026-06-01', compareTo: '2026-06-30',
+      store: { id: storeId, code: 'multi-brand', name: 'Multi Brand Store' },
+    });
+    expect(scopedMixed.summary).toMatchObject({ unitsOnHand: 103, inventoryValue: 15050 });
+    expect(scopedMixed.stock).toEqual([]);
+
+    const nextMonth = await getInventoryDomain({
+      preset: 'custom', from: '2026-08-01', to: '2026-08-31',
+      compareFrom: '2026-07-01', compareTo: '2026-07-31', store: null,
+    });
+    expect(nextMonth.summary).toMatchObject({ unitsOnHand: 153, inventoryValue: 20050, stockAccuracy: 0 });
+  });
+
+  it('uses overlapping product insight metrics only for group reporting', async () => {
+    const productId = Number(
+      (await client.query(
+        `insert into products (sku, name, brand_id, category_id, unit_cost, created_by_user_id, updated_by_user_id)
+         values ('INSIGHT-SCOPE', 'Insight Scope', (select min(id) from brands),
+           (select min(id) from categories), 20, $1, $1)
+         returning id`,
+        [userId]
+      )).rows[0].id
+    );
+    await client.query(
+      `insert into product_insights (
+         product_id, period_start, period_end, status, units_sold, current_stock, days_in_stock,
+         created_by_user_id, updated_by_user_id
+       ) values
+         ($1, '2026-06-01', '2026-06-30', 'slow', 99, 88, 60, $2, $2),
+         ($1, '2026-07-01', '2026-07-31', 'active', 7, 6, 12, $2, $2)`,
+      [productId, userId]
+    );
+    const { getCommercialDomain } = await import('./commercial');
+    const baseScope = {
+      preset: 'custom' as const,
+      from: '2026-07-01',
+      to: '2026-07-31',
+      compareFrom: '2026-06-01',
+      compareTo: '2026-06-30',
+    };
+    const [group, store] = await Promise.all([
+      getCommercialDomain({ ...baseScope, store: null }),
+      getCommercialDomain({
+        ...baseScope,
+        store: { id: storeId, code: 'multi-brand', name: 'Multi Brand Store' },
+      }),
+    ]);
+
+    expect(group.productVelocity.find((product) => product.id === productId)).toMatchObject({
+      unitsSold: 7,
+      stock: 6,
+      daysSinceMovement: 12,
+    });
+    expect(store.productVelocity.find((product) => product.id === productId)).toBeUndefined();
+
+    const august = await getCommercialDomain({
+      ...baseScope,
+      from: '2026-08-01',
+      to: '2026-08-31',
+      store: null,
+    });
+    expect(august.productVelocity.find((product) => product.id === productId)).toMatchObject({
+      unitsSold: 0,
+      stock: 0,
+    });
   });
 });

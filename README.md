@@ -101,13 +101,16 @@ environment, then apply reviewed migrations:
 npm run db:migrate
 npm run db:seed:foundation
 npm run db:seed:foundation:apply
+npm run db:backfill:daily
+npm run db:backfill:legacy
 npm run dev
 ```
 
 The first foundation command is a read-only preview. Review its blockers and counts before running
 the explicit apply command. Typed analytics return `LEGACY_BACKFILL_REQUIRED` while any historical
 daily-report source remains unlinked, so an upgrade cannot silently replace live trading history
-with empty charts. Non-trading legacy workflows remain separate release-checklist items.
+with empty charts. The legacy-workflow command previews the remaining typed conversions and refuses
+to apply while any source row lacks an approved mapping.
 
 Do not point development commands at production. Do not use `db:push` as a production migration
 strategy.
@@ -118,6 +121,7 @@ strategy.
 - `npm run db:migrate` - apply versioned migrations
 - `npm run db:plan-backfill` - inspect legacy-to-typed backfill coverage without writing
 - `npm run db:backfill:daily` - preview the idempotent daily-report conversion
+- `npm run db:backfill:legacy` - preview all remaining legacy workflow conversions and migration-ledger coverage
 - `npm run db:seed:foundation` - preview foundation catalog conversion
 - `npm run db:seed:foundation:apply` - apply a reviewed foundation catalog conversion
 - `npm run db:studio` - inspect the configured database

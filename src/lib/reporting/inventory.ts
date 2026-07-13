@@ -12,6 +12,7 @@ export async function getInventoryDomain(scope: AnalyticsScope): Promise<Invento
     : sql``;
   const replenishmentStore = scope.store ? sql`and request.store_id = ${scope.store.id}` : sql``;
   const countStore = scope.store ? sql`and count.store_id = ${scope.store.id}` : sql``;
+  const summaryStore = scope.store ? sql`and snapshot.store_id = ${scope.store.id}` : sql``;
   const dispositionStore = scope.store ? sql`and disposition.store_id = ${scope.store.id}` : sql``;
 
   const result = await db.execute(sql`
@@ -27,6 +28,7 @@ export async function getInventoryDomain(scope: AnalyticsScope): Promise<Invento
     ), stock_rows as (
       select
         balance.product_id,
+        balance.store_id,
         product.sku,
         product.name as product_name,
         store.name as store_name,
@@ -43,6 +45,53 @@ export async function getInventoryDomain(scope: AnalyticsScope): Promise<Invento
       join products product on product.id = balance.product_id and product.active = true
       join stores store on store.id = balance.store_id and store.active = true
       where balance.units >= 0
+    ), latest_summary_rows as (
+      select distinct on (snapshot.store_id)
+        snapshot.store_id, snapshot.business_date, snapshot.system_quantity, snapshot.physical_quantity,
+        snapshot.stock_value, snapshot.created_at
+      from inventory_summary_snapshots snapshot
+      where snapshot.business_date <= ${scope.to}::date ${summaryStore}
+      order by snapshot.store_id, snapshot.business_date desc, snapshot.id desc
+    ), summary_movement_deltas as (
+      select
+        snapshot.store_id,
+        coalesce(sum(movement.quantity), 0)::integer as units,
+        coalesce(sum(movement.quantity * coalesce(movement.unit_cost, product.unit_cost, 0)), 0) as value
+      from latest_summary_rows snapshot
+      left join inventory_movements movement on movement.store_id = snapshot.store_id
+        and movement.business_date <= ${scope.to}::date
+        and (
+          movement.business_date > snapshot.business_date or
+          (movement.business_date = snapshot.business_date and movement.created_at > snapshot.created_at)
+        )
+      left join products product on product.id = movement.product_id
+      group by snapshot.store_id
+    ), summary_stock_rows as (
+      select
+        snapshot.store_id,
+        (snapshot.physical_quantity + delta.units)::integer as units,
+        snapshot.stock_value + delta.value as value
+      from latest_summary_rows snapshot
+      join summary_movement_deltas delta on delta.store_id = snapshot.store_id
+    ), movement_only_stock_rows as (
+      select stock.*
+      from stock_rows stock
+      where not exists (select 1 from latest_summary_rows snapshot where snapshot.store_id = stock.store_id)
+    ), latest_accuracy_summary_rows as (
+      select distinct on (snapshot.store_id)
+        snapshot.store_id, snapshot.system_quantity, snapshot.physical_quantity
+      from inventory_summary_snapshots snapshot
+      where snapshot.business_date between ${scope.from}::date and ${scope.to}::date ${summaryStore}
+      order by snapshot.store_id, snapshot.business_date desc, snapshot.id desc
+    ), stock_summary as (
+      select
+        (coalesce((select sum(stock.units) from movement_only_stock_rows stock), 0) +
+          coalesce((select sum(snapshot.units) from summary_stock_rows snapshot), 0))::integer as units,
+        coalesce((select sum(stock.value) from movement_only_stock_rows stock), 0) +
+          coalesce((select sum(snapshot.value) from summary_stock_rows snapshot), 0) as value,
+        (select count(*) from movement_only_stock_rows stock where stock.risk in ('critical', 'low'))::integer as low_stock_products,
+        coalesce((select round(100 * sum(stock.value) filter (where stock.risk = 'slow') /
+          nullif(sum(stock.value), 0), 1) from movement_only_stock_rows stock), 0) as dead_stock_percent
     ), receipt_rows as (
       select
         receipt.id,
@@ -113,14 +162,32 @@ export async function getInventoryDomain(scope: AnalyticsScope): Promise<Invento
       where receipt.status = 'received'
         and receipt.business_date between ${scope.from}::date and ${scope.to}::date ${receiptStore}
       group by date_trunc('month', receipt.business_date)::date
-    ), count_accuracy as (
+    ), typed_count_accuracy as (
       select
-        coalesce(100.0 * (1 - sum(abs(line.physical_quantity - line.system_quantity))::numeric /
-          nullif(sum(greatest(line.system_quantity, 1)), 0)), 0) as accuracy
+        count.store_id,
+        sum(abs(line.physical_quantity - line.system_quantity))::numeric as variance,
+        sum(greatest(line.system_quantity, 1))::numeric as baseline,
+        count(*)::integer as line_count
       from stock_counts count
       join stock_count_lines line on line.stock_count_id = count.id
       where count.status = 'approved'
         and count.business_date between ${scope.from}::date and ${scope.to}::date ${countStore}
+      group by count.store_id
+    ), accuracy_components as (
+      select typed.store_id, typed.variance, typed.baseline, typed.line_count
+      from typed_count_accuracy typed
+      union all
+      select snapshot.store_id,
+        abs(snapshot.physical_quantity - snapshot.system_quantity)::numeric,
+        greatest(snapshot.system_quantity, 1)::numeric,
+        1
+      from latest_accuracy_summary_rows snapshot
+      where not exists (select 1 from typed_count_accuracy typed where typed.store_id = snapshot.store_id)
+    ), count_accuracy as (
+      select
+        coalesce(100.0 * (1 - sum(component.variance) / nullif(sum(component.baseline), 0)), 0) as accuracy,
+        coalesce(sum(component.line_count), 0)::integer as line_count
+      from accuracy_components component
     ), accuracy_distribution as (
       select bucket.name, bucket.sort, count(*)::integer as value
       from (
@@ -216,11 +283,14 @@ export async function getInventoryDomain(scope: AnalyticsScope): Promise<Invento
     )
     select jsonb_build_object(
       'summary', jsonb_build_object(
-        'unitsOnHand', coalesce(sum(stock.units), 0)::integer,
-        'inventoryValue', round(coalesce(sum(stock.value), 0), 2)::float8,
-        'stockAccuracy', coalesce(round((select accuracy from count_accuracy), 1), 0)::float8,
-        'deadStockPercent', coalesce(round(100 * sum(stock.value) filter (where stock.risk = 'slow') / nullif(sum(stock.value), 0), 1), 0)::float8,
-        'lowStockProducts', count(*) filter (where stock.risk in ('critical', 'low')),
+        'unitsOnHand', stock.units,
+        'inventoryValue', round(stock.value, 2)::float8,
+        'stockAccuracy', case
+          when (select line_count from count_accuracy) > 0 then round((select accuracy from count_accuracy), 1)::float8
+          else 0::float8
+        end,
+        'deadStockPercent', stock.dead_stock_percent::float8,
+        'lowStockProducts', stock.low_stock_products,
         'openReplenishments', (select count(*) from replenishment_rows),
         'inTransitTransfers', (select count from in_transit)
       ),
@@ -238,7 +308,7 @@ export async function getInventoryDomain(scope: AnalyticsScope): Promise<Invento
           case item.risk when 'critical' then 1 when 'low' then 2 when 'slow' then 3 else 4 end,
           item.value desc)
         from (
-          select * from stock_rows
+          select * from movement_only_stock_rows
           order by case risk when 'critical' then 1 when 'low' then 2 when 'slow' then 3 else 4 end, value desc
           limit 30
         ) item
@@ -312,11 +382,8 @@ export async function getInventoryDomain(scope: AnalyticsScope): Promise<Invento
         ) order by item.business_date desc, item.id desc) from receipt_issues item
       ), '[]'::jsonb)
     ) as data
-    from stock_rows stock
+    from stock_summary stock
     cross join movement_summary movement
-    group by
-      movement.received_units, movement.received_value, movement.transferred_units,
-      movement.transferred_value, movement.dead_stock_value, movement.counted_value
   `);
 
   return jsonResult<InventoryDomain>(result);

@@ -18,16 +18,12 @@ const databaseUrl = process.env.DATABASE_URL;
 const apply = process.argv.includes('--apply');
 const actorArgument = process.argv.find((argument) => argument.startsWith('--actor-email='));
 const actorEmail = actorArgument?.slice('--actor-email='.length).trim().toLowerCase();
+const SYSTEM_EMAIL = 'system-migration@statestreet.local';
 
 if (!databaseUrl) {
   console.error('DATABASE_URL is required.');
   process.exit(1);
 }
-if (apply && !actorEmail) {
-  console.error('--actor-email is required when --apply is used.');
-  process.exit(1);
-}
-
 const client = new pg.Client({ connectionString: databaseUrl });
 const clean = (value) => String(value ?? '').trim();
 const normalizedNumber = (value) => clean(value).replace(/[, ]/g, '');
@@ -282,20 +278,37 @@ async function applyPlan(plan, actorUserId) {
   return { reports: plan.reports.length, salesLines, paymentLines, links };
 }
 
+async function systemActor() {
+  const existing = await client.query('select id from users where lower(email) = $1 limit 1', [SYSTEM_EMAIL]);
+  if (existing.rowCount) return Number(existing.rows[0].id);
+  const created = await client.query(
+    `insert into users (name, email, password_hash, role, department, active)
+     values ('Data Migration', $1, 'disabled:disabled', 'owner', 'admin', false)
+     returning id`,
+    [SYSTEM_EMAIL]
+  );
+  return Number(created.rows[0].id);
+}
+
 try {
   await client.connect();
   await client.query('set statement_timeout = 60000');
   await client.query(apply ? 'begin' : 'begin read only');
   await client.query(`select pg_advisory_xact_lock(hashtext('statestreet-daily-report-backfill-v1'))`);
+  if (apply) await client.query('lock table entries in share mode');
   const plan = await buildPlan();
   let actorUserId = null;
   if (apply) {
-    const actor = await client.query(
-      `select id from users where lower(email) = $1 and active = true and role in ('owner', 'finance') limit 1`,
-      [actorEmail]
-    );
-    if (!actor.rowCount) plan.blockers.push('actor-email:not-an-active-owner-or-finance-user');
-    else actorUserId = Number(actor.rows[0].id);
+    if (actorEmail) {
+      const actor = await client.query(
+        `select id from users where lower(email) = $1 and active = true and role in ('owner', 'finance') limit 1`,
+        [actorEmail]
+      );
+      if (!actor.rowCount) plan.blockers.push('actor-email:not-an-active-owner-or-finance-user');
+      else actorUserId = Number(actor.rows[0].id);
+    } else {
+      actorUserId = await systemActor();
+    }
   }
   const summary = {
     apply,
@@ -316,7 +329,7 @@ try {
     console.log(JSON.stringify({ ...summary, applied }, null, 2));
   } else {
     console.log(JSON.stringify(summary, null, 2));
-    console.log('Preview only. Re-run with --apply and an explicit --actor-email after reviewing this output.');
+    console.log('Preview only. Re-run with --apply after reviewing this output.');
     await client.query('rollback');
   }
 } catch (error) {

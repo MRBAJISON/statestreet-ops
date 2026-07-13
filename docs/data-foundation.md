@@ -100,21 +100,40 @@ After the planner and foundation catalog are clean, preview the supported daily-
 npm run db:backfill:daily
 ```
 
-Apply requires an explicit active Owner or Finance account for migration provenance:
+Apply defaults to a disabled migration actor. An active Owner or Finance account can be supplied
+with `--actor-email` when a named migration actor is required:
 
 ```bash
-npm run db:backfill:daily -- --apply --actor-email=approved.account@example.com
+npm run db:backfill:daily -- --apply
 ```
 
 The command is transactional and idempotent through `daily_report_legacy_entries`. It refuses
 unknown references, invalid amounts, customer-count inconsistencies, and collisions with existing
-typed reports. It never invents a store, category, payment method, or actor.
+typed reports. It never invents a store, category, or payment method.
 
 The analytics API also checks this gate at runtime. If a legacy `finance/revenue` or
 `finance/closing` source is not linked to a typed daily report, it returns
-`LEGACY_BACKFILL_REQUIRED` instead of serving incomplete trading totals. Other legacy workflows are
-tracked separately in the production parity checklist and must be reconciled before their typed
-domain is released; they cannot be linked by the daily-report backfill.
+`LEGACY_BACKFILL_REQUIRED` instead of serving incomplete trading totals.
+
+Preview the remaining workflow conversion after the daily-report backfill:
+
+```bash
+npm run db:backfill:legacy
+```
+
+It validates every unmigrated `entries` row before writing. Apply uses a disabled system migration
+actor, writes typed records and `audit_events`, and records every source row in
+`legacy_migration_records` as converted, derived, or retained. The transaction is refused while
+any blocker remains. The approved mappings cover the form types observed in the production release
+snapshot; a new or previously unseen legacy form remains a hard blocker until its destination is
+reviewed. Unique typed destinations are insert-only during migration: an existing typed row or two
+legacy rows targeting the same unique key blocks the run instead of overwriting data. Same-day
+aggregate inventory counts are combined before that collision check, and inventory reporting treats
+the latest aggregate count as a baseline with only later movements applied. Apply transactions lock
+the legacy table while reading and converting it, so a concurrent legacy submission cannot be missed
+or copied from a stale payload. Once the ledger is populated, both the API and database reject new
+legacy writes as well as changes or deletion of migrated rows, so the raw evidence cannot drift from
+the typed copy during the deployment cutover.
 
 ## Release Order
 
@@ -122,8 +141,8 @@ domain is released; they cannot be linked by the daily-report backfill.
 2. Resolve every blocker and review the header-count correction.
 3. Create a Neon branch or backup and apply the versioned migrations there.
 4. Preview and apply the foundation catalog seed.
-5. Preview and apply the daily-report backfill with an approved migration actor.
-6. Re-run the planner and migration/constraint checks on the branch.
-7. Migrate one remaining UI workflow at a time; compare counts and money totals before
-   switching dashboard reads.
-8. Keep `entries` read-only after parity. Do not delete it during the UI rebuild.
+5. Preview and apply the daily-report backfill with the disabled migration actor.
+6. Preview and apply `db:backfill:legacy`; require zero blockers and full migration-ledger coverage.
+7. Re-run the planner, typed counts, money parity, and migration/constraint checks on the branch.
+8. Switch dashboard reads only after preview smoke tests pass.
+9. Keep `entries` read-only after parity. Do not delete it during the rollback window.
