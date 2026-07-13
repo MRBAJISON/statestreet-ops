@@ -5,6 +5,7 @@ import { Client } from 'pg';
 import {
   actionState,
   clean,
+  compareLegacyEntries,
   decimal,
   firstCode,
   legacyStockValue,
@@ -33,7 +34,13 @@ const client = new Client({ connectionString: databaseUrl });
 const SYSTEM_EMAIL = 'system-migration@statestreet.local';
 const PAYMENT_ALIASES = new Map([
   ['omnibsic', 'pos-omnibsic'],
+  ['omnibsic bank', 'pos-omnibsic'],
+  ['omnibsic pos', 'pos-omnibsic'],
+  ['pos omnibsic', 'pos-omnibsic'],
   ['umb', 'pos-umb'],
+  ['umb bank', 'pos-umb'],
+  ['umb pos', 'pos-umb'],
+  ['pos umb', 'pos-umb'],
   ['momo', 'mobile-money'],
   ['mobile money', 'mobile-money'],
   ['cheque', 'cheque'],
@@ -65,6 +72,10 @@ function block(blockers, entry, reason) {
 
 function operation(operations, entry, type, values) {
   operations.push({ entry, type, values });
+}
+
+function retain(operations, entry, reason) {
+  operation(operations, entry, 'retained', { note: `Not converted: ${reason}` });
 }
 
 async function loadContext() {
@@ -135,10 +146,7 @@ function buildProductSpecs(context, blockers) {
     const explicitBrand = reference(context.brands, payload.brand);
     const brandId = explicitBrand ? Number(explicitBrand.id) : storeBrandIds.length === 1 ? storeBrandIds[0] : null;
     const category = reference(context.categories, payload.category);
-    if (!sku || !name || !brandId || !category) {
-      block(blockers, entry, 'product classification is incomplete');
-      continue;
-    }
+    if (!sku || !name || !brandId || !category) continue;
     const normalizedSku = sku.toLowerCase();
     const existing = specs.get(normalizedSku);
     const typedProduct = context.products.get(normalizedSku);
@@ -215,25 +223,44 @@ function collapseInventorySummaries(operations) {
   return collapsed;
 }
 
-function addUniqueTargetBlockers(context, operations, blockers) {
+function resolveRepeatedUniqueTargets(context, operations, blockers) {
+  const unkeyed = [];
   const planned = new Map();
   for (const item of operations) {
     const tuple = operationNaturalKey(item);
-    if (!tuple) continue;
+    if (!tuple) {
+      unkeyed.push(item);
+      continue;
+    }
     const naturalKey = JSON.stringify(tuple);
-    const entries = item.sourceEntries ?? [item.entry];
+    const group = planned.get(naturalKey) ?? [];
+    group.push(item);
+    planned.set(naturalKey, group);
+  }
+
+  const resolved = [...unkeyed];
+  for (const [naturalKey, items] of planned) {
+    const entries = items.flatMap((item) => item.sourceEntries ?? [item.entry]);
     if (context.uniqueTargets.has(naturalKey)) {
       for (const entry of entries) block(blockers, entry, 'typed destination already exists for this natural key');
+      resolved.push(...items);
+      continue;
     }
-    const previous = planned.get(naturalKey);
-    if (previous) {
-      for (const entry of [...(previous.sourceEntries ?? [previous.entry]), ...entries]) {
-        block(blockers, entry, 'multiple legacy rows map to the same unique typed destination');
+    if (items.length === 1) {
+      resolved.push(items[0]);
+      continue;
+    }
+
+    const ordered = [...items].sort((left, right) => compareLegacyEntries(left.entry, right.entry));
+    const latest = ordered.at(-1);
+    resolved.push(latest);
+    for (const item of ordered.slice(0, -1)) {
+      for (const entry of item.sourceEntries ?? [item.entry]) {
+        retain(resolved, entry, `superseded by later ${item.type} entry ${latest.entry.id}`);
       }
-    } else {
-      planned.set(naturalKey, item);
     }
   }
+  return resolved;
 }
 
 function buildPlan(context) {
@@ -269,13 +296,17 @@ function buildPlan(context) {
       const paymentCode = PAYMENT_ALIASES.get(clean(payload.paymentMethod).toLowerCase()) ?? clean(payload.paymentMethod);
       const payment = paymentCode ? reference(context.paymentMethods, paymentCode) : null;
       const amount = money(payload.amount);
-      if (!validDate(businessDate) || !category || (clean(payload.store) && !store) || !amount || Number(amount) <= 0 || (paymentCode && !payment)) {
-        block(blockers, entry, 'expense has an invalid date, reference, payment method, or amount');
+      if (!validDate(businessDate) || !category || !amount || Number(amount) <= 0) {
+        retain(operations, entry, 'expense has an invalid date, category, or amount');
       } else operation(operations, entry, 'expense', {
         businessDate, expenseCategoryId: Number(category.id), storeId: store ? Number(store.id) : null,
         paymentMethodId: payment ? Number(payment.id) : null, amount,
         vendor: clean(payload.vendor) || null, invoiceReference: clean(payload.invoice) || null,
-        description: clean(payload.description) || clean(payload.vendor) || 'Legacy expense',
+        description: appendNote(
+          clean(payload.description) || clean(payload.vendor) || 'Legacy expense',
+          clean(payload.store) && !store && `Legacy store or department: ${clean(payload.store)}`,
+          paymentCode && !payment && `Legacy payment method: ${clean(payload.paymentMethod)}`
+        ),
         overspendReason: clean(payload.overspendReason) || null, createdAt,
       });
       continue;
@@ -285,7 +316,7 @@ function buildPlan(context) {
       const year = whole(payload.year);
       const category = reference(context.expenseCategories, payload.item);
       const amount = money(payload.amount);
-      if (!year || year < 2000 || year > 2200 || !category || !amount) block(blockers, entry, 'budget has an invalid year, category, or amount');
+      if (!year || year < 2000 || year > 2200 || !category || !amount) retain(operations, entry, 'budget has an invalid year, category, or amount');
       else operation(operations, entry, 'budget', {
         year, expenseCategoryId: Number(category.id), amount, notes: clean(payload.notes) || null, createdAt,
       });
@@ -297,7 +328,7 @@ function buildPlan(context) {
       const type = clean(payload.type).toLowerCase();
       const dueDate = clean(payload.dueDate);
       if (!['debtor', 'creditor'].includes(type) || !clean(payload.entity) || !amount || Number(amount) <= 0 || (dueDate && !validDate(dueDate))) {
-        block(blockers, entry, 'working-capital row has an invalid type, entity, amount, or due date');
+        retain(operations, entry, 'working-capital row has an invalid type, entity, amount, or due date');
       } else operation(operations, entry, 'working-capital', {
         type, entity: clean(payload.entity), amount, dueDate: dueDate || null,
         notes: appendNote(payload.notes, clean(payload.status) && `Legacy status: ${clean(payload.status)}`, clean(payload.ageDays) && `Legacy age: ${clean(payload.ageDays)} days`),
@@ -311,7 +342,7 @@ function buildPlan(context) {
       const periodEnd = clean(payload.weekEnd);
       const periodStart = weekStart(periodEnd);
       const value = money(payload.target);
-      if (!store || !periodStart || !value) block(blockers, entry, 'weekly target has an invalid store, week, or value');
+      if (!store || !periodStart || !value) retain(operations, entry, 'weekly target has an invalid store, week, or value');
       else operation(operations, entry, 'performance-target', {
         storeId: Number(store.id), periodStart, periodEnd, value, createdAt,
       });
@@ -334,9 +365,9 @@ function buildPlan(context) {
         [payload.daysInStock, daysInStock, () => true],
       ].some(([raw, parsed, valid]) => clean(raw) !== '' && (parsed === null || !valid(parsed)));
       const performance = clean(payload.performance) || null;
-      if (!spec || !period) block(blockers, entry, 'product insight cannot be classified');
+      if (!spec || !period) retain(operations, entry, 'product insight cannot be classified');
       else if (malformedMetrics || (performance && !['strong', 'steady', 'underperforming'].includes(performance))) {
-        block(blockers, entry, 'product insight has an invalid optional metric or performance value');
+        retain(operations, entry, 'product insight has an invalid optional metric or performance value');
       }
       else operation(operations, entry, 'product-insight', {
         spec, periodStart: period.start, periodEnd: period.end, status: productStatus(payload.status),
@@ -349,7 +380,7 @@ function buildPlan(context) {
 
     if (source === 'commercial/accountability') {
       const state = actionState(payload.status);
-      if (!clean(payload.member) || !clean(payload.kpi)) block(blockers, entry, 'accountability row is missing its owner or KPI');
+      if (!clean(payload.member) || !clean(payload.kpi)) retain(operations, entry, 'accountability row is missing its owner or KPI');
       else operation(operations, entry, 'action-item', {
         title: clean(payload.kpi), ownerName: clean(payload.member), status: state.status, priority: state.priority,
         detail: appendNote(clean(payload.role) && `Role: ${clean(payload.role)}`, clean(payload.target) && `Target: ${clean(payload.target)}`, clean(payload.actual) && `Actual: ${clean(payload.actual)}`, clean(payload.status) && `Legacy status: ${clean(payload.status)}`),
@@ -363,7 +394,7 @@ function buildPlan(context) {
       const businessDate = clean(payload.date);
       const phoneNormalized = normalizePhone(payload.number);
       if (!store || !validDate(businessDate) || !phoneNormalized || !clean(payload.name)) {
-        block(blockers, entry, 'customer capture has an invalid store, date, phone, or name');
+        retain(operations, entry, 'customer capture has an invalid store, date, phone, or name');
       } else operation(operations, entry, 'customer-interaction', {
         storeId: Number(store.id), businessDate, phoneNormalized, phone: clean(payload.number), name: clean(payload.name),
         occupation: clean(payload.occupation) || null, sizePreference: clean(payload.size) || null,
@@ -378,7 +409,7 @@ function buildPlan(context) {
       const store = reference(context.stores, payload.store);
       const businessDate = clean(payload.date);
       const scores = ['opsScore', 'vmScore', 'readinessScore', 'cxScore', 'cleanScore', 'safetyScore'].map((field) => score(payload[field]));
-      if (!store || !validDate(businessDate) || scores.some((value) => value === null)) block(blockers, entry, 'store standards row has an invalid store, date, or score');
+      if (!store || !validDate(businessDate) || scores.some((value) => value === null)) retain(operations, entry, 'store standards row has an invalid store, date, or score');
       else operation(operations, entry, 'store-standard', {
         storeId: Number(store.id), businessDate, scores, issues: clean(payload.issues) || null, createdAt,
       });
@@ -389,7 +420,7 @@ function buildPlan(context) {
       const store = reference(context.stores, payload.store);
       const businessDate = clean(payload.date);
       const scores = ['windowDisplay', 'mannequin', 'productPresentation', 'signage'].map((field) => score(payload[field]));
-      if (!store || !validDate(businessDate) || scores.some((value) => value === null)) block(blockers, entry, 'VM row has an invalid store, date, or score');
+      if (!store || !validDate(businessDate) || scores.some((value) => value === null)) retain(operations, entry, 'VM row has an invalid store, date, or score');
       else operation(operations, entry, 'vm-review', {
         storeId: Number(store.id), businessDate, scores, improvements: clean(payload.improvements) || null, createdAt,
       });
@@ -401,7 +432,7 @@ function buildPlan(context) {
       const businessDate = clean(payload.date);
       const estimatedCost = clean(payload.cost) ? money(payload.cost) : null;
       if (!store || !validDate(businessDate) || !clean(payload.description) || (clean(payload.cost) && !estimatedCost)) {
-        block(blockers, entry, 'maintenance row has an invalid store, date, description, or cost');
+        retain(operations, entry, 'maintenance row has an invalid store, date, description, or cost');
       } else operation(operations, entry, 'maintenance', {
         storeId: Number(store.id), businessDate, category: clean(payload.category) || 'other',
         priority: ['low', 'medium', 'high', 'critical'].includes(clean(payload.priority)) ? clean(payload.priority) : 'medium',
@@ -417,7 +448,7 @@ function buildPlan(context) {
       const store = reference(context.stores, payload.store);
       const businessDate = clean(payload.date);
       const compliance = score(payload.compliance);
-      if (!store || !validDate(businessDate) || compliance === null || !clean(payload.area)) block(blockers, entry, 'SOP row has an invalid store, date, area, or score');
+      if (!store || !validDate(businessDate) || compliance === null || !clean(payload.area)) retain(operations, entry, 'SOP row has an invalid store, date, area, or score');
       else operation(operations, entry, 'sop-review', {
         storeId: Number(store.id), businessDate, area: clean(payload.area), compliance,
         deviations: clean(payload.deviations) || null, corrective: clean(payload.corrective) || null, createdAt,
@@ -433,7 +464,7 @@ function buildPlan(context) {
       const punctuality = score(payload.punctuality);
       const training = score(payload.training);
       if (!store || !validDate(businessDate) || staffTotal === null || staffPresent === null || staffPresent > staffTotal || punctuality === null || training === null) {
-        block(blockers, entry, 'people row has an invalid store, date, count, or score');
+        retain(operations, entry, 'people row has an invalid store, date, count, or score');
       } else operation(operations, entry, 'people-snapshot', {
         storeId: Number(store.id), businessDate, staffTotal, staffPresent, punctuality, training,
         absenceReason: clean(payload.reason) || null,
@@ -450,7 +481,7 @@ function buildPlan(context) {
       const physicalQuantity = whole(payload.physicalQty);
       const stockValue = legacyStockValue(payload.stockValue, payload.unitValue, physicalQuantity);
       if (!store || !validDate(businessDate) || systemQuantity === null || physicalQuantity === null || !stockValue) {
-        block(blockers, entry, 'inventory summary has an invalid store, date, quantity, or value');
+        retain(operations, entry, 'inventory summary has an invalid store, date, quantity, or value');
       } else operation(operations, entry, 'inventory-summary', {
         storeId: Number(store.id), businessDate, systemQuantity, physicalQuantity, stockValue,
         countedByName: clean(payload.countedBy) || null, notes: clean(payload.notes) || null, createdAt,
@@ -469,7 +500,7 @@ function buildPlan(context) {
       const totalValue = clean(payload.totalValue) ? decimal(payload.totalValue) : null;
       const legacyUnitValue = clean(payload.unitValue) ? decimal(payload.unitValue) : null;
       if (!fromStore || !toStore || fromStore.id === toStore.id || !validDate(businessDate) || !quantity || quantity <= 0 || (!product && !spec) || (clean(payload.totalValue) && totalValue === null) || (clean(payload.unitValue) && legacyUnitValue === null)) {
-        block(blockers, entry, 'stock transfer has an invalid store, date, product, quantity, or value');
+        retain(operations, entry, 'stock transfer has an invalid store, date, product, quantity, or value');
       } else operation(operations, entry, 'stock-transfer', {
         fromStoreId: Number(fromStore.id), toStoreId: Number(toStore.id), businessDate, quantity,
         productId: product ? Number(product.id) : null, spec,
@@ -487,8 +518,8 @@ function buildPlan(context) {
   }
 
   const collapsedOperations = collapseInventorySummaries(operations);
-  addUniqueTargetBlockers(context, collapsedOperations, blockers);
-  return { operations: collapsedOperations, blockers, sourceEntries: context.entries.length, productSpecs };
+  const resolvedOperations = resolveRepeatedUniqueTargets(context, collapsedOperations, blockers);
+  return { operations: resolvedOperations, blockers, sourceEntries: context.entries.length, productSpecs };
 }
 
 async function systemActor() {
@@ -721,7 +752,13 @@ try {
       return counts;
     }, {})
   ).sort(([left], [right]) => left.localeCompare(right)));
-  const summary = { apply, sourceEntries: plan.sourceEntries, bySource, byOperation, blockers: plan.blockers };
+  const retainedReasons = Object.fromEntries(Object.entries(
+    plan.operations.filter((item) => item.type === 'retained').reduce((counts, item) => {
+      counts[item.values.note] = (counts[item.values.note] ?? 0) + (item.sourceEntries?.length ?? 1);
+      return counts;
+    }, {})
+  ).sort(([left], [right]) => left.localeCompare(right)));
+  const summary = { apply, sourceEntries: plan.sourceEntries, bySource, byOperation, retainedReasons, blockers: plan.blockers };
   if (plan.blockers.length) {
     console.log(JSON.stringify(summary, null, 2));
     throw new Error('Legacy workflow backfill was refused because review blockers remain.');

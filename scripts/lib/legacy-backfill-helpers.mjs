@@ -89,3 +89,10 @@ export function maintenanceStatus(value) {
 export function lifecycle(value) {
   return clean(value).toLowerCase().includes('buyer') ? 'buyer' : 'lead';
 }
+
+export function compareLegacyEntries(left, right) {
+  const leftTime = new Date(left.created_at).getTime();
+  const rightTime = new Date(right.created_at).getTime();
+  if (leftTime !== rightTime) return leftTime - rightTime;
+  return Number(left.id) - Number(right.id);
+}

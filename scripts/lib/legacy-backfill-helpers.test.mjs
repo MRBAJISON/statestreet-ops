@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   actionState,
+  compareLegacyEntries,
   firstCode,
   legacyStockValue,
   maintenanceStatus,
@@ -40,5 +41,14 @@ describe('legacy workflow backfill helpers', () => {
     expect(legacyStockValue('1250.50', '99', 4)).toBe('1250.50');
     expect(legacyStockValue('', '125.50', 4)).toBe('502.00');
     expect(legacyStockValue('', 'invalid', 4)).toBeNull();
+  });
+
+  it('orders repeated legacy snapshots by timestamp and then source id', () => {
+    const earlier = { id: 12, created_at: '2026-07-13T10:00:00Z' };
+    const later = { id: 3, created_at: '2026-07-13T11:00:00Z' };
+    const sameTimeLaterId = { id: 13, created_at: earlier.created_at };
+
+    expect(compareLegacyEntries(earlier, later)).toBeLessThan(0);
+    expect(compareLegacyEntries(earlier, sameTimeLaterId)).toBeLessThan(0);
   });
 });

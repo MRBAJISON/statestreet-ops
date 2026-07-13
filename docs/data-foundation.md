@@ -130,8 +130,11 @@ actor, writes typed records and `audit_events`, and records every source row in
 `legacy_migration_records` as converted, derived, or retained. The transaction is refused while
 any blocker remains. The approved mappings cover the form types observed in the production release
 snapshot; a new or previously unseen legacy form remains a hard blocker until its destination is
-reviewed. Unique typed destinations are insert-only during migration: an existing typed row or two
-legacy rows targeting the same unique key blocks the run instead of overwriting data. Same-day
+reviewed. Historical rows that cannot satisfy a typed contract remain in `entries` and receive an
+explicit `retained` ledger record; the migration never guesses missing business facts. Repeated
+setpoint and snapshot rows use the latest legacy value while older versions are retained as
+superseded evidence. Unique typed destinations are insert-only during migration: an existing typed
+row still blocks the run instead of being overwritten. Same-day
 aggregate inventory counts are combined before that collision check, and inventory reporting treats
 the latest aggregate count as a baseline with only later movements applied. Apply transactions lock
 the legacy table while reading and converting it, so a concurrent legacy submission cannot be missed
