@@ -1,17 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Eye, LoaderCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
-// Shows a banner while the owner is viewing another user's account, with a
-// one-click return to the admin (owner) session. Driven by the non-httpOnly
-// `impersonating` cookie (display name only).
 export default function ImpersonationBanner() {
   const [name, setName] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    const m = document.cookie.match(/(?:^|;\s*)impersonating=([^;]+)/);
-    setName(m ? decodeURIComponent(m[1]) : null);
+    const match = document.cookie.match(/(?:^|;\s*)impersonating=([^;]+)/);
+    setName(match ? decodeURIComponent(match[1]) : null);
   }, []);
 
   if (!name) return null;
@@ -19,21 +18,24 @@ export default function ImpersonationBanner() {
   async function returnToAdmin() {
     setBusy(true);
     try {
-      const res = await fetch('/api/impersonate', { method: 'DELETE' });
-      const json = await res.json().catch(() => ({}));
-      window.location.href = json.redirect || '/dashboard/admin';
+      const response = await fetch('/api/impersonate', { method: 'DELETE' });
+      const payload = (await response.json().catch(() => ({}))) as { redirect?: string };
+      window.location.href = payload.redirect || '/dashboard/admin';
     } catch {
       setBusy(false);
     }
   }
 
   return (
-    <div className="sticky top-0 z-[60] flex items-center justify-center gap-3 bg-[#c8a951] text-black text-xs font-medium px-4 py-2">
-      <span>👁 Viewing as <span className="font-bold">{name}</span> (impersonation)</span>
-      <button onClick={returnToAdmin} disabled={busy}
-        className="rounded bg-black/85 text-white px-3 py-1 font-semibold hover:bg-black disabled:opacity-50">
-        {busy ? 'Returning…' : 'Return to my admin account'}
-      </button>
+    <div className="sticky top-0 z-50 flex min-h-11 flex-wrap items-center justify-center gap-3 border-b border-chart-2/25 bg-chart-2/15 px-4 py-2 text-xs text-foreground">
+      <span className="flex min-w-0 items-center gap-2">
+        <Eye className="size-4 shrink-0 text-chart-2" aria-hidden="true" />
+        <span className="truncate">Viewing as <strong>{name}</strong></span>
+      </span>
+      <Button type="button" variant="outline" size="sm" disabled={busy} onClick={returnToAdmin}>
+        {busy ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : null}
+        Return to admin
+      </Button>
     </div>
   );
 }

@@ -1,7 +1,7 @@
-# Claude Workflow
+# Partner Workflow
 
-This repo is primarily built with Claude. Keep the workflow simple and repeatable
-so a non-technical owner does not have to debug setup drift.
+This guide keeps local development repeatable for a non-technical product owner. Local work uses
+an isolated disposable PostgreSQL database and must never point at production.
 
 ## First Session Setup
 
@@ -9,80 +9,73 @@ so a non-technical owner does not have to debug setup drift.
 cd /Users/eyacquah/Desktop/projects/statestreet-ops
 nvm use
 npm install
-cp .env.example .env.local
+npm run db:local:fresh
+npm run dev:local
 ```
 
-Fill `.env.local` with a Neon development `DATABASE_URL`. Use a strong
-`AUTH_SECRET` outside local throwaway development.
+Open `http://localhost:3000`. The seed command creates realistic StateStreet sample data and prints
+the shared password for local demo accounts. `dev:local` reads the local authentication secret from
+macOS Keychain through `agent-secret`.
 
-Then run:
-
-```bash
-npm run db:push
-npm run db:seed
-npm run dev
-```
-
-`npm run db:seed` is idempotent for seeded demo accounts, but it updates their
-password hashes. Check whether users already exist before running it on a shared
-dev database.
+Do not create `.env.local` for ordinary local work. The local scripts deliberately use
+`statestreet_ops_local` through the PostgreSQL Unix socket and do not read a production URL.
 
 ## Normal Development
 
 ```bash
 nvm use
-npm run dev
+npm run dev:local
 ```
 
-Open `http://127.0.0.1:3000`. The root route redirects based on session state.
+Use `npm run db:local:fresh` when the local data needs to be reset. This deletes and recreates only
+the database named `statestreet_ops_local`.
 
 Before handoff:
 
 ```bash
+npx tsc --noEmit
+npm run lint
 npm test
-npm run verify:fast
+npm run build
+git diff --check
 ```
 
-For schema/setup work:
+## Product Boundaries
 
-```bash
-npm run db:push
-npm run db:generate
-```
-
-`db:push` is development-only. Test generated SQL against an isolated database
-and follow `docs/data-foundation.md` before any remote migration or backfill.
+- Use the existing shadcn components and analytics primitives before adding a new UI system.
+- Keep dashboard names and sections aligned with `docs/dashboard-parity.md`.
+- New data entry must write to typed workflows and tables. Never add writes to `entries.payload`.
+- Do not change dashboard calculations inside React components. Calculations belong in
+  `src/lib/reporting` and their response types belong in `src/lib/contracts/analytics.ts`.
+- Reuse products, stores, brands, categories, suppliers, and payment methods from reference data;
+  do not ask users to retype them into each form.
 
 ## Browser Verification
 
-Use a real browser for auth-protected UI checks. Minimum UI smoke:
+For every visible change:
 
-1. Open `http://127.0.0.1:3000/login`.
-2. Sign in with an appropriate seeded demo user from `scripts/seed-users.mjs`.
-3. Confirm the expected dashboard route renders.
-4. Check the browser console for relevant errors.
+1. Sign in at `http://localhost:3000/login` with the affected local role.
+2. Open the changed dashboard or workflow and complete the main interaction.
+3. Test at desktop and mobile width.
+4. Confirm there are no relevant browser-console errors.
+5. Verify that a store manager cannot see another store's data.
 
-## Secrets
+## Data and Deployment Safety
 
-- Do not paste real database URLs, API keys, reset links, or passwords into chat,
-  docs, screenshots, commits, PR descriptions, or instructions.
-- Keep local values in `.env.local`, which is ignored by git.
-- Read `docs/deployment.md` before using Vercel CLI. `vercel link` can rewrite
-  `.env.local`; back it up first.
-- Use `/Users/eyacquah/.config/local-agents/README.md` for machine-local secret
-  handling conventions.
+- Do not run `db:push`, migration, seed, reset, or cleanup commands against a shared or production
+  database.
+- Production changes require reviewed versioned SQL migrations and a separate rollout decision.
+- Merging to `main` can trigger the production Vercel deployment. A pull request or preview is not
+  permission to merge.
+- Do not paste database URLs, API keys, reset links, or real customer records into chat, docs,
+  screenshots, commits, or pull-request descriptions.
+- Read `docs/deployment.md` before any Vercel or production work.
 
 ## Handoff Checklist
 
-For meaningful changes, Claude should finish with a practical handoff:
-
-1. Implement the smallest scoped change.
-2. Run `npm run verify:fast`.
-3. Run `npm test`; include the isolated database test for persistence changes.
-4. Browser-smoke any changed UI route.
-5. Re-read the diff using `docs/code-review.md` as a checklist.
-6. Tell the user what was verified, what was not verified, and what risks remain.
-
-This is not an independent review system. Recommend a second reviewer only when
-the change touches auth, role access, data persistence, exports, or dashboard
-calculations.
+1. Explain the user-visible change in plain language.
+2. List the dashboard-parity sections or workflows affected.
+3. Run the verification commands above.
+4. Browser-smoke the affected roles.
+5. Review the complete diff using `docs/code-review.md`.
+6. State what was verified, what was not, and any remaining data or deployment risk.

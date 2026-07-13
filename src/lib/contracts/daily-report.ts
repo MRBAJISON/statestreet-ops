@@ -13,16 +13,22 @@ export const dailySalesLineSchema = z
     grossRevenue: moneySchema,
     cogs: moneySchema,
     discounts: moneySchema.default('0.00'),
+    returns: moneySchema.default('0.00'),
     creditSales: moneySchema.default('0.00'),
   })
   .superRefine((line, ctx) => {
     const gross = moneyToCents(line.grossRevenue);
     const discounts = moneyToCents(line.discounts);
+    const returns = moneyToCents(line.returns);
     const credit = moneyToCents(line.creditSales);
-    if (discounts > gross) {
-      ctx.addIssue({ code: 'custom', path: ['discounts'], message: 'Discounts cannot exceed gross revenue' });
+    if (discounts + returns > gross) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['returns'],
+        message: 'Discounts and returns cannot exceed gross revenue',
+      });
     }
-    if (credit > gross - discounts) {
+    if (credit > gross - discounts - returns) {
       ctx.addIssue({ code: 'custom', path: ['creditSales'], message: 'Credit sales cannot exceed net revenue' });
     }
   });
@@ -73,6 +79,28 @@ export const saveDailyReportSchema = z
       }
       paymentMethods.add(line.paymentMethodId);
     });
+    if (report.status === 'submitted') {
+      const expectedPayments = report.sales.reduce<bigint>(
+        (total, line) =>
+          total +
+          moneyToCents(line.grossRevenue) -
+          moneyToCents(line.discounts) -
+          moneyToCents(line.returns) -
+          moneyToCents(line.creditSales),
+        BigInt(0)
+      );
+      const actualPayments = report.payments.reduce<bigint>(
+        (total, line) => total + moneyToCents(line.amount),
+        BigInt(0)
+      );
+      if (actualPayments !== expectedPayments) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['payments'],
+          message: 'Payment total must match net cash sales before this report can be submitted',
+        });
+      }
+    }
   });
 
 export const dailyReportDecisionSchema = z
@@ -108,12 +136,21 @@ export interface DailyReportSalesRecord {
   grossRevenue: string;
   cogs: string;
   discounts: string;
+  returns: string;
   creditSales: string;
 }
 
 export interface DailyReportPaymentRecord {
   paymentMethodId: number;
   amount: string;
+}
+
+export interface DailyReportActivityRecord {
+  id: number;
+  action: string;
+  actorName: string | null;
+  reason: string | null;
+  createdAt: string;
 }
 
 export interface DailyReportRecord {
@@ -135,6 +172,7 @@ export interface DailyReportRecord {
   updatedAt: string;
   sales: DailyReportSalesRecord[];
   payments: DailyReportPaymentRecord[];
+  activity: DailyReportActivityRecord[];
 }
 
 export interface DailyReportReferences {

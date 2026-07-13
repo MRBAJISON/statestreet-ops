@@ -34,12 +34,12 @@ const TARGET_WRITES = new Set(['commercial/weekly-target', 'commercial/exec-targ
 const READ_DEPARTMENTS: Record<UserRole, ReadonlySet<LegacyDepartment>> = {
   owner: new Set(['finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand']),
   finance: new Set(['finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand']),
-  commercial: new Set(['commercial', 'finance']),
-  marketing: new Set(['marketing', 'brand', 'commercial']),
+  commercial: new Set(['commercial']),
+  marketing: new Set(['marketing', 'brand']),
   operations: new Set(['finance', 'commercial', 'marketing', 'operations', 'inventory', 'brand']),
   inventory: new Set(['inventory']),
   brand: new Set(['brand']),
-  'store-manager': new Set(['finance', 'commercial', 'inventory']),
+  'store-manager': new Set(),
 };
 
 export function isLegacyDepartment(value: string): value is LegacyDepartment {
@@ -52,6 +52,13 @@ export function isKnownLegacyForm(department: string, formType: string): boolean
 
 export function canReadLegacyDepartment(role: UserRole, department: LegacyDepartment): boolean {
   return READ_DEPARTMENTS[role].has(department);
+}
+
+export function canReadLegacyForm(user: AppUser, department: LegacyDepartment, formType: string): boolean {
+  if (!isKnownLegacyForm(department, formType)) return false;
+  if (canReadLegacyDepartment(user.role, department)) return true;
+  if (user.role !== 'store-manager' || !user.store) return false;
+  return STORE_MANAGER_WRITES.has(`${department}/${formType}`);
 }
 
 export function canWriteLegacyForm(user: AppUser, department: LegacyDepartment, formType: string): boolean {

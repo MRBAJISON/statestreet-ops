@@ -5,9 +5,9 @@ import { DEFAULT_ORG, mergeOrg, type OrgSettings } from '@/lib/org';
 
 interface OrgCtx {
   org: OrgSettings;
-  refresh: () => void;
+  refresh: () => Promise<void>;
 }
-const OrgContext = createContext<OrgCtx>({ org: DEFAULT_ORG, refresh: () => {} });
+const OrgContext = createContext<OrgCtx>({ org: DEFAULT_ORG, refresh: async () => {} });
 
 export function useOrg() {
   return useContext(OrgContext);

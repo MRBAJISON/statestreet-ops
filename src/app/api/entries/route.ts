@@ -6,6 +6,7 @@ import { isAudited, recordAudit } from '@/lib/audit';
 import { getSession } from '@/lib/auth';
 import {
   canReadLegacyDepartment,
+  canReadLegacyForm,
   canWriteLegacyForm,
   isKnownLegacyForm,
   isLegacyDepartment,
@@ -77,22 +78,25 @@ export async function GET(req: NextRequest) {
     const department = sp.get('department');
     const formType = sp.get('formType');
     const conds = [];
+    const legacyDepartment = department && isLegacyDepartment(department) ? department : null;
     if (department) {
-      if (!isLegacyDepartment(department)) {
+      if (!legacyDepartment) {
         return NextResponse.json({ error: `Unknown department "${department}"` }, { status: 400 });
       }
-      if (!canReadLegacyDepartment(session.user.role, department)) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
-      conds.push(eq(entries.department, department));
+      conds.push(eq(entries.department, legacyDepartment));
     } else if (!['owner', 'finance', 'operations'].includes(session.user.role)) {
       return NextResponse.json({ error: 'A department filter is required' }, { status: 400 });
     }
     if (formType) {
-      if (!department || !isKnownLegacyForm(department, formType)) {
+      if (!legacyDepartment || !isKnownLegacyForm(legacyDepartment, formType)) {
         return NextResponse.json({ error: `Unknown form type "${formType}"` }, { status: 400 });
       }
+      if (!canReadLegacyForm(session.user, legacyDepartment, formType)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
       conds.push(eq(entries.formType, formType));
+    } else if (legacyDepartment && !canReadLegacyDepartment(session.user.role, legacyDepartment)) {
+      return NextResponse.json({ error: 'A permitted formType filter is required' }, { status: 403 });
     }
     // A store manager only ever sees their own store's submissions (the store
     // lives in the payload under store / fromStore / toStore). Other roles

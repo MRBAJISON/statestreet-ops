@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     const { email } = (await req.json()) ?? {};
     if (email && typeof email === 'string') {
       const [u] = await db.select().from(users).where(eq(users.email, email.toLowerCase().trim()));
-      if (u) {
+      if (u?.active) {
         const token = await signResetToken(u);
         const link = `${req.nextUrl.origin}/reset-password?token=${encodeURIComponent(token)}`;
         await sendEmail({

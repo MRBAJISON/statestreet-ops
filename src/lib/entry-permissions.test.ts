@@ -3,6 +3,7 @@ import type { AppUser } from './auth';
 import {
   canMutateLegacyEntry,
   canReadLegacyDepartment,
+  canReadLegacyForm,
   canWriteLegacyForm,
   isKnownLegacyForm,
 } from './entry-permissions';
@@ -22,10 +23,18 @@ describe('legacy entry permissions', () => {
     expect(canWriteLegacyForm(user('finance'), 'finance', 'made-up-form')).toBe(false);
   });
 
-  it('keeps intentional cross-department reads', () => {
-    expect(canReadLegacyDepartment('commercial', 'finance')).toBe(true);
-    expect(canReadLegacyDepartment('marketing', 'commercial')).toBe(true);
+  it('keeps raw legacy reads within the approved role matrix', () => {
+    expect(canReadLegacyDepartment('commercial', 'finance')).toBe(false);
+    expect(canReadLegacyDepartment('marketing', 'commercial')).toBe(false);
+    expect(canReadLegacyDepartment('marketing', 'brand')).toBe(true);
     expect(canReadLegacyDepartment('inventory', 'finance')).toBe(false);
+  });
+
+  it('allows store managers to read only their transitional workflow types', () => {
+    const manager = user('store-manager', 'labone-men');
+    expect(canReadLegacyForm(manager, 'finance', 'revenue')).toBe(true);
+    expect(canReadLegacyForm(manager, 'inventory', 'store-transfer')).toBe(true);
+    expect(canReadLegacyForm(manager, 'finance', 'expenses')).toBe(false);
   });
 
   it('limits ordinary roles to their own write surfaces', () => {

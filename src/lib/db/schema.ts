@@ -1,8 +1,7 @@
-import { pgTable, serial, text, jsonb, timestamp, index, integer } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, jsonb, timestamp, index, integer, boolean } from 'drizzle-orm/pg-core';
 
-// A single flexible table holds every form submission across all departments.
-// `payload` is the raw form data (jsonb); dashboards aggregate from these rows.
-// This lets all 7 departments persist real data immediately without 30+ rigid tables.
+// Transitional legacy submissions. Rebuilt workflows do not write here; these
+// rows remain migration evidence until production parity is complete.
 export const entries = pgTable(
   'entries',
   {
@@ -27,7 +26,10 @@ export const users = pgTable('users', {
   role: text('role').notNull(),
   department: text('department').notNull(),
   store: text('store'), // assigned store for store-manager role (nullable)
+  active: boolean('active').notNull().default(true),
+  sessionVersion: integer('session_version').notNull().default(1),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export type DbUser = typeof users.$inferSelect;

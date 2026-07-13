@@ -29,11 +29,15 @@ export const stores = pgTable(
     id: id(),
     code: text('code').notNull(),
     name: text('name').notNull(),
+    type: text('type').notNull().default('store'),
     active: boolean('active').notNull().default(true),
     closedAt: timestamp('closed_at', { withTimezone: true }),
     ...timestamps(),
   },
-  (t) => [uniqueIndex('stores_code_lower_uidx').on(sql`lower(${t.code})`)]
+  (t) => [
+    uniqueIndex('stores_code_lower_uidx').on(sql`lower(${t.code})`),
+    check('stores_type_check', sql`${t.type} in ('store', 'warehouse', 'office')`),
+  ]
 );
 
 export const brands = pgTable(
@@ -256,6 +260,7 @@ export const dailySalesLines = pgTable(
     grossRevenue: money('gross_revenue').notNull(),
     cogs: money('cogs').notNull(),
     discounts: money('discounts').notNull().default('0'),
+    returns: money('returns').notNull().default('0'),
     creditSales: money('credit_sales').notNull().default('0'),
     ...timestamps(),
   },
@@ -265,10 +270,10 @@ export const dailySalesLines = pgTable(
     check('daily_sales_lines_counts_check', sql`${t.openingStock} >= 0 and ${t.unitsSold} >= 0`),
     check(
       'daily_sales_lines_amounts_check',
-      sql`${t.grossRevenue} >= 0 and ${t.cogs} >= 0 and ${t.discounts} >= 0 and ${t.creditSales} >= 0`
+      sql`${t.grossRevenue} >= 0 and ${t.cogs} >= 0 and ${t.discounts} >= 0 and ${t.returns} >= 0 and ${t.creditSales} >= 0`
     ),
-    check('daily_sales_lines_discount_check', sql`${t.discounts} <= ${t.grossRevenue}`),
-    check('daily_sales_lines_credit_check', sql`${t.creditSales} <= ${t.grossRevenue} - ${t.discounts}`),
+    check('daily_sales_lines_deductions_check', sql`${t.discounts} + ${t.returns} <= ${t.grossRevenue}`),
+    check('daily_sales_lines_credit_check', sql`${t.creditSales} <= ${t.grossRevenue} - ${t.discounts} - ${t.returns}`),
   ]
 );
 
@@ -527,6 +532,79 @@ export const replenishmentRequestLines = pgTable(
   ]
 );
 
+export const importBatches = pgTable(
+  'import_batches',
+  {
+    id: id(),
+    type: text('type').notNull(),
+    filename: text('filename').notNull(),
+    status: text('status').notNull().default('pending'),
+    totalRows: integer('total_rows').notNull().default(0),
+    importedRows: integer('imported_rows').notNull().default(0),
+    errorRows: integer('error_rows').notNull().default(0),
+    summary: jsonb('summary').$type<Record<string, unknown>>(),
+    createdByUserId: integer('created_by_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    undoneAt: timestamp('undone_at', { withTimezone: true }),
+    undoneByUserId: integer('undone_by_user_id').references(() => users.id, { onDelete: 'restrict' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('import_batches_type_created_idx').on(t.type, t.createdAt),
+    index('import_batches_created_by_idx').on(t.createdByUserId),
+    index('import_batches_undone_by_idx').on(t.undoneByUserId),
+    check('import_batches_status_check', sql`${t.status} in ('pending', 'running', 'completed', 'failed', 'undone')`),
+    check(
+      'import_batches_counts_check',
+      sql`${t.totalRows} >= 0 and ${t.importedRows} >= 0 and ${t.errorRows} >= 0 and ${t.importedRows} + ${t.errorRows} <= ${t.totalRows}`
+    ),
+    check(
+      'import_batches_undo_check',
+      sql`(${t.status} = 'undone' and ${t.undoneAt} is not null and ${t.undoneByUserId} is not null) or (${t.status} <> 'undone' and ${t.undoneAt} is null and ${t.undoneByUserId} is null)`
+    ),
+  ]
+);
+
+export const importBatchRows = pgTable(
+  'import_batch_rows',
+  {
+    id: id(),
+    importBatchId: bigint('import_batch_id', { mode: 'number' })
+      .notNull()
+      .references(() => importBatches.id, { onDelete: 'restrict' }),
+    sheet: text('sheet').notNull(),
+    sourceRow: integer('source_row').notNull(),
+    operation: text('operation').notNull(),
+    entityType: text('entity_type').notNull(),
+    entityId: bigint('entity_id', { mode: 'number' }).notNull(),
+    before: jsonb('before').$type<Record<string, unknown>>(),
+    after: jsonb('after').$type<Record<string, unknown>>().notNull(),
+    undoneAt: timestamp('undone_at', { withTimezone: true }),
+    undoneByUserId: integer('undone_by_user_id').references(() => users.id, { onDelete: 'restrict' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('import_batch_rows_batch_sheet_row_uidx').on(t.importBatchId, t.sheet, t.sourceRow),
+    index('import_batch_rows_entity_idx').on(t.entityType, t.entityId),
+    index('import_batch_rows_undone_by_idx').on(t.undoneByUserId),
+    check('import_batch_rows_source_row_check', sql`${t.sourceRow} >= 2`),
+    check('import_batch_rows_sheet_check', sql`${t.sheet} in ('expenses', 'budget')`),
+    check('import_batch_rows_operation_check', sql`${t.operation} in ('insert', 'update')`),
+    check('import_batch_rows_entity_type_check', sql`${t.entityType} in ('expense', 'budget')`),
+    check(
+      'import_batch_rows_before_check',
+      sql`(${t.operation} = 'insert' and ${t.before} is null) or (${t.operation} = 'update' and ${t.before} is not null)`
+    ),
+    check(
+      'import_batch_rows_undo_check',
+      sql`(${t.undoneAt} is null and ${t.undoneByUserId} is null) or (${t.undoneAt} is not null and ${t.undoneByUserId} is not null)`
+    ),
+  ]
+);
+
 export const expenses = pgTable(
   'expenses',
   {
@@ -542,6 +620,10 @@ export const expenses = pgTable(
     paymentMethodId: bigint('payment_method_id', { mode: 'number' }).references(() => paymentMethods.id, {
       onDelete: 'restrict',
     }),
+    importBatchId: bigint('import_batch_id', { mode: 'number' }).references(() => importBatches.id, {
+      onDelete: 'restrict',
+    }),
+    importSourceRow: integer('import_source_row'),
     description: text('description').notNull(),
     overspendReason: text('overspend_reason'),
     createdByUserId: integer('created_by_user_id')
@@ -556,9 +638,14 @@ export const expenses = pgTable(
     index('expenses_category_date_idx').on(t.expenseCategoryId, t.businessDate),
     index('expenses_store_date_idx').on(t.storeId, t.businessDate),
     index('expenses_payment_method_idx').on(t.paymentMethodId),
+    uniqueIndex('expenses_import_batch_source_uidx').on(t.importBatchId, t.importSourceRow),
     index('expenses_created_by_idx').on(t.createdByUserId),
     index('expenses_updated_by_idx').on(t.updatedByUserId),
     check('expenses_amount_check', sql`${t.amount} > 0`),
+    check(
+      'expenses_import_source_check',
+      sql`(${t.importBatchId} is null and ${t.importSourceRow} is null) or (${t.importBatchId} is not null and ${t.importSourceRow} >= 2)`
+    ),
   ]
 );
 
@@ -573,6 +660,10 @@ export const budgets = pgTable(
     storeId: bigint('store_id', { mode: 'number' }).references(() => stores.id, { onDelete: 'restrict' }),
     amount: money('amount').notNull(),
     notes: text('notes'),
+    importBatchId: bigint('import_batch_id', { mode: 'number' }).references(() => importBatches.id, {
+      onDelete: 'restrict',
+    }),
+    importSourceRow: integer('import_source_row'),
     createdByUserId: integer('created_by_user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),
@@ -587,10 +678,15 @@ export const budgets = pgTable(
       .on(t.year, t.expenseCategoryId)
       .where(sql`${t.storeId} is null`),
     index('budgets_category_idx').on(t.expenseCategoryId),
+    uniqueIndex('budgets_import_batch_source_uidx').on(t.importBatchId, t.importSourceRow),
     index('budgets_created_by_idx').on(t.createdByUserId),
     index('budgets_updated_by_idx').on(t.updatedByUserId),
     check('budgets_year_check', sql`${t.year} between 2000 and 2200`),
     check('budgets_amount_check', sql`${t.amount} >= 0`),
+    check(
+      'budgets_import_source_check',
+      sql`(${t.importBatchId} is null and ${t.importSourceRow} is null) or (${t.importBatchId} is not null and ${t.importSourceRow} >= 2)`
+    ),
   ]
 );
 
@@ -661,6 +757,13 @@ export const weeklyReviews = pgTable(
     summary: text('summary'),
     risks: text('risks'),
     opportunities: text('opportunities'),
+    marketingAmplifyCategoryId: bigint('marketing_amplify_category_id', { mode: 'number' }).references(
+      () => categories.id,
+      { onDelete: 'restrict' }
+    ),
+    differentThisWeek: text('different_this_week'),
+    firstThreeActions: text('first_three_actions'),
+    lockVersion: integer('lock_version').notNull().default(1),
     submittedByUserId: integer('submitted_by_user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),
@@ -673,7 +776,9 @@ export const weeklyReviews = pgTable(
     index('weekly_reviews_week_status_idx').on(t.weekEnd, t.status),
     index('weekly_reviews_submitted_by_idx').on(t.submittedByUserId),
     index('weekly_reviews_approved_by_idx').on(t.approvedByUserId),
+    index('weekly_reviews_amplify_category_idx').on(t.marketingAmplifyCategoryId),
     check('weekly_reviews_status_check', sql`${t.status} in ('draft', 'submitted', 'approved')`),
+    check('weekly_reviews_lock_version_check', sql`${t.lockVersion} > 0`),
   ]
 );
 
@@ -723,35 +828,9 @@ export const auditEvents = pgTable(
   (t) => [
     index('audit_events_entity_idx').on(t.entityType, t.entityId, t.createdAt),
     index('audit_events_actor_idx').on(t.actorUserId, t.createdAt),
-    check('audit_events_action_check', sql`${t.action} in ('create', 'update', 'submit', 'approve', 'reopen', 'cancel')`),
-  ]
-);
-
-export const importBatches = pgTable(
-  'import_batches',
-  {
-    id: id(),
-    type: text('type').notNull(),
-    filename: text('filename').notNull(),
-    status: text('status').notNull().default('pending'),
-    totalRows: integer('total_rows').notNull().default(0),
-    importedRows: integer('imported_rows').notNull().default(0),
-    errorRows: integer('error_rows').notNull().default(0),
-    summary: jsonb('summary').$type<Record<string, unknown>>(),
-    createdByUserId: integer('created_by_user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'restrict' }),
-    startedAt: timestamp('started_at', { withTimezone: true }),
-    completedAt: timestamp('completed_at', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [
-    index('import_batches_type_created_idx').on(t.type, t.createdAt),
-    index('import_batches_created_by_idx').on(t.createdByUserId),
-    check('import_batches_status_check', sql`${t.status} in ('pending', 'running', 'completed', 'failed')`),
     check(
-      'import_batches_counts_check',
-      sql`${t.totalRows} >= 0 and ${t.importedRows} >= 0 and ${t.errorRows} >= 0 and ${t.importedRows} + ${t.errorRows} <= ${t.totalRows}`
+      'audit_events_action_check',
+      sql`${t.action} in ('create', 'update', 'submit', 'approve', 'reopen', 'cancel', 'complete', 'archive', 'restore', 'import', 'settle', 'authorize', 'receive', 'undo')`
     ),
   ]
 );

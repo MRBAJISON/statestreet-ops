@@ -8,8 +8,9 @@ import {
   buildDecideDailyReportQuery,
   buildReplaceDailyReportQuery,
 } from './daily-report-queries';
+import { testDatabaseUrl } from './test-database';
 
-const databaseUrl = process.env.TEST_DATABASE_URL;
+const databaseUrl = testDatabaseUrl(process.env.TEST_DATABASE_URL);
 const describeWithDatabase = databaseUrl ? describe : describe.skip;
 const dialect = new PgDialect();
 
@@ -17,6 +18,7 @@ describeWithDatabase('daily report SQL integration', () => {
   const client = new Client({ connectionString: databaseUrl });
   let userId: number;
   let storeId: number;
+  let warehouseId: number;
   let categoryOneId: number;
   let categoryTwoId: number;
   let paymentOneId: number;
@@ -28,6 +30,8 @@ describeWithDatabase('daily report SQL integration', () => {
   }
 
   beforeAll(async () => {
+    process.env.DATABASE_URL = databaseUrl;
+    process.env.DATABASE_DRIVER = 'node-postgres';
     await client.connect();
     await client.query(`
       truncate table
@@ -47,6 +51,13 @@ describeWithDatabase('daily report SQL integration', () => {
     storeId = Number(
       (await client.query(`insert into stores (code, name) values ('test-store', 'Test Store') returning id`)).rows[0].id
     );
+    warehouseId = Number(
+      (
+        await client.query(
+          `insert into stores (code, name, type) values ('test-warehouse', 'Test Warehouse', 'warehouse') returning id`
+        )
+      ).rows[0].id
+    );
     const categoryRows = await client.query(
       `insert into categories (code, name, sort_order)
        values ('shirts', 'Shirts', 1), ('shoes', 'Shoes', 2)
@@ -65,6 +76,34 @@ describeWithDatabase('daily report SQL integration', () => {
 
   afterAll(async () => {
     await client.end();
+  });
+
+  it('accepts retail stores and rejects non-retail locations for daily reports', async () => {
+    const { resolveDailyReportStore } = await import('./daily-reports');
+    const financeUser = {
+      id: String(userId),
+      name: 'Finance Test',
+      email: 'finance-test@example.com',
+      role: 'finance' as const,
+      department: 'finance' as const,
+    };
+
+    await expect(resolveDailyReportStore(financeUser, storeId)).resolves.toBe(storeId);
+    await expect(resolveDailyReportStore(financeUser, warehouseId)).rejects.toMatchObject({
+      status: 400,
+      message: 'Store was not found or is inactive',
+    });
+    await expect(
+      resolveDailyReportStore({
+        ...financeUser,
+        role: 'store-manager',
+        department: 'commercial',
+        store: 'test-warehouse',
+      })
+    ).rejects.toMatchObject({
+      status: 409,
+      message: 'Assigned store is not available in the new store catalog',
+    });
   });
 
   it('creates, replaces, locks, approves, and reopens atomically', async () => {

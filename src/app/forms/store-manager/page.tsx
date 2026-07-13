@@ -1,10 +1,8 @@
-import StoreManagerForms from './StoreManagerForms';
-import { getSession } from '@/lib/auth';
+'use client';
 
-export default async function StoreManagerFormsPage() {
-  const session = await getSession();
-  const assignedStore = session?.user.store ?? '';
-  const managerName = session?.user.name ?? '';
+import { WorkflowWorkspace } from '@/components/forms/WorkflowWorkspace';
+import { storeShortcuts, storeWorkflows } from '@/components/forms/workflow-definitions';
 
-  return <StoreManagerForms managerName={managerName} assignedStore={assignedStore} />;
+export default function StoreManagerFormsPage() {
+  return <WorkflowWorkspace title="Store workflows" definitions={storeWorkflows} shortcuts={storeShortcuts} />;
 }

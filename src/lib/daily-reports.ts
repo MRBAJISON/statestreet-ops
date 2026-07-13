@@ -103,7 +103,7 @@ export async function resolveDailyReportStore(user: AppUser, requestedStoreId?: 
     const [store] = await db
       .select({ id: stores.id })
       .from(stores)
-      .where(and(eq(stores.code, user.store), eq(stores.active, true)))
+      .where(and(eq(stores.code, user.store), eq(stores.type, 'store'), eq(stores.active, true)))
       .limit(1);
     if (!store) throw new HttpError(409, 'Assigned store is not available in the new store catalog');
     return store.id;
@@ -112,7 +112,7 @@ export async function resolveDailyReportStore(user: AppUser, requestedStoreId?: 
   const [store] = await db
     .select({ id: stores.id })
     .from(stores)
-    .where(and(eq(stores.id, requestedStoreId), eq(stores.active, true)))
+    .where(and(eq(stores.id, requestedStoreId), eq(stores.type, 'store'), eq(stores.active, true)))
     .limit(1);
   if (!store) throw new HttpError(400, 'Store was not found or is inactive');
   return store.id;

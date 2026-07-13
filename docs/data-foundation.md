@@ -1,8 +1,8 @@
 # Data Foundation
 
 StateStreet is moving from generic JSON submissions to typed business tables in
-the same Neon database. This is an additive transition: the live screens remain
-on `entries` until each workflow is migrated and its totals are reconciled.
+the same Neon database. This is an additive transition: legacy rows remain intact,
+and typed analytics stay blocked until each historical workflow is reconciled.
 
 ## Source-Of-Truth Rules
 
@@ -46,10 +46,8 @@ The server derives the store for store managers and never trusts a client-sent
 store assignment. Shared Zod contracts reject duplicate lines, invalid dates,
 inconsistent customer totals, and invalid money precision.
 
-The typed store-manager workflow is available only at the unlinked preview route
-when `ENABLE_TYPED_DAILY_REPORT_PREVIEW=true`. Keep that flag off in production
-until typed reports have parity and the dashboard and Finance readers switch in
-the same release.
+Store Manager and Finance use the same typed daily-report contract. Store scope is derived from the
+authenticated account, while Finance owns approval and reopening decisions.
 
 ## Migration Files
 
@@ -75,7 +73,7 @@ npm run db:seed:foundation
 The command is read-only unless `--apply` is explicit:
 
 ```bash
-npm run db:seed:foundation -- --apply
+npm run db:seed:foundation:apply
 ```
 
 Apply runs in one transaction, takes an advisory lock, refuses unresolved
@@ -96,13 +94,36 @@ The planner exits `2` when review is required. It never writes or prints custome
 records. No production backfill should be written until this output is reviewed
 against a fresh production snapshot.
 
+After the planner and foundation catalog are clean, preview the supported daily-report conversion:
+
+```bash
+npm run db:backfill:daily
+```
+
+Apply requires an explicit active Owner or Finance account for migration provenance:
+
+```bash
+npm run db:backfill:daily -- --apply --actor-email=approved.account@example.com
+```
+
+The command is transactional and idempotent through `daily_report_legacy_entries`. It refuses
+unknown references, invalid amounts, customer-count inconsistencies, and collisions with existing
+typed reports. It never invents a store, category, payment method, or actor.
+
+The analytics API also checks this gate at runtime. If a legacy `finance/revenue` or
+`finance/closing` source is not linked to a typed daily report, it returns
+`LEGACY_BACKFILL_REQUIRED` instead of serving incomplete trading totals. Other legacy workflows are
+tracked separately in the production parity checklist and must be reconciled before their typed
+domain is released; they cannot be linked by the daily-report backfill.
+
 ## Release Order
 
 1. Refresh read-only production access and run `db:plan-backfill`.
 2. Resolve every blocker and review the header-count correction.
-3. Create a Neon branch or backup and apply both migrations there.
+3. Create a Neon branch or backup and apply the versioned migrations there.
 4. Preview and apply the foundation catalog seed.
-5. Re-run the planner and migration/constraint checks on the branch.
-6. Migrate one UI workflow at a time; compare counts and money totals before
+5. Preview and apply the daily-report backfill with an approved migration actor.
+6. Re-run the planner and migration/constraint checks on the branch.
+7. Migrate one remaining UI workflow at a time; compare counts and money totals before
    switching dashboard reads.
-7. Keep `entries` read-only after parity. Do not delete it during the UI rebuild.
+8. Keep `entries` read-only after parity. Do not delete it during the UI rebuild.

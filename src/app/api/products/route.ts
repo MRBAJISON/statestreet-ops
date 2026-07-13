@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
 import { createProductSchema } from '@/lib/contracts/product';
 import { formatContractError } from '@/lib/contracts/shared';
 import { db } from '@/lib/db';
 import { auditEvents, brandCategories, brands, categories, products, subcategories } from '@/lib/db/foundation-schema';
 import { databaseErrorCode, sessionUserId } from '@/lib/server-errors';
+import { canReadUnitCost } from '@/lib/access';
 
 const PRODUCT_EDITORS = new Set(['owner', 'commercial', 'operations', 'inventory']);
 
@@ -13,39 +14,76 @@ export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const q = req.nextUrl.searchParams.get('q')?.trim() ?? '';
-  const includeInactive = req.nextUrl.searchParams.get('includeInactive') === 'true';
-  const requestedLimit = Number(req.nextUrl.searchParams.get('limit') ?? 50);
-  const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 50;
+  const rawBrandIds = req.nextUrl.searchParams.get('brandIds')?.trim() ?? '';
+  const requestedBrandIds = rawBrandIds
+    ? rawBrandIds.split(',').map((value) => Number(value))
+    : [];
+  if (
+    requestedBrandIds.length > 20 ||
+    requestedBrandIds.some((id) => !Number.isSafeInteger(id) || id <= 0)
+  ) {
+    return NextResponse.json({ error: 'brandIds must contain valid catalog identifiers' }, { status: 400 });
+  }
+  const requestedStatus = req.nextUrl.searchParams.get('status');
+  const status = requestedStatus === 'all' || requestedStatus === 'inactive'
+    ? requestedStatus
+    : req.nextUrl.searchParams.get('includeInactive') === 'true' ? 'all' : 'active';
+  if (status !== 'active' && !PRODUCT_EDITORS.has(session.user.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  const requestedPageSize = Number(req.nextUrl.searchParams.get('pageSize') ?? req.nextUrl.searchParams.get('limit') ?? 50);
+  const pageSize = Number.isInteger(requestedPageSize) ? Math.min(Math.max(requestedPageSize, 1), 100) : 50;
+  const requestedPage = Number(req.nextUrl.searchParams.get('page') ?? 1);
+  const page = Number.isInteger(requestedPage) ? Math.max(requestedPage, 1) : 1;
   const conditions = [];
-  if (!includeInactive) conditions.push(eq(products.active, true));
+  if (status === 'active') conditions.push(eq(products.active, true));
+  if (status === 'inactive') conditions.push(eq(products.active, false));
   if (q) conditions.push(or(ilike(products.sku, `%${q}%`), ilike(products.name, `%${q}%`))!);
-  const rows = await db
-    .select({
-      id: products.id,
-      sku: products.sku,
-      name: products.name,
-      description: products.description,
-      brandId: products.brandId,
-      brandName: brands.name,
-      categoryId: products.categoryId,
-      categoryName: categories.name,
-      subcategoryId: products.subcategoryId,
-      subcategoryName: subcategories.name,
-      size: products.size,
-      color: products.color,
-      unitCost: products.unitCost,
-      sellingPrice: products.sellingPrice,
-      active: products.active,
-      updatedAt: products.updatedAt,
-    })
-    .from(products)
-    .innerJoin(brands, eq(products.brandId, brands.id))
-    .innerJoin(categories, eq(products.categoryId, categories.id))
-    .leftJoin(subcategories, eq(products.subcategoryId, subcategories.id))
-    .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(desc(products.updatedAt), products.sku)
-    .limit(limit);
-  return NextResponse.json({ products: rows });
+  if (requestedBrandIds.length) conditions.push(inArray(products.brandId, requestedBrandIds));
+  const where = conditions.length ? and(...conditions) : undefined;
+  const [rows, totals] = await Promise.all([
+    db
+      .select({
+        id: products.id,
+        sku: products.sku,
+        name: products.name,
+        description: products.description,
+        brandId: products.brandId,
+        brandName: brands.name,
+        categoryId: products.categoryId,
+        categoryName: categories.name,
+        subcategoryId: products.subcategoryId,
+        subcategoryName: subcategories.name,
+        size: products.size,
+        color: products.color,
+        unitCost: products.unitCost,
+        sellingPrice: products.sellingPrice,
+        active: products.active,
+        updatedAt: products.updatedAt,
+      })
+      .from(products)
+      .innerJoin(brands, eq(products.brandId, brands.id))
+      .innerJoin(categories, eq(products.categoryId, categories.id))
+      .leftJoin(subcategories, eq(products.subcategoryId, subcategories.id))
+      .where(where)
+      .orderBy(desc(products.updatedAt), products.sku)
+      .limit(pageSize)
+      .offset((page - 1) * pageSize),
+    db.select({ value: sql<number>`count(*)::integer` }).from(products).where(where),
+  ]);
+  const mayReadCost = canReadUnitCost(session.user.role);
+  return NextResponse.json({
+    products: rows.map((product) => {
+      if (mayReadCost) return product;
+      return Object.fromEntries(Object.entries(product).filter(([key]) => key !== 'unitCost'));
+    }),
+    pagination: {
+      page,
+      pageSize,
+      total: totals[0]?.value ?? 0,
+      totalPages: Math.max(1, Math.ceil((totals[0]?.value ?? 0) / pageSize)),
+    },
+  });
 }
 
 export async function POST(req: NextRequest) {

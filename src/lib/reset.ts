@@ -46,7 +46,7 @@ export async function verifyResetToken(token: string | undefined | null): Promis
   }
   if (!data?.uid || !data.exp || Date.now() > data.exp) return null;
   const [u] = await db.select().from(users).where(eq(users.id, Number(data.uid)));
-  if (!u) return null;
+  if (!u || !u.active) return null;
   if ((await hmac(payload, authSecret() + u.passwordHash)) !== sig) return null;
   return u;
 }

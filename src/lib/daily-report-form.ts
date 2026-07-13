@@ -15,6 +15,7 @@ export interface DailySalesDraftRow {
   grossRevenue: string;
   cogs: string;
   discounts: string;
+  returns: string;
   creditSales: string;
 }
 
@@ -42,6 +43,7 @@ const emptySalesRow = (categoryId: number): DailySalesDraftRow => ({
   grossRevenue: '',
   cogs: '',
   discounts: '',
+  returns: '',
   creditSales: '',
 });
 
@@ -81,6 +83,7 @@ export function createDailyReportDraft(
             grossRevenue: line.grossRevenue,
             cogs: line.cogs,
             discounts: line.discounts,
+            returns: line.returns,
             creditSales: line.creditSales,
           }
         : emptySalesRow(categoryId);
@@ -93,7 +96,7 @@ export function createDailyReportDraft(
 }
 
 const salesRowHasValue = (row: DailySalesDraftRow) =>
-  [row.openingStock, row.unitsSold, row.grossRevenue, row.cogs, row.discounts, row.creditSales].some(
+  [row.openingStock, row.unitsSold, row.grossRevenue, row.cogs, row.discounts, row.returns, row.creditSales].some(
     (value) => value.trim() !== ''
   );
 
@@ -119,6 +122,7 @@ export function buildDailyReportInput(
       grossRevenue: row.grossRevenue.trim() || '0',
       cogs: row.cogs.trim() || '0',
       discounts: row.discounts.trim() || '0',
+      returns: row.returns.trim() || '0',
       creditSales: row.creditSales.trim() || '0',
     })),
     payments: draft.payments
@@ -162,6 +166,7 @@ export function createSavedDailyReportRecord(
     updatedAt: savedAt,
     sales: input.sales.map((line) => ({ ...line })),
     payments: input.payments.map((line) => ({ ...line })),
+    activity: existing?.activity ?? [],
   };
 }
 
@@ -233,23 +238,26 @@ export function calculateDailyReportTotals(draft: DailyReportDraft) {
   let grossCents = 0;
   let cogsCents = 0;
   let discountCents = 0;
+  let returnCents = 0;
   let creditCents = 0;
   let unitsSold = 0;
   for (const line of draft.sales) {
     grossCents += draftMoneyToCents(line.grossRevenue);
     cogsCents += draftMoneyToCents(line.cogs);
     discountCents += draftMoneyToCents(line.discounts);
+    returnCents += draftMoneyToCents(line.returns);
     creditCents += draftMoneyToCents(line.creditSales);
     unitsSold += Number(line.unitsSold) || 0;
   }
   const paymentsCents = draft.payments.reduce((sum, line) => sum + draftMoneyToCents(line.amount), 0);
-  const netCents = grossCents - discountCents;
+  const netCents = grossCents - discountCents - returnCents;
   const expectedPaymentsCents = netCents - creditCents;
 
   return {
     grossCents,
     cogsCents,
     discountCents,
+    returnCents,
     creditCents,
     netCents,
     expectedPaymentsCents,

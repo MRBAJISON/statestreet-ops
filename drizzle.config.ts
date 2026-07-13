@@ -5,7 +5,7 @@ import { loadEnvConfig } from '@next/env';
 loadEnvConfig(process.cwd(), true);
 
 export default {
-  schema: ['./src/lib/db/schema.ts', './src/lib/db/foundation-schema.ts'],
+  schema: ['./src/lib/db/schema.ts', './src/lib/db/foundation-schema.ts', './src/lib/db/operational-schema.ts'],
   out: './drizzle',
   dialect: 'postgresql',
   dbCredentials: { url: process.env.DATABASE_URL! },

@@ -19,11 +19,11 @@ export function buildCreateDailyReportQuery(userId: number, storeId: number, inp
       returning *
     ), new_sales as (
       insert into daily_sales_lines (
-        daily_report_id, category_id, opening_stock, units_sold, gross_revenue, cogs, discounts, credit_sales
+        daily_report_id, category_id, opening_stock, units_sold, gross_revenue, cogs, discounts, returns, credit_sales
       )
       select
         report.id, line."categoryId", line."openingStock", line."unitsSold",
-        line."grossRevenue", line.cogs, line.discounts, line."creditSales"
+        line."grossRevenue", line.cogs, line.discounts, line.returns, line."creditSales"
       from new_report report
       cross join jsonb_to_recordset(${sales}::jsonb) as line(
         "categoryId" bigint,
@@ -32,6 +32,7 @@ export function buildCreateDailyReportQuery(userId: number, storeId: number, inp
         "grossRevenue" numeric(14, 2),
         cogs numeric(14, 2),
         discounts numeric(14, 2),
+        returns numeric(14, 2),
         "creditSales" numeric(14, 2)
       )
       returning id
@@ -111,11 +112,11 @@ export function buildReplaceDailyReportQuery(
       returning report.*
     ), upsert_sales as (
       insert into daily_sales_lines (
-        daily_report_id, category_id, opening_stock, units_sold, gross_revenue, cogs, discounts, credit_sales
+        daily_report_id, category_id, opening_stock, units_sold, gross_revenue, cogs, discounts, returns, credit_sales
       )
       select
         report.id, line."categoryId", line."openingStock", line."unitsSold",
-        line."grossRevenue", line.cogs, line.discounts, line."creditSales"
+        line."grossRevenue", line.cogs, line.discounts, line.returns, line."creditSales"
       from updated_report report
       cross join jsonb_to_recordset(${sales}::jsonb) as line(
         "categoryId" bigint,
@@ -124,6 +125,7 @@ export function buildReplaceDailyReportQuery(
         "grossRevenue" numeric(14, 2),
         cogs numeric(14, 2),
         discounts numeric(14, 2),
+        returns numeric(14, 2),
         "creditSales" numeric(14, 2)
       )
       on conflict (daily_report_id, category_id) do update set
@@ -132,6 +134,7 @@ export function buildReplaceDailyReportQuery(
         gross_revenue = excluded.gross_revenue,
         cogs = excluded.cogs,
         discounts = excluded.discounts,
+        returns = excluded.returns,
         credit_sales = excluded.credit_sales,
         updated_at = now()
       returning id

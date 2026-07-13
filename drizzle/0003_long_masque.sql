@@ -1,0 +1,14 @@
+CREATE UNIQUE INDEX "clienteling_date_type_store_uidx" ON "clienteling_activities" USING btree ("business_date","type","store_id") WHERE "clienteling_activities"."store_id" is not null;--> statement-breakpoint
+CREATE UNIQUE INDEX "clienteling_date_type_group_uidx" ON "clienteling_activities" USING btree ("business_date","type") WHERE "clienteling_activities"."store_id" is null;--> statement-breakpoint
+CREATE UNIQUE INDEX "digital_reputation_date_brand_uidx" ON "digital_reputation_snapshots" USING btree ("business_date","brand_id") WHERE "digital_reputation_snapshots"."brand_id" is not null;--> statement-breakpoint
+CREATE UNIQUE INDEX "digital_reputation_date_group_uidx" ON "digital_reputation_snapshots" USING btree ("business_date") WHERE "digital_reputation_snapshots"."brand_id" is null;--> statement-breakpoint
+CREATE UNIQUE INDEX "targets_group_period_uidx" ON "performance_targets" USING btree ("metric","period_start","period_end") WHERE "performance_targets"."scope_type" = 'group';--> statement-breakpoint
+CREATE UNIQUE INDEX "targets_store_period_uidx" ON "performance_targets" USING btree ("metric","store_id","period_start","period_end") WHERE "performance_targets"."scope_type" = 'store';--> statement-breakpoint
+CREATE UNIQUE INDEX "targets_brand_period_uidx" ON "performance_targets" USING btree ("metric","brand_id","period_start","period_end") WHERE "performance_targets"."scope_type" = 'brand';--> statement-breakpoint
+CREATE UNIQUE INDEX "targets_category_period_uidx" ON "performance_targets" USING btree ("metric","category_id","period_start","period_end") WHERE "performance_targets"."scope_type" = 'category';--> statement-breakpoint
+CREATE UNIQUE INDEX "social_metrics_date_platform_brand_uidx" ON "social_metrics" USING btree ("business_date","platform","brand_id") WHERE "social_metrics"."brand_id" is not null;--> statement-breakpoint
+CREATE UNIQUE INDEX "social_metrics_date_platform_group_uidx" ON "social_metrics" USING btree ("business_date","platform") WHERE "social_metrics"."brand_id" is null;--> statement-breakpoint
+CREATE UNIQUE INDEX "sop_reviews_store_date_area_uidx" ON "sop_reviews" USING btree ("store_id","business_date","area");--> statement-breakpoint
+CREATE UNIQUE INDEX "store_experience_reviews_store_date_category_uidx" ON "store_experience_reviews" USING btree ("store_id","business_date","category");--> statement-breakpoint
+CREATE UNIQUE INDEX "store_standard_reviews_store_date_uidx" ON "store_standard_reviews" USING btree ("store_id","business_date");--> statement-breakpoint
+CREATE UNIQUE INDEX "vm_reviews_store_date_uidx" ON "visual_merchandising_reviews" USING btree ("store_id","business_date");

@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { cookies } from 'next/headers';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
-import { getSession } from '@/lib/auth';
+import { createSessionToken, getSession } from '@/lib/auth';
 import { verifyPassword, hashPassword } from '@/lib/password';
 import { getOrgSettings } from '@/lib/org-server';
+import { isDepartment, isUserRole, isValidRoleDepartment } from '@/lib/access';
 
 // Self-service password change for the signed-in user.
 export async function POST(req: NextRequest) {
@@ -24,6 +26,44 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Current password is incorrect' }, { status: 400 });
   }
 
-  await db.update(users).set({ passwordHash: await hashPassword(String(newPassword)) }).where(eq(users.id, u.id));
+  const nextPasswordHash = await hashPassword(String(newPassword));
+  const [row] = await db
+    .update(users)
+    .set({
+      passwordHash: nextPasswordHash,
+      sessionVersion: sql`${users.sessionVersion} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(users.id, u.id),
+        eq(users.passwordHash, u.passwordHash),
+        eq(users.sessionVersion, u.sessionVersion)
+      )
+    )
+    .returning();
+  if (!row) {
+    return NextResponse.json({ error: 'Your password changed while this request was in progress. Sign in and try again.' }, { status: 409 });
+  }
+  if (!isUserRole(row.role) || !isDepartment(row.department) || !isValidRoleDepartment(row.role, row.department)) {
+    return NextResponse.json({ error: 'Account access configuration is invalid' }, { status: 409 });
+  }
+  const token = await createSessionToken({
+    id: String(row.id),
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    department: row.department,
+    store: row.store ?? '',
+    sessionVersion: row.sessionVersion,
+  });
+  const cookieStore = await cookies();
+  cookieStore.set('session', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * (await getOrgSettings()).security.sessionDays,
+    path: '/',
+  });
   return NextResponse.json({ ok: true });
 }

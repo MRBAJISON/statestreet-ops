@@ -8,6 +8,9 @@ export default async function DashboardPage() {
   if (session.user.role === 'owner') {
     redirect('/dashboard/executive');
   }
+  if (session.user.role === 'store-manager') {
+    redirect('/dashboard/store-manager');
+  }
 
   const dept = session.user.department === 'brand' ? 'brand-health' : session.user.department;
   redirect(`/dashboard/${dept}`);

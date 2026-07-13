@@ -51,10 +51,12 @@ const report: DailyReportRecord = {
       grossRevenue: '500.00',
       cogs: '250.00',
       discounts: '20.00',
+      returns: '0.00',
       creditSales: '80.00',
     },
   ],
   payments: [{ paymentMethodId: 20, amount: '400.00' }],
+  activity: [],
 };
 
 describe('daily report form helpers', () => {
@@ -100,6 +102,7 @@ describe('daily report form helpers', () => {
       grossRevenue: '500',
       cogs: '250',
       discounts: '',
+      returns: '',
       creditSales: '80',
     };
     draft.payments[0].amount = '420';
@@ -113,6 +116,7 @@ describe('daily report form helpers', () => {
         grossRevenue: '500.00',
         cogs: '250.00',
         discounts: '0.00',
+        returns: '0.00',
         creditSales: '80.00',
       },
     ]);
