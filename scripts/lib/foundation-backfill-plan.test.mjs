@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildFoundationBackfillPlan } from './foundation-backfill-plan.mjs';
+import {
+  buildFoundationBackfillPlan,
+  legacyCount,
+  normalizeLegacyCustomerCounts,
+  validLegacyCount,
+} from './foundation-backfill-plan.mjs';
 
 const org = {
   stores: [{ value: 'labone-men', label: 'Labone Men' }],
@@ -73,6 +78,51 @@ describe('foundation backfill planner', () => {
       expenseCategories: [],
       relationships: [],
     });
+  });
+
+  it('uses the same legacy count and customer normalization as the converter', () => {
+    expect(validLegacyCount('12.9')).toBe(true);
+    expect(legacyCount('12.9')).toBe(12);
+    expect(normalizeLegacyCustomerCounts('4', '3', '2')).toEqual({
+      totalCustomers: 5,
+      newCustomers: 3,
+      returningCustomers: 2,
+    });
+  });
+
+  it('preserves closing-only days and links every repeated closing source row', () => {
+    const plan = buildFoundationBackfillPlan(org, [
+      {
+        id: 10,
+        department: 'finance',
+        form_type: 'closing',
+        created_at: '2026-07-10T18:00:00Z',
+        payload: { store: 'labone-men', date: '2026-07-10', pay_cash: '100' },
+      },
+      {
+        id: 11,
+        department: 'finance',
+        form_type: 'closing',
+        created_at: '2026-07-10T19:00:00Z',
+        payload: {
+          store: 'labone-men',
+          date: '2026-07-10',
+          customers: '4',
+          newCustomers: '3',
+          returningCustomers: '2',
+          pay_cash: '125',
+        },
+      },
+    ]);
+
+    expect(plan.dailyReports).toMatchObject({
+      reports: 1,
+      salesLines: 0,
+      paymentLines: 1,
+      legacyLinks: 2,
+      closingWithoutSales: 1,
+    });
+    expect(plan.blockers.numbers).toEqual([]);
   });
 
   it('reports unresolved references and product classification gaps without inventing records', () => {

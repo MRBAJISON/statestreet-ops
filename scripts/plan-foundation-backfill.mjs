@@ -37,7 +37,7 @@ try {
   const plan = buildFoundationBackfillPlan(orgResult.rows[0].payload, entriesResult.rows);
   console.log(JSON.stringify(plan, null, 2));
   const blockerCount = Object.values(plan.blockers).reduce((sum, values) => sum + values.length, 0);
-  if (blockerCount || plan.dailyReports.closingWithoutSales || plan.products.conflicting) process.exitCode = 2;
+  if (blockerCount || plan.products.conflicting) process.exitCode = 2;
 } catch (error) {
   console.error((error instanceof Error ? error.message : String(error)).replace(databaseUrl, '[DATABASE_URL]'));
   process.exitCode = 1;

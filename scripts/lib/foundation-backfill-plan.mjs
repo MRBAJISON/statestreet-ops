@@ -40,6 +40,24 @@ function integer(value) {
   return Number.isFinite(parsed) && parsed >= 0 ? Math.trunc(parsed) : 0;
 }
 
+export function validLegacyCount(value) {
+  return validNumber(value);
+}
+
+export function legacyCount(value) {
+  return integer(value);
+}
+
+export function normalizeLegacyCustomerCounts(totalValue, newValue, returningValue) {
+  const newCustomers = integer(newValue);
+  const returningCustomers = integer(returningValue);
+  return {
+    totalCustomers: Math.max(integer(totalValue), newCustomers + returningCustomers),
+    newCustomers,
+    returningCustomers,
+  };
+}
+
 function cents(value) {
   const normalized = clean(value).replace(/[, ]/g, '');
   if (!/^\d+(?:\.\d+)?$/.test(normalized)) return BigInt(0);
@@ -162,7 +180,7 @@ export function buildFoundationBackfillPlan(org, entries) {
 
   const revenueRows = entries.filter((entry) => entry.department === 'finance' && entry.form_type === 'revenue');
   const closingRows = entries.filter((entry) => entry.department === 'finance' && entry.form_type === 'closing');
-  const closingByDay = new Map();
+  const closingsByDay = new Map();
   for (const entry of closingRows) {
     const store = clean(entry.payload?.store);
     const date = clean(entry.payload?.date);
@@ -173,8 +191,10 @@ export function buildFoundationBackfillPlan(org, entries) {
     }
     if (!stores.has(store) || !validDate(date)) continue;
     const key = `${store}|${date}`;
-    const existing = closingByDay.get(key);
-    if (!existing || String(existing.created_at) < String(entry.created_at)) closingByDay.set(key, entry);
+    const group = closingsByDay.get(key) ?? { store, date, entries: [], latest: null };
+    group.entries.push(entry);
+    if (!group.latest || String(group.latest.created_at) < String(entry.created_at)) group.latest = entry;
+    closingsByDay.set(key, group);
   }
 
   const reports = new Map();
@@ -207,7 +227,7 @@ export function buildFoundationBackfillPlan(org, entries) {
       'footfall',
       'itemsSold',
     ]) {
-      if (!validNumber(payload[field])) invalidNumbers.add(`${entry.id}:${field}`);
+      if (!validLegacyCount(payload[field])) invalidNumbers.add(`${entry.id}:${field}`);
     }
     if (!stores.has(store) || !categories.has(category) || !validDate(date)) continue;
     const key = `${store}|${date}`;
@@ -219,8 +239,8 @@ export function buildFoundationBackfillPlan(org, entries) {
       links: [],
       lines: new Map(),
     };
-    const transactions = integer(payload.transactions);
-    const footfall = integer(payload.footfall);
+    const transactions = legacyCount(payload.transactions);
+    const footfall = legacyCount(payload.footfall);
     oldTransactions += transactions;
     oldFootfall += footfall;
     report.transactions = Math.max(report.transactions, transactions);
@@ -235,8 +255,8 @@ export function buildFoundationBackfillPlan(org, entries) {
       discounts: BigInt(0),
       creditSales: BigInt(0),
     };
-    line.openingStock += integer(payload.openingStock);
-    line.unitsSold += integer(payload.itemsSold);
+    line.openingStock += legacyCount(payload.openingStock);
+    line.unitsSold += legacyCount(payload.itemsSold);
     line.grossRevenue += cents(payload.grossRevenue);
     line.cogs += cents(payload.cogs);
     line.discounts += cents(payload.discounts);
@@ -245,21 +265,35 @@ export function buildFoundationBackfillPlan(org, entries) {
     totals.cogs += cents(payload.cogs);
     totals.discounts += cents(payload.discounts);
     totals.creditSales += cents(payload.creditSales);
-    totals.unitsSold += integer(payload.itemsSold);
+    totals.unitsSold += legacyCount(payload.itemsSold);
     report.lines.set(category, line);
+    reports.set(key, report);
+  }
+
+  const closingWithoutSales = [...closingsByDay.keys()].filter((key) => !reports.has(key)).length;
+  for (const [key, closingGroup] of closingsByDay) {
+    const report = reports.get(key) ?? {
+      store: closingGroup.store,
+      date: closingGroup.date,
+      transactions: 0,
+      footfall: 0,
+      links: [],
+      lines: new Map(),
+    };
+    report.links.push(...closingGroup.entries.map((entry) => entry.id));
+    report.closing = closingGroup.latest;
     reports.set(key, report);
   }
 
   let salesLineCount = 0;
   let paymentLineCount = 0;
   let legacyLinkCount = 0;
-  for (const [key, report] of reports) {
+  for (const report of reports.values()) {
     plannedTransactions += report.transactions;
     plannedFootfall += report.footfall;
     salesLineCount += report.lines.size;
-    const closing = closingByDay.get(key);
+    const closing = report.closing;
     if (closing) {
-      report.links.push(closing.id);
       for (const [, field] of PAYMENT_FIELDS) {
         if (cents(closing.payload?.[field]) > BigInt(0)) paymentLineCount += 1;
       }
@@ -290,7 +324,6 @@ export function buildFoundationBackfillPlan(org, entries) {
     } else unclassifiedProducts += 1;
   }
 
-  const closingWithoutSales = [...closingByDay.keys()].filter((key) => !reports.has(key)).length;
   return {
     masters: {
       stores: catalog.stores.length,

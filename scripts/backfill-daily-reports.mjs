@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 import nextEnv from '@next/env';
 import pg from 'pg';
+import {
+  legacyCount,
+  normalizeLegacyCustomerCounts,
+  validLegacyCount,
+} from './lib/foundation-backfill-plan.mjs';
 
 const { loadEnvConfig } = nextEnv;
 loadEnvConfig(process.cwd(), true);
@@ -28,9 +33,7 @@ const client = new pg.Client({ connectionString: databaseUrl });
 const clean = (value) => String(value ?? '').trim();
 const normalizedNumber = (value) => clean(value).replace(/[, ]/g, '');
 const validNumber = (value) => /^\d+(?:\.\d{1,2})?$/.test(normalizedNumber(value) || '0');
-const validCount = (value) => /^\d+$/.test(normalizedNumber(value) || '0');
 const amount = (value) => Number(normalizedNumber(value) || '0').toFixed(2);
-const count = (value) => Math.trunc(Number(normalizedNumber(value) || '0'));
 
 function validDate(value) {
   const text = clean(value);
@@ -122,14 +125,14 @@ async function buildPlan() {
       const countFields = ['openingStock', 'transactions', 'footfall', 'itemsSold'];
       const moneyFields = ['grossRevenue', 'cogs', 'discounts', 'creditSales'];
       for (const field of countFields) {
-        if (!validCount(payload[field])) appendBlocker(blockers, entry, field, 'invalid-count');
+        if (!validLegacyCount(payload[field])) appendBlocker(blockers, entry, field, 'invalid-count');
       }
       for (const field of moneyFields) {
         if (!validNumber(payload[field])) appendBlocker(blockers, entry, field, 'invalid-number');
       }
       if (
         !categoryId ||
-        countFields.some((field) => !validCount(payload[field])) ||
+        countFields.some((field) => !validLegacyCount(payload[field])) ||
         moneyFields.some((field) => !validNumber(payload[field]))
       ) continue;
       const grossRevenue = Number(amount(payload.grossRevenue));
@@ -137,8 +140,8 @@ async function buildPlan() {
       const creditSales = Number(amount(payload.creditSales));
       if (discounts > grossRevenue) appendBlocker(blockers, entry, 'discounts', 'exceeds-gross-revenue');
       if (creditSales > grossRevenue - discounts) appendBlocker(blockers, entry, 'creditSales', 'exceeds-net-revenue');
-      report.transactions = Math.max(report.transactions, count(payload.transactions));
-      report.footfall = Math.max(report.footfall, count(payload.footfall));
+      report.transactions = Math.max(report.transactions, legacyCount(payload.transactions));
+      report.footfall = Math.max(report.footfall, legacyCount(payload.footfall));
       const line = report.sales.get(categoryId) ?? {
         categoryId,
         openingStock: 0,
@@ -148,8 +151,8 @@ async function buildPlan() {
         discounts: 0,
         creditSales: 0,
       };
-      line.openingStock += count(payload.openingStock);
-      line.unitsSold += count(payload.itemsSold);
+      line.openingStock += legacyCount(payload.openingStock);
+      line.unitsSold += legacyCount(payload.itemsSold);
       line.grossRevenue += grossRevenue;
       line.cogs += Number(amount(payload.cogs));
       line.discounts += discounts;
@@ -161,21 +164,20 @@ async function buildPlan() {
     const customerFields = ['customers', 'newCustomers', 'returningCustomers'];
     const paymentFields = PAYMENT_FIELDS.map(([, field]) => field);
     for (const field of customerFields) {
-      if (!validCount(payload[field])) appendBlocker(blockers, entry, field, 'invalid-count');
+      if (!validLegacyCount(payload[field])) appendBlocker(blockers, entry, field, 'invalid-count');
     }
     for (const field of paymentFields) {
       if (!validNumber(payload[field])) appendBlocker(blockers, entry, field, 'invalid-number');
     }
     if (
-      customerFields.some((field) => !validCount(payload[field])) ||
+      customerFields.some((field) => !validLegacyCount(payload[field])) ||
       paymentFields.some((field) => !validNumber(payload[field]))
     ) continue;
-    const totalCustomers = count(payload.customers);
-    const newCustomers = count(payload.newCustomers);
-    const returningCustomers = count(payload.returningCustomers);
-    if (newCustomers + returningCustomers > totalCustomers) {
-      appendBlocker(blockers, entry, 'customers', 'breakdown-exceeds-total');
-    }
+    const { totalCustomers, newCustomers, returningCustomers } = normalizeLegacyCustomerCounts(
+      payload.customers,
+      payload.newCustomers,
+      payload.returningCustomers
+    );
     const closingTime = new Date(entry.created_at).getTime();
     if (report.latestClosingAtMs === null || closingTime >= report.latestClosingAtMs) {
       report.latestClosingAtMs = closingTime;

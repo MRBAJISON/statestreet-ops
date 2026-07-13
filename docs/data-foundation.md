@@ -88,7 +88,8 @@ mappings, upserts current values, and marks removed values inactive.
 - unresolved store/category/date values;
 - revenue, COGS, discount, credit-sales, and unit parity;
 - the intended transaction/footfall correction when repeated category-level
-  header counts become one store/day value.
+  header counts become one store/day value;
+- closing-only reports and every repeated closing source link.
 
 The planner exits `2` when review is required. It never writes or prints customer
 records. No production backfill should be written until this output is reviewed
@@ -108,8 +109,11 @@ npm run db:backfill:daily -- --apply
 ```
 
 The command is transactional and idempotent through `daily_report_legacy_entries`. It refuses
-unknown references, invalid amounts, customer-count inconsistencies, and collisions with existing
-typed reports. It never invents a store, category, or payment method.
+unknown references, invalid amounts, and collisions with existing typed reports. Closing-only days
+become typed reports with zero sales lines so their payments and customer counts remain queryable.
+Historical decimal count fields are truncated consistently, and the customer total is raised when
+needed to preserve a larger new-plus-returning breakdown. It never invents a store, category, or
+payment method.
 
 The analytics API also checks this gate at runtime. If a legacy `finance/revenue` or
 `finance/closing` source is not linked to a typed daily report, it returns
