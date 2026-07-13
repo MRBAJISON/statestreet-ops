@@ -74,6 +74,19 @@ export async function getBrandDomain(scope: AnalyticsScope): Promise<BrandDomain
       left join sentiment_rows sentiment on sentiment.brand_id = brand.id
       left join digital_latest digital on digital.brand_id = brand.id
       where brand.active = true and (assessment.brand_id is not null or sentiment.brand_id is not null or digital.brand_id is not null)
+    ), brand_group as (
+      select
+        avg(health) as health,
+        avg(awareness) as awareness,
+        avg(consideration) as consideration,
+        avg(preference) as preference,
+        avg(satisfaction) as satisfaction,
+        avg(loyalty) as loyalty,
+        avg(advocacy) as advocacy,
+        avg(momentum) as momentum,
+        avg(positive_sentiment) as positive_sentiment,
+        avg(google_rating) as google_rating
+      from brand_rows
     ), sentiment_summary as (
       select
         coalesce(sum(positive_mentions), 0) as positive,
@@ -138,10 +151,10 @@ export async function getBrandDomain(scope: AnalyticsScope): Promise<BrandDomain
     )
     select jsonb_build_object(
       'summary', jsonb_build_object(
-        'healthIndex', coalesce(round(avg(brand.health), 1), 0)::float8,
-        'momentum', coalesce(round(avg(brand.momentum), 1), 0)::float8,
-        'positiveSentiment', coalesce(round(avg(brand.positive_sentiment), 1), 0)::float8,
-        'googleRating', round(avg(brand.google_rating), 2)::float8,
+        'healthIndex', coalesce(round(brand.health, 1), 0)::float8,
+        'momentum', coalesce(round(brand.momentum, 1), 0)::float8,
+        'positiveSentiment', coalesce(round(brand.positive_sentiment, 1), 0)::float8,
+        'googleRating', round(brand.google_rating, 2)::float8,
         'nps', (select nps::float8 from feedback_summary),
         'highThreats', (
           select count(*) from competitor_rows where threat_level in ('high', 'critical')
@@ -180,13 +193,13 @@ export async function getBrandDomain(scope: AnalyticsScope): Promise<BrandDomain
         from feedback_rows item
       ), '[]'::jsonb),
       'equity', jsonb_build_array(
-        jsonb_build_object('name', 'Awareness', 'value', coalesce(round(avg(brand.awareness), 1), 0)::float8),
-        jsonb_build_object('name', 'Consideration', 'value', coalesce(round(avg(brand.consideration), 1), 0)::float8),
-        jsonb_build_object('name', 'Preference', 'value', coalesce(round(avg(brand.preference), 1), 0)::float8),
-        jsonb_build_object('name', 'Satisfaction', 'value', coalesce(round(avg(brand.satisfaction), 1), 0)::float8),
-        jsonb_build_object('name', 'Loyalty', 'value', coalesce(round(avg(brand.loyalty), 1), 0)::float8),
-        jsonb_build_object('name', 'Advocacy', 'value', coalesce(round(avg(brand.advocacy), 1), 0)::float8),
-        jsonb_build_object('name', 'Momentum', 'value', coalesce(round(avg(brand.momentum), 1), 0)::float8)
+        jsonb_build_object('name', 'Awareness', 'value', coalesce(round(brand.awareness, 1), 0)::float8),
+        jsonb_build_object('name', 'Consideration', 'value', coalesce(round(brand.consideration, 1), 0)::float8),
+        jsonb_build_object('name', 'Preference', 'value', coalesce(round(brand.preference, 1), 0)::float8),
+        jsonb_build_object('name', 'Satisfaction', 'value', coalesce(round(brand.satisfaction, 1), 0)::float8),
+        jsonb_build_object('name', 'Loyalty', 'value', coalesce(round(brand.loyalty, 1), 0)::float8),
+        jsonb_build_object('name', 'Advocacy', 'value', coalesce(round(brand.advocacy, 1), 0)::float8),
+        jsonb_build_object('name', 'Momentum', 'value', coalesce(round(brand.momentum, 1), 0)::float8)
       ),
       'sentiment', jsonb_build_object(
         'positive', sentiment.positive::integer,
@@ -235,14 +248,9 @@ export async function getBrandDomain(scope: AnalyticsScope): Promise<BrandDomain
         from attention_rows action
       ), '[]'::jsonb)
     ) as data
-    from brand_rows brand
+    from brand_group brand
     cross join sentiment_summary sentiment
-    left join digital_group digital on true
-    group by
-      sentiment.positive, sentiment.neutral, sentiment.negative,
-      digital.google_rating, digital.google_review_count, digital.trustpilot_rating,
-      digital.response_rate, digital.nps, digital.instagram_followers,
-      digital.new_reviews, digital.negative_reviews
+    cross join digital_group digital
   `);
 
   return jsonResult<BrandDomain>(result);

@@ -85,6 +85,103 @@ describeWithDatabase('reporting SQL integration', () => {
     expect(trading.brands).toEqual([{ name: 'Unassigned', value: 150 }]);
   });
 
+  it('keeps group revenue trends visible when store reporting is sparse', async () => {
+    const sparseStoreRows = await client.query(
+      `insert into stores (code, name) values
+         ('sparse-1', 'Sparse Store 1'),
+         ('sparse-2', 'Sparse Store 2'),
+         ('sparse-3', 'Sparse Store 3'),
+         ('sparse-4', 'Sparse Store 4')
+       returning id`
+    );
+
+    try {
+      const { getTradingOverview } = await import('./trading');
+      const trading = await getTradingOverview({
+        preset: 'custom',
+        from: '2026-07-01',
+        to: '2026-07-31',
+        compareFrom: '2026-06-01',
+        compareTo: '2026-06-30',
+        store: null,
+      });
+
+      expect(trading.trend.find((point) => point.date === '2026-07-10')).toMatchObject({
+        revenue: 150,
+        grossProfit: 90,
+      });
+    } finally {
+      await client.query('update stores set active = false where id = any($1::bigint[])', [
+        sparseStoreRows.rows.map((row) => row.id),
+      ]);
+    }
+  });
+
+  it('stops group revenue trends at the latest sufficiently reported day', async () => {
+    const secondStoreId = Number(
+      (await client.query(`insert into stores (code, name) values ('coverage-store', 'Coverage Store') returning id`)).rows[0].id
+    );
+    const categoryId = Number((await client.query(`select min(id) as id from categories`)).rows[0].id);
+    const insertedReports = await client.query(
+      `insert into daily_reports (
+         store_id, business_date, status, transactions, footfall, created_by_user_id, updated_by_user_id
+       ) values
+         ($1, '2026-07-10', 'approved', 2, 3, $3, $3),
+         ($2, '2026-07-11', 'approved', 1, 2, $3, $3)
+       returning id`,
+      [secondStoreId, storeId, userId]
+    );
+    const insertedReportIds = insertedReports.rows.map((row) => Number(row.id));
+    await client.query(
+      `insert into daily_sales_lines (daily_report_id, category_id, opening_stock, units_sold, gross_revenue, cogs)
+       values ($1, $3, 4, 1, 80, 30), ($2, $3, 3, 1, 70, 25)`,
+      [insertedReportIds[0], insertedReportIds[1], categoryId]
+    );
+
+    try {
+      const { getTradingOverview } = await import('./trading');
+      const trading = await getTradingOverview({
+        preset: 'custom',
+        from: '2026-07-01',
+        to: '2026-07-31',
+        compareFrom: '2026-06-01',
+        compareTo: '2026-06-30',
+        store: null,
+      });
+
+      expect(trading.trend.at(-1)?.date).toBe('2026-07-10');
+      expect(trading.trend.some((point) => point.date === '2026-07-11')).toBe(false);
+    } finally {
+      await client.query('delete from daily_sales_lines where daily_report_id = any($1::bigint[])', [insertedReportIds]);
+      await client.query('delete from daily_reports where id = any($1::bigint[])', [insertedReportIds]);
+      await client.query('delete from stores where id = $1', [secondStoreId]);
+    }
+  });
+
+  it('returns an empty brand-health domain before brand reporting starts', async () => {
+    const { getBrandDomain } = await import('./brand');
+    const brand = await getBrandDomain({
+      preset: 'custom',
+      from: '2026-07-01',
+      to: '2026-07-31',
+      compareFrom: '2026-06-01',
+      compareTo: '2026-06-30',
+      store: null,
+    });
+
+    expect(brand.summary).toMatchObject({
+      healthIndex: 0,
+      momentum: 0,
+      positiveSentiment: 0,
+      googleRating: null,
+      nps: null,
+      highThreats: 0,
+    });
+    expect(brand.brands).toEqual([]);
+    expect(brand.sentimentTrend).toEqual([]);
+    expect(brand.attention).toEqual([]);
+  });
+
   it('prefers group targets for group dashboards and store targets for a selected store', async () => {
     await client.query(
       `insert into performance_targets (
@@ -282,6 +379,11 @@ describeWithDatabase('reporting SQL integration', () => {
          ('2026-07-12', $2, 50, 50, 5000, $3, $3)`,
       [storeId, snapshotOnlyStoreId, userId]
     );
+    await client.query(
+      `insert into brand_stores (brand_id, store_id)
+       values ((select min(id) from brands), $1)`,
+      [snapshotOnlyStoreId]
+    );
     const { getInventoryDomain } = await import('./inventory');
     const inventory = await getInventoryDomain({
       preset: 'custom',
@@ -294,6 +396,21 @@ describeWithDatabase('reporting SQL integration', () => {
 
     expect(inventory.summary).toMatchObject({ unitsOnHand: 98, inventoryValue: 15000, stockAccuracy: 98 });
     expect(inventory.stock).toEqual([]);
+    expect(inventory.valueByBrand).toEqual([{ name: 'Unassigned', value: 15000 }]);
+    expect(inventory.accuracyDistribution).toEqual([{ name: 'Within 2%', value: 1 }]);
+
+    const groupSnapshots = await getInventoryDomain({
+      preset: 'custom', from: '2026-07-01', to: '2026-07-31',
+      compareFrom: '2026-06-01', compareTo: '2026-06-30', store: null,
+    });
+    expect(groupSnapshots.valueByBrand).toEqual([
+      { name: 'Unassigned', value: 15000 },
+      { name: 'Brand A', value: 5000 },
+    ]);
+    expect(groupSnapshots.accuracyDistribution).toEqual([
+      { name: 'Exact', value: 1 },
+      { name: 'Within 2%', value: 1 },
+    ]);
 
     const productId = Number(
       (await client.query(

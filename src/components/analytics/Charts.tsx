@@ -1,5 +1,6 @@
 'use client';
 
+import { ChartNoAxesCombined } from 'lucide-react';
 import {
   Area,
   Bar,
@@ -25,7 +26,21 @@ const revenueConfig = {
   grossProfit: { label: 'Gross profit', color: 'var(--chart-4)' },
 } satisfies ChartConfig;
 
+function ChartEmptyState({ className }: { className: string }) {
+  return (
+    <div className={`flex w-full flex-col items-center justify-center gap-2 text-center text-muted-foreground ${className}`} role="status">
+      <span className="flex size-9 items-center justify-center rounded-md bg-muted">
+        <ChartNoAxesCombined className="size-4" />
+      </span>
+      <span className="text-xs font-medium">No recorded data for this period</span>
+    </div>
+  );
+}
+
 export function RevenueTrendChart({ data, currency }: { data: TradingTrendPoint[]; currency: string }) {
+  if (!data.length) {
+    return <ChartEmptyState className="h-[310px]" />;
+  }
   return (
     <ChartContainer config={revenueConfig} className="h-[310px] w-full aspect-auto" initialDimension={{ width: 760, height: 310 }}>
       <ComposedChart data={data} margin={{ top: 14, right: 8, left: 0, bottom: 0 }} accessibilityLayer>
@@ -91,6 +106,9 @@ export function RevenueTrendChart({ data, currency }: { data: TradingTrendPoint[
 const storeConfig = { revenue: { label: 'Revenue', color: 'var(--chart-1)' } } satisfies ChartConfig;
 
 export function StoreRankingChart({ data, currency }: { data: StorePerformanceRow[]; currency: string }) {
+  if (!data.length) {
+    return <ChartEmptyState className="h-[320px]" />;
+  }
   return (
     <ChartContainer config={storeConfig} className="h-[320px] w-full aspect-auto" initialDimension={{ width: 700, height: 320 }}>
       <BarChart data={data.slice(0, 8)} layout="vertical" margin={{ top: 6, right: 14, left: 18, bottom: 0 }} accessibilityLayer>
@@ -112,6 +130,9 @@ const categoryConfig = { value: { label: 'Revenue' } } satisfies ChartConfig;
 
 export function CategoryContributionChart({ data }: { data: CategoryPerformanceRow[] }) {
   const chartData = data.slice(0, 5).map((item) => ({ name: item.name, value: item.revenue }));
+  if (!chartData.length) {
+    return <ChartEmptyState className="h-[220px]" />;
+  }
   return (
     <ChartContainer config={categoryConfig} className="mx-auto h-[220px] w-full max-w-[320px] aspect-auto" initialDimension={{ width: 300, height: 220 }}>
       <PieChart accessibilityLayer>
@@ -127,6 +148,9 @@ export function CategoryContributionChart({ data }: { data: CategoryPerformanceR
 const namedConfig = { value: { label: 'Value', color: 'var(--chart-4)' } } satisfies ChartConfig;
 
 export function NamedBarChart({ data, valueFormatter = formatNumber }: { data: NamedValue[]; valueFormatter?: (value: number) => string }) {
+  if (!data.length) {
+    return <ChartEmptyState className="h-[260px]" />;
+  }
   return (
     <ChartContainer config={namedConfig} className="h-[260px] w-full aspect-auto" initialDimension={{ width: 520, height: 260 }}>
       <BarChart data={data.slice(0, 8)} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} accessibilityLayer>
@@ -141,6 +165,9 @@ export function NamedBarChart({ data, valueFormatter = formatNumber }: { data: N
 }
 
 export function HorizontalBarChart({ data, valueFormatter = formatNumber }: { data: NamedValue[]; valueFormatter?: (value: number) => string }) {
+  if (!data.length) {
+    return <ChartEmptyState className="h-[270px]" />;
+  }
   return (
     <ChartContainer config={namedConfig} className="h-[270px] w-full aspect-auto" initialDimension={{ width: 520, height: 270 }}>
       <BarChart data={data.slice(0, 9)} layout="vertical" margin={{ top: 8, right: 12, left: 22, bottom: 0 }} accessibilityLayer>
@@ -164,6 +191,9 @@ export function DonutChart({
   valueFormatter?: (value: number) => string;
 }) {
   const chartData = data.slice(0, 8);
+  if (!chartData.length) {
+    return <ChartEmptyState className="h-[230px]" />;
+  }
   return (
     <ChartContainer config={donutConfig} className="mx-auto h-[230px] w-full max-w-[340px] aspect-auto" initialDimension={{ width: 320, height: 230 }}>
       <PieChart accessibilityLayer>
@@ -202,6 +232,9 @@ export function ComparisonBarChart({
     primary: { ...comparisonConfig.primary, label: primaryLabel },
     secondary: { ...comparisonConfig.secondary, label: secondaryLabel },
   } satisfies ChartConfig;
+  if (!data.length) {
+    return <ChartEmptyState className="h-[290px]" />;
+  }
   return (
     <ChartContainer config={config} className="h-[290px] w-full aspect-auto" initialDimension={{ width: 650, height: 290 }}>
       <BarChart data={data.slice(0, 10)} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} accessibilityLayer>
@@ -224,6 +257,9 @@ export function ComparisonBarChart({
 const trendConfig = { value: { label: 'Value', color: 'var(--chart-1)' } } satisfies ChartConfig;
 
 export function ValueTrendChart({ data, valueFormatter = formatNumber }: { data: Array<{ date: string; value: number }>; valueFormatter?: (value: number) => string }) {
+  if (!data.length) {
+    return <ChartEmptyState className="h-[270px]" />;
+  }
   return (
     <ChartContainer config={trendConfig} className="h-[270px] w-full aspect-auto" initialDimension={{ width: 640, height: 270 }}>
       <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} accessibilityLayer>
@@ -244,6 +280,9 @@ const sentimentConfig = {
 } satisfies ChartConfig;
 
 export function SentimentTrendChart({ data }: { data: Array<{ date: string; positive: number; neutral: number; negative: number }> }) {
+  if (!data.length) {
+    return <ChartEmptyState className="h-[270px]" />;
+  }
   return (
     <ChartContainer config={sentimentConfig} className="h-[270px] w-full aspect-auto" initialDimension={{ width: 640, height: 270 }}>
       <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} accessibilityLayer>
@@ -272,6 +311,9 @@ export function CashFlowChart({
   data: Array<{ date: string; inflow: number; outflow: number }>;
   currency: string;
 }) {
+  if (!data.length) {
+    return <ChartEmptyState className="h-[280px]" />;
+  }
   return (
     <ChartContainer config={cashConfig} className="h-[280px] w-full aspect-auto" initialDimension={{ width: 680, height: 280 }}>
       <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} accessibilityLayer>

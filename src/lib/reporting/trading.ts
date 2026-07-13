@@ -148,16 +148,21 @@ export async function getTradingOverview(scope: AnalyticsScope): Promise<Trading
       left join standard_scores standard on standard.store_id = store.id
       group by store.id, store.code, store.name, store.brand_name, target.value, standard.operations, standard.vm
     ), trend_range as (
-      select max(complete_day.business_date) as end_date
-      from (
-        select trade.business_date
-        from current_trade trade
-        group by trade.business_date
-        having count(distinct trade.store_id) >= greatest(
-          1,
-          ceil((select count(*) from eligible_stores) * 0.8)::integer
-        )
-      ) complete_day
+      select coalesce(
+        (
+          select max(complete_day.business_date)
+          from (
+            select trade.business_date
+            from current_trade trade
+            group by trade.business_date
+            having count(distinct trade.store_id) >= greatest(
+              1,
+              ceil((select count(*) from eligible_stores) * 0.8)::integer
+            )
+          ) complete_day
+        ),
+        (select max(trade.business_date) from current_trade trade)
+      ) as end_date
     ), dates as (
       select generated.date::date
       from trend_range range

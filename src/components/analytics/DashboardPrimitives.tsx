@@ -1,8 +1,9 @@
 import type { LucideIcon } from 'lucide-react';
-import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Inbox } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TableCell, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { formatPercent } from './format';
 
@@ -95,6 +96,27 @@ export function SectionHeading({
       </div>
       {action}
     </div>
+  );
+}
+
+export function EmptyPanel({ message = 'No records for this period', className }: { message?: string; className?: string }) {
+  return (
+    <div className={cn('flex min-h-28 flex-col items-center justify-center gap-2 text-center text-muted-foreground', className)}>
+      <span className="flex size-9 items-center justify-center rounded-md bg-muted">
+        <Inbox className="size-4" />
+      </span>
+      <span className="text-xs font-medium">{message}</span>
+    </div>
+  );
+}
+
+export function EmptyTableRow({ colSpan, message = 'No records for this period' }: { colSpan: number; message?: string }) {
+  return (
+    <TableRow>
+      <TableCell colSpan={colSpan} className="h-28 text-center text-xs font-medium text-muted-foreground">
+        {message}
+      </TableCell>
+    </TableRow>
   );
 }
 

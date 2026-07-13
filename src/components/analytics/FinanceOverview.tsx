@@ -1,7 +1,7 @@
 import { CircleDollarSign, Clock3, Landmark, ReceiptText, Scale, TrendingUp } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { AnalyticsMeta, FinanceDomain, TradingOverview } from '@/lib/contracts/analytics';
-import { Attainment, MetricRail, SectionHeading, StatusBadge } from './DashboardPrimitives';
+import { Attainment, EmptyTableRow, MetricRail, SectionHeading, StatusBadge } from './DashboardPrimitives';
 import { CashFlowChart, ComparisonBarChart, HorizontalBarChart, NamedBarChart } from './Charts';
 import { formatCurrency, formatNumber, formatPercent } from './format';
 import { TradingSnapshot } from './TradingSnapshot';
@@ -62,7 +62,7 @@ export function FinanceOverview({ meta, trading, domain }: { meta: AnalyticsMeta
           <div className="p-5 pb-3"><SectionHeading title="Overspend Register" description="Exceptions with a recorded business reason" /></div>
           <Table>
             <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Category</TableHead><TableHead>Reason</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-            <TableBody>{domain.overspend.slice(0, 8).map((item) => <TableRow key={item.id}><TableCell>{item.date}</TableCell><TableCell className="font-medium">{item.category}</TableCell><TableCell className="max-w-64 truncate text-muted-foreground">{item.reason}</TableCell><TableCell className="text-right">{formatCurrency(item.amount, meta.currency)}</TableCell></TableRow>)}</TableBody>
+            <TableBody>{domain.overspend.length ? domain.overspend.slice(0, 8).map((item) => <TableRow key={item.id}><TableCell>{item.date}</TableCell><TableCell className="font-medium">{item.category}</TableCell><TableCell className="max-w-64 truncate text-muted-foreground">{item.reason}</TableCell><TableCell className="text-right">{formatCurrency(item.amount, meta.currency)}</TableCell></TableRow>) : <EmptyTableRow colSpan={4} message="No overspend exceptions recorded for this period" />}</TableBody>
           </Table>
         </section>
       </div>
@@ -72,7 +72,7 @@ export function FinanceOverview({ meta, trading, domain }: { meta: AnalyticsMeta
           <div className="p-5 pb-3"><SectionHeading title="Store P&L" description="Revenue, operating cost, and contribution by store" /></div>
           <Table>
             <TableHeader><TableRow><TableHead>Store</TableHead><TableHead className="text-right">Revenue</TableHead><TableHead className="text-right">Expenses</TableHead><TableHead className="text-right">Profit</TableHead></TableRow></TableHeader>
-            <TableBody>{domain.storePnl.map((store) => <TableRow key={store.id}><TableCell className="font-medium">{store.name}</TableCell><TableCell className="text-right">{formatCurrency(store.revenue, meta.currency)}</TableCell><TableCell className="text-right">{formatCurrency(store.expenses, meta.currency)}</TableCell><TableCell className={`text-right font-semibold ${store.profit < 0 ? 'text-destructive' : 'text-primary'}`}>{formatCurrency(store.profit, meta.currency)}</TableCell></TableRow>)}</TableBody>
+            <TableBody>{domain.storePnl.length ? domain.storePnl.map((store) => <TableRow key={store.id}><TableCell className="font-medium">{store.name}</TableCell><TableCell className="text-right">{formatCurrency(store.revenue, meta.currency)}</TableCell><TableCell className="text-right">{formatCurrency(store.expenses, meta.currency)}</TableCell><TableCell className={`text-right font-semibold ${store.profit < 0 ? 'text-destructive' : 'text-primary'}`}>{formatCurrency(store.profit, meta.currency)}</TableCell></TableRow>) : <EmptyTableRow colSpan={4} />}</TableBody>
           </Table>
         </section>
         <section className="surface min-w-0 p-5 xl:col-span-5">
@@ -86,7 +86,7 @@ export function FinanceOverview({ meta, trading, domain }: { meta: AnalyticsMeta
           <div className="p-5 pb-3"><SectionHeading title="Weekly & Period Forecast" description="Latest revenue, profit, and cash outlook" /></div>
           <Table>
             <TableHeader><TableRow><TableHead>Period</TableHead><TableHead className="text-right">Revenue</TableHead><TableHead className="text-right">Net profit</TableHead><TableHead className="text-right">Cash</TableHead><TableHead>Confidence</TableHead></TableRow></TableHeader>
-            <TableBody>{domain.forecasts.map((item) => <TableRow key={item.id}><TableCell className="font-medium">{item.periodStart} to {item.periodEnd}</TableCell><TableCell className="text-right">{formatCurrency(item.revenue, meta.currency)}</TableCell><TableCell className="text-right">{formatCurrency(item.netProfit, meta.currency)}</TableCell><TableCell className="text-right">{formatCurrency(item.cashBalance, meta.currency)}</TableCell><TableCell><StatusBadge value={item.confidence} /></TableCell></TableRow>)}</TableBody>
+            <TableBody>{domain.forecasts.length ? domain.forecasts.map((item) => <TableRow key={item.id}><TableCell className="font-medium">{item.periodStart} to {item.periodEnd}</TableCell><TableCell className="text-right">{formatCurrency(item.revenue, meta.currency)}</TableCell><TableCell className="text-right">{formatCurrency(item.netProfit, meta.currency)}</TableCell><TableCell className="text-right">{formatCurrency(item.cashBalance, meta.currency)}</TableCell><TableCell><StatusBadge value={item.confidence} /></TableCell></TableRow>) : <EmptyTableRow colSpan={5} message="No forecast has been submitted for this period" />}</TableBody>
           </Table>
         </section>
         <section className="surface min-w-0 p-5">
@@ -99,7 +99,7 @@ export function FinanceOverview({ meta, trading, domain }: { meta: AnalyticsMeta
         <div className="p-5 pb-3"><SectionHeading title="Daily Sales by Store" description="Approved reporting coverage for the selected period" /></div>
         <Table>
           <TableHeader><TableRow><TableHead>Store</TableHead><TableHead className="text-right">Revenue</TableHead><TableHead className="text-right">Transactions</TableHead><TableHead className="text-right">Units</TableHead><TableHead className="text-right">Reports</TableHead></TableRow></TableHeader>
-          <TableBody>{domain.dailySalesByStore.map((store) => <TableRow key={store.id}><TableCell className="font-medium">{store.name}</TableCell><TableCell className="text-right">{formatCurrency(store.revenue, meta.currency)}</TableCell><TableCell className="text-right">{formatNumber(store.transactions)}</TableCell><TableCell className="text-right">{formatNumber(store.units)}</TableCell><TableCell className="text-right">{store.reports}</TableCell></TableRow>)}</TableBody>
+          <TableBody>{domain.dailySalesByStore.length ? domain.dailySalesByStore.map((store) => <TableRow key={store.id}><TableCell className="font-medium">{store.name}</TableCell><TableCell className="text-right">{formatCurrency(store.revenue, meta.currency)}</TableCell><TableCell className="text-right">{formatNumber(store.transactions)}</TableCell><TableCell className="text-right">{formatNumber(store.units)}</TableCell><TableCell className="text-right">{store.reports}</TableCell></TableRow>) : <EmptyTableRow colSpan={5} message="No approved daily sales reports for this period" />}</TableBody>
         </Table>
       </section>
 
@@ -108,7 +108,7 @@ export function FinanceOverview({ meta, trading, domain }: { meta: AnalyticsMeta
           <div className="p-5 pb-3"><SectionHeading title="Store Ledger & Working Capital" description="Open debtors and creditors ordered by due date" /></div>
           <Table>
             <TableHeader><TableRow><TableHead>Entity</TableHead><TableHead>Type</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Open</TableHead></TableRow></TableHeader>
-            <TableBody>{domain.workingCapital.items.slice(0, 10).map((item) => <TableRow key={item.id}><TableCell className="max-w-44 truncate font-medium">{item.entity}</TableCell><TableCell><StatusBadge value={item.type} /></TableCell><TableCell className="text-muted-foreground">{item.dueDate ?? 'Not set'}</TableCell><TableCell className="text-right font-medium">{formatCurrency(item.amount, meta.currency)}</TableCell></TableRow>)}</TableBody>
+            <TableBody>{domain.workingCapital.items.length ? domain.workingCapital.items.slice(0, 10).map((item) => <TableRow key={item.id}><TableCell className="max-w-44 truncate font-medium">{item.entity}</TableCell><TableCell><StatusBadge value={item.type} /></TableCell><TableCell className="text-muted-foreground">{item.dueDate ?? 'Not set'}</TableCell><TableCell className="text-right font-medium">{formatCurrency(item.amount, meta.currency)}</TableCell></TableRow>) : <EmptyTableRow colSpan={4} message="No open debtors or creditors recorded" />}</TableBody>
           </Table>
         </section>
         <section className="surface p-5">
