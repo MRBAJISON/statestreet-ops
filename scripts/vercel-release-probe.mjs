@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 
 import pg from 'pg';
-import { buildFoundationBackfillPlan } from './lib/foundation-backfill-plan.mjs';
+import {
+  buildFoundationBackfillPlan,
+  buildFoundationCatalog,
+} from './lib/foundation-backfill-plan.mjs';
 
 const { Client } = pg;
 const EXPECTED_PROBE = '2026-07-13-v1';
@@ -96,6 +99,7 @@ try {
         appliedMigrations: migrationCount,
         entryTypes: entryRows.rows,
         accountRoles: roleRows.rows,
+        catalog: organization ? buildFoundationCatalog(organization) : null,
         backfillPlan,
       },
       null,
