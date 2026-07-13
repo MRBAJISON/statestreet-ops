@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:local": "agent-secret run AUTH_SECRET statestreet.local.auth_secret -- node scripts/run-local.mjs",
+    "vercel-build": "node scripts/vercel-release-probe.mjs && next build",
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings=0",
