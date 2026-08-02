@@ -39,14 +39,21 @@ export async function getBrandDomain(scope: AnalyticsScope): Promise<BrandDomain
       from brand_sentiment_snapshots sentiment
       where sentiment.business_date between ${scope.from}::date and ${scope.to}::date
       group by sentiment.brand_id
+    ), sentiment_trend_dates as (
+      select date.date
+      from (select generate_series(${scope.from}::date, ${scope.to}::date, interval '1 day')::date as date) date
+      where exists (
+        select 1 from brand_sentiment_snapshots sentiment
+        where sentiment.business_date between ${scope.from}::date and ${scope.to}::date
+      )
     ), sentiment_trend as (
-      select sentiment.business_date,
-        sum(sentiment.positive_mentions)::integer as positive,
-        sum(sentiment.neutral_mentions)::integer as neutral,
-        sum(sentiment.negative_mentions)::integer as negative
-      from brand_sentiment_snapshots sentiment
-      where sentiment.business_date between ${scope.from}::date and ${scope.to}::date
-      group by sentiment.business_date
+      select date.date as business_date,
+        coalesce(sum(sentiment.positive_mentions), 0)::integer as positive,
+        coalesce(sum(sentiment.neutral_mentions), 0)::integer as neutral,
+        coalesce(sum(sentiment.negative_mentions), 0)::integer as negative
+      from sentiment_trend_dates date
+      left join brand_sentiment_snapshots sentiment on sentiment.business_date = date.date
+      group by date.date
     ), digital_latest as (
       select distinct on (digital.brand_id)
         digital.brand_id, digital.google_rating, digital.google_review_count,

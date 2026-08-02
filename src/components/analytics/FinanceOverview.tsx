@@ -1,5 +1,7 @@
 import { CircleDollarSign, Clock3, Landmark, ReceiptText, Scale, TrendingUp } from 'lucide-react';
+import { ShowMoreButton } from '@/components/ui/show-more-button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useExpandable } from '@/hooks/use-expandable';
 import type { AnalyticsMeta, FinanceDomain, TradingOverview } from '@/lib/contracts/analytics';
 import { Attainment, EmptyTableRow, MetricRail, SectionHeading, StatusBadge } from './DashboardPrimitives';
 import { CashFlowChart, ComparisonBarChart, HorizontalBarChart, NamedBarChart } from './Charts';
@@ -14,6 +16,12 @@ export function FinanceOverview({ meta, trading, domain }: { meta: AnalyticsMeta
     ['ROCE', domain.profitability.roce],
     ['ROI', domain.profitability.roi],
   ] as const;
+
+  const overspend = useExpandable(domain.overspend);
+  const storePnl = useExpandable(domain.storePnl);
+  const dailySalesByStore = useExpandable(domain.dailySalesByStore);
+  const workingCapitalItems = useExpandable(domain.workingCapital.items);
+  const pendingReports = useExpandable(domain.pendingReports);
 
   return (
     <div className="flex flex-col gap-5">
@@ -62,8 +70,9 @@ export function FinanceOverview({ meta, trading, domain }: { meta: AnalyticsMeta
           <div className="p-5 pb-3"><SectionHeading title="Overspend Register" description="Exceptions with a recorded business reason" /></div>
           <Table>
             <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Category</TableHead><TableHead>Reason</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-            <TableBody>{domain.overspend.length ? domain.overspend.slice(0, 8).map((item) => <TableRow key={item.id}><TableCell>{item.date}</TableCell><TableCell className="font-medium">{item.category}</TableCell><TableCell className="max-w-64 truncate text-muted-foreground">{item.reason}</TableCell><TableCell className="text-right">{formatCurrency(item.amount, meta.currency)}</TableCell></TableRow>) : <EmptyTableRow colSpan={4} message="No overspend exceptions recorded for this period" />}</TableBody>
+            <TableBody>{domain.overspend.length ? overspend.visible.map((item) => <TableRow key={item.id}><TableCell>{item.date}</TableCell><TableCell className="font-medium">{item.category}</TableCell><TableCell className="max-w-64 truncate text-muted-foreground">{item.reason}</TableCell><TableCell className="text-right">{formatCurrency(item.amount, meta.currency)}</TableCell></TableRow>) : <EmptyTableRow colSpan={4} message="No overspend exceptions recorded for this period" />}</TableBody>
           </Table>
+          <ShowMoreButton expanded={overspend.expanded} hiddenCount={overspend.hiddenCount} canExpand={overspend.canExpand} onClick={overspend.toggle} />
         </section>
       </div>
 
@@ -72,8 +81,9 @@ export function FinanceOverview({ meta, trading, domain }: { meta: AnalyticsMeta
           <div className="p-5 pb-3"><SectionHeading title="Store P&L" description="Revenue, operating cost, and contribution by store" /></div>
           <Table>
             <TableHeader><TableRow><TableHead>Store</TableHead><TableHead className="text-right">Revenue</TableHead><TableHead className="text-right">Expenses</TableHead><TableHead className="text-right">Profit</TableHead></TableRow></TableHeader>
-            <TableBody>{domain.storePnl.length ? domain.storePnl.map((store) => <TableRow key={store.id}><TableCell className="font-medium">{store.name}</TableCell><TableCell className="text-right">{formatCurrency(store.revenue, meta.currency)}</TableCell><TableCell className="text-right">{formatCurrency(store.expenses, meta.currency)}</TableCell><TableCell className={`text-right font-semibold ${store.profit < 0 ? 'text-destructive' : 'text-primary'}`}>{formatCurrency(store.profit, meta.currency)}</TableCell></TableRow>) : <EmptyTableRow colSpan={4} />}</TableBody>
+            <TableBody>{domain.storePnl.length ? storePnl.visible.map((store) => <TableRow key={store.id}><TableCell className="font-medium">{store.name}</TableCell><TableCell className="text-right">{formatCurrency(store.revenue, meta.currency)}</TableCell><TableCell className="text-right">{formatCurrency(store.expenses, meta.currency)}</TableCell><TableCell className={`text-right font-semibold ${store.profit < 0 ? 'text-destructive' : 'text-primary'}`}>{formatCurrency(store.profit, meta.currency)}</TableCell></TableRow>) : <EmptyTableRow colSpan={4} />}</TableBody>
           </Table>
+          <ShowMoreButton expanded={storePnl.expanded} hiddenCount={storePnl.hiddenCount} canExpand={storePnl.canExpand} onClick={storePnl.toggle} />
         </section>
         <section className="surface min-w-0 p-5 xl:col-span-5">
           <SectionHeading title="Debtor Aging" description="Outstanding debtor balance by age" />
@@ -99,8 +109,9 @@ export function FinanceOverview({ meta, trading, domain }: { meta: AnalyticsMeta
         <div className="p-5 pb-3"><SectionHeading title="Daily Sales by Store" description="Approved reporting coverage for the selected period" /></div>
         <Table>
           <TableHeader><TableRow><TableHead>Store</TableHead><TableHead className="text-right">Revenue</TableHead><TableHead className="text-right">Transactions</TableHead><TableHead className="text-right">Units</TableHead><TableHead className="text-right">Reports</TableHead></TableRow></TableHeader>
-          <TableBody>{domain.dailySalesByStore.length ? domain.dailySalesByStore.map((store) => <TableRow key={store.id}><TableCell className="font-medium">{store.name}</TableCell><TableCell className="text-right">{formatCurrency(store.revenue, meta.currency)}</TableCell><TableCell className="text-right">{formatNumber(store.transactions)}</TableCell><TableCell className="text-right">{formatNumber(store.units)}</TableCell><TableCell className="text-right">{store.reports}</TableCell></TableRow>) : <EmptyTableRow colSpan={5} message="No approved daily sales reports for this period" />}</TableBody>
+          <TableBody>{domain.dailySalesByStore.length ? dailySalesByStore.visible.map((store) => <TableRow key={store.id}><TableCell className="font-medium">{store.name}</TableCell><TableCell className="text-right">{formatCurrency(store.revenue, meta.currency)}</TableCell><TableCell className="text-right">{formatNumber(store.transactions)}</TableCell><TableCell className="text-right">{formatNumber(store.units)}</TableCell><TableCell className="text-right">{store.reports}</TableCell></TableRow>) : <EmptyTableRow colSpan={5} message="No approved daily sales reports for this period" />}</TableBody>
         </Table>
+        <ShowMoreButton expanded={dailySalesByStore.expanded} hiddenCount={dailySalesByStore.hiddenCount} canExpand={dailySalesByStore.canExpand} onClick={dailySalesByStore.toggle} />
       </section>
 
       <div className="grid gap-5 xl:grid-cols-2">
@@ -108,12 +119,13 @@ export function FinanceOverview({ meta, trading, domain }: { meta: AnalyticsMeta
           <div className="p-5 pb-3"><SectionHeading title="Store Ledger & Working Capital" description="Open debtors and creditors ordered by due date" /></div>
           <Table>
             <TableHeader><TableRow><TableHead>Entity</TableHead><TableHead>Type</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Open</TableHead></TableRow></TableHeader>
-            <TableBody>{domain.workingCapital.items.length ? domain.workingCapital.items.slice(0, 10).map((item) => <TableRow key={item.id}><TableCell className="max-w-44 truncate font-medium">{item.entity}</TableCell><TableCell><StatusBadge value={item.type} /></TableCell><TableCell className="text-muted-foreground">{item.dueDate ?? 'Not set'}</TableCell><TableCell className="text-right font-medium">{formatCurrency(item.amount, meta.currency)}</TableCell></TableRow>) : <EmptyTableRow colSpan={4} message="No open debtors or creditors recorded" />}</TableBody>
+            <TableBody>{domain.workingCapital.items.length ? workingCapitalItems.visible.map((item) => <TableRow key={item.id}><TableCell className="max-w-44 truncate font-medium">{item.entity}</TableCell><TableCell><StatusBadge value={item.type} /></TableCell><TableCell className="text-muted-foreground">{item.dueDate ?? 'Not set'}</TableCell><TableCell className="text-right font-medium">{formatCurrency(item.amount, meta.currency)}</TableCell></TableRow>) : <EmptyTableRow colSpan={4} message="No open debtors or creditors recorded" />}</TableBody>
           </Table>
+          <ShowMoreButton expanded={workingCapitalItems.expanded} hiddenCount={workingCapitalItems.hiddenCount} canExpand={workingCapitalItems.canExpand} onClick={workingCapitalItems.toggle} />
         </section>
         <section className="surface p-5">
           <SectionHeading title="Recent Entries & Approval Queue" description="Submitted daily reports waiting for Finance" />
-          {domain.pendingReports.length ? <div className="mt-4 divide-y">{domain.pendingReports.slice(0, 10).map((report) => <div key={report.id} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0"><span className="flex size-8 items-center justify-center rounded-md bg-chart-2/12 text-amber-800"><ReceiptText className="size-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{report.storeName}</span><span className="block text-xs text-muted-foreground">{report.businessDate}</span></span><StatusBadge value="submitted" /></div>)}</div> : <div className="flex min-h-52 items-center justify-center text-sm text-muted-foreground">No reports are waiting for approval.</div>}
+          {domain.pendingReports.length ? <><div className="mt-4 divide-y">{pendingReports.visible.map((report) => <div key={report.id} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0"><span className="flex size-8 items-center justify-center rounded-md bg-chart-2/12 text-amber-800"><ReceiptText className="size-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{report.storeName}</span><span className="block text-xs text-muted-foreground">{report.businessDate}</span></span><StatusBadge value="submitted" /></div>)}</div><ShowMoreButton expanded={pendingReports.expanded} hiddenCount={pendingReports.hiddenCount} canExpand={pendingReports.canExpand} onClick={pendingReports.toggle} /></> : <div className="flex min-h-52 items-center justify-center text-sm text-muted-foreground">No reports are waiting for approval.</div>}
         </section>
       </div>
     </div>

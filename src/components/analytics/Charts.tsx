@@ -18,7 +18,7 @@ import {
 } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import type { CategoryPerformanceRow, NamedValue, StorePerformanceRow, TradingTrendPoint } from '@/lib/contracts/analytics';
-import { formatCurrency, formatNumber, formatShortDate } from './format';
+import { formatCurrency, formatNumber, formatShortDate, truncateLabel } from './format';
 
 const revenueConfig = {
   revenue: { label: 'Net revenue', color: 'var(--chart-1)' },
@@ -43,9 +43,9 @@ export function RevenueTrendChart({ data, currency }: { data: TradingTrendPoint[
   }
   return (
     <ChartContainer config={revenueConfig} className="h-[310px] w-full aspect-auto" initialDimension={{ width: 760, height: 310 }}>
-      <ComposedChart data={data} margin={{ top: 14, right: 8, left: 0, bottom: 0 }} accessibilityLayer>
+      <ComposedChart data={data} margin={{ top: 14, right: 8, left: 0, bottom: 24 }} accessibilityLayer>
         <CartesianGrid vertical={false} strokeDasharray="3 5" />
-        <XAxis dataKey="date" tickLine={false} axisLine={false} minTickGap={28} tickFormatter={formatShortDate} />
+        <XAxis dataKey="date" tickLine={false} axisLine={false} interval={0} angle={-35} textAnchor="end" height={48} tickFormatter={formatShortDate} />
         <YAxis
           tickLine={false}
           axisLine={false}
@@ -153,9 +153,9 @@ export function NamedBarChart({ data, valueFormatter = formatNumber }: { data: N
   }
   return (
     <ChartContainer config={namedConfig} className="h-[260px] w-full aspect-auto" initialDimension={{ width: 520, height: 260 }}>
-      <BarChart data={data.slice(0, 8)} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} accessibilityLayer>
+      <BarChart data={data.slice(0, 8)} margin={{ top: 8, right: 8, left: 0, bottom: 24 }} accessibilityLayer>
         <CartesianGrid vertical={false} strokeDasharray="3 5" />
-        <XAxis dataKey="name" tickLine={false} axisLine={false} interval={0} tick={{ fontSize: 10 }} />
+        <XAxis dataKey="name" tickLine={false} axisLine={false} interval={0} height={48} angle={-35} textAnchor="end" tickFormatter={(value) => truncateLabel(String(value))} tick={{ fontSize: 10 }} />
         <YAxis tickLine={false} axisLine={false} width={48} tickFormatter={(value) => formatNumber(Number(value), true)} />
         <ChartTooltip content={<ChartTooltipContent hideLabel formatter={(value) => <span className="font-mono font-medium">{valueFormatter(Number(value))}</span>} />} />
         <Bar dataKey="value" fill="var(--color-value)" radius={[5, 5, 0, 0]} maxBarSize={34} isAnimationActive animationDuration={450} />
@@ -237,9 +237,9 @@ export function ComparisonBarChart({
   }
   return (
     <ChartContainer config={config} className="h-[290px] w-full aspect-auto" initialDimension={{ width: 650, height: 290 }}>
-      <BarChart data={data.slice(0, 10)} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} accessibilityLayer>
+      <BarChart data={data.slice(0, 10)} margin={{ top: 8, right: 8, left: 0, bottom: 24 }} accessibilityLayer>
         <CartesianGrid vertical={false} strokeDasharray="3 5" />
-        <XAxis dataKey="name" tickLine={false} axisLine={false} interval={0} tick={{ fontSize: 10 }} />
+        <XAxis dataKey="name" tickLine={false} axisLine={false} interval={0} height={48} angle={-35} textAnchor="end" tickFormatter={(value) => truncateLabel(String(value))} tick={{ fontSize: 10 }} />
         <YAxis tickLine={false} axisLine={false} width={50} tickFormatter={(value) => formatNumber(Number(value), true)} />
         <ChartTooltip content={<ChartTooltipContent formatter={(value, name) => (
           <div className="flex min-w-40 items-center justify-between gap-4">
@@ -262,9 +262,9 @@ export function ValueTrendChart({ data, valueFormatter = formatNumber }: { data:
   }
   return (
     <ChartContainer config={trendConfig} className="h-[270px] w-full aspect-auto" initialDimension={{ width: 640, height: 270 }}>
-      <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} accessibilityLayer>
+      <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 24 }} accessibilityLayer>
         <CartesianGrid vertical={false} strokeDasharray="3 5" />
-        <XAxis dataKey="date" tickLine={false} axisLine={false} minTickGap={28} tickFormatter={formatShortDate} />
+        <XAxis dataKey="date" tickLine={false} axisLine={false} interval={0} angle={-35} textAnchor="end" height={48} tickFormatter={formatShortDate} />
         <YAxis tickLine={false} axisLine={false} width={50} tickFormatter={(value) => formatNumber(Number(value), true)} />
         <ChartTooltip content={<ChartTooltipContent labelFormatter={(_, payload) => formatShortDate(String(payload[0]?.payload?.date ?? ''))} formatter={(value) => <span className="font-mono font-medium">{valueFormatter(Number(value))}</span>} />} />
         <Line type="monotone" dataKey="value" stroke="var(--color-value)" strokeWidth={2.4} dot={false} activeDot={{ r: 4 }} />
@@ -285,9 +285,9 @@ export function SentimentTrendChart({ data }: { data: Array<{ date: string; posi
   }
   return (
     <ChartContainer config={sentimentConfig} className="h-[270px] w-full aspect-auto" initialDimension={{ width: 640, height: 270 }}>
-      <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} accessibilityLayer>
+      <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 24 }} accessibilityLayer>
         <CartesianGrid vertical={false} strokeDasharray="3 5" />
-        <XAxis dataKey="date" tickLine={false} axisLine={false} minTickGap={28} tickFormatter={formatShortDate} />
+        <XAxis dataKey="date" tickLine={false} axisLine={false} interval={0} angle={-35} textAnchor="end" height={48} tickFormatter={formatShortDate} />
         <YAxis tickLine={false} axisLine={false} width={48} tickFormatter={(value) => formatNumber(Number(value), true)} />
         <ChartTooltip content={<ChartTooltipContent labelFormatter={(_, payload) => formatShortDate(String(payload[0]?.payload?.date ?? ''))} />} />
         <Legend />
@@ -316,9 +316,9 @@ export function CashFlowChart({
   }
   return (
     <ChartContainer config={cashConfig} className="h-[280px] w-full aspect-auto" initialDimension={{ width: 680, height: 280 }}>
-      <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} accessibilityLayer>
+      <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 24 }} accessibilityLayer>
         <CartesianGrid vertical={false} strokeDasharray="3 5" />
-        <XAxis dataKey="date" tickLine={false} axisLine={false} minTickGap={26} tickFormatter={formatShortDate} />
+        <XAxis dataKey="date" tickLine={false} axisLine={false} interval={0} angle={-35} textAnchor="end" height={48} tickFormatter={formatShortDate} />
         <YAxis tickLine={false} axisLine={false} width={52} tickFormatter={(value) => formatNumber(Number(value), true)} />
         <ChartTooltip
           content={<ChartTooltipContent labelFormatter={(_, payload) => formatShortDate(String(payload[0]?.payload?.date ?? ''))} formatter={(value, name) => (

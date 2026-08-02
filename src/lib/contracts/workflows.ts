@@ -21,6 +21,8 @@ const optionalPercent = z.preprocess(
   (value) => (value === '' || value === null ? undefined : value),
   z.number().min(0).max(100).optional()
 );
+const optionalEnum = <T extends [string, ...string[]]>(values: T) =>
+  z.preprocess((value) => (value === '' || value === null ? undefined : value), z.enum(values).optional());
 const count = z.number().int().min(0).max(100_000_000);
 const score100 = z.number().int().min(0).max(100);
 
@@ -409,6 +411,7 @@ export const customerCaptureSchema = z.object({
   sourceDetail: optionalText(200),
   productId: optionalId,
   interestText: optionalText(500),
+  fulfillmentStatus: optionalEnum(['in_stock', 'stock_gap']),
   notes: optionalText(1000),
 }).refine((value) => Boolean(value.productId || value.interestText), {
   path: ['productId'],

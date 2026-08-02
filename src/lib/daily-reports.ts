@@ -1,27 +1,38 @@
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { AppUser } from './auth';
 import type {
   DailyReportMutationRecord,
   DailyReportReferences,
+  DailyReportRecord,
   SaveDailyReportInput,
 } from './contracts/daily-report';
 import { db } from './db';
 import {
+  auditEvents,
   brandCategories,
+  brands,
   brandStores,
   categories,
   dailyPaymentLines,
+  dailyReportProducts,
   dailyReports,
   dailySalesLines,
   paymentMethods,
+  products,
   stores,
 } from './db/foundation-schema';
+import { users } from './db/schema';
 import { HttpError, sessionUserId } from './server-errors';
 import {
   buildCreateDailyReportQuery,
   buildDecideDailyReportQuery,
   buildReplaceDailyReportQuery,
 } from './daily-report-queries';
+
+export const submittedUsers = alias(users, 'daily_reports_submitted_users');
+export const createdUsers = alias(users, 'daily_reports_created_users');
+export const managerNameColumn = sql<string | null>`coalesce(${submittedUsers.name}, ${createdUsers.name})`;
 
 const DAILY_REPORT_WRITERS = new Set(['store-manager', 'finance', 'operations']);
 
@@ -219,4 +230,137 @@ export async function getDailyReportForMutation(reportId: number) {
         paymentMethodIds: paymentRows.map((row) => row.paymentMethodId),
       }
     : undefined;
+}
+
+export type DailyReportBaseRow = Omit<DailyReportRecord, 'sales' | 'payments' | 'activity'>;
+
+// Shared by the list endpoint and the single-report PDF fetch: joins sales, payments,
+// products, and activity for a batch of report ids, keeping one code path for both.
+export async function attachDailyReportDetails(baseReports: DailyReportBaseRow[]): Promise<DailyReportRecord[]> {
+  const reportIds = baseReports.map((report) => report.id);
+  if (!reportIds.length) return [];
+
+  const [sales, payments, reportProducts, activity] = await Promise.all([
+    db
+      .select({
+        dailyReportId: dailySalesLines.dailyReportId,
+        categoryId: dailySalesLines.categoryId,
+        openingStock: dailySalesLines.openingStock,
+        unitsSold: dailySalesLines.unitsSold,
+        grossRevenue: dailySalesLines.grossRevenue,
+        cogs: dailySalesLines.cogs,
+        discounts: dailySalesLines.discounts,
+        returns: dailySalesLines.returns,
+        creditSales: dailySalesLines.creditSales,
+      })
+      .from(dailySalesLines)
+      .where(inArray(dailySalesLines.dailyReportId, reportIds)),
+    db
+      .select({
+        dailyReportId: dailyPaymentLines.dailyReportId,
+        paymentMethodId: dailyPaymentLines.paymentMethodId,
+        amount: dailyPaymentLines.amount,
+      })
+      .from(dailyPaymentLines)
+      .where(inArray(dailyPaymentLines.dailyReportId, reportIds)),
+    db
+      .select({
+        dailyReportId: dailyReportProducts.dailyReportId,
+        categoryId: dailyReportProducts.categoryId,
+        productId: dailyReportProducts.productId,
+        customName: dailyReportProducts.customName,
+        productName: products.name,
+        sku: products.sku,
+        brandName: brands.name,
+      })
+      .from(dailyReportProducts)
+      .leftJoin(products, eq(dailyReportProducts.productId, products.id))
+      .leftJoin(brands, eq(products.brandId, brands.id))
+      .where(inArray(dailyReportProducts.dailyReportId, reportIds))
+      .orderBy(asc(dailyReportProducts.id)),
+    db
+      .select({
+        id: auditEvents.id,
+        dailyReportId: auditEvents.entityId,
+        action: auditEvents.action,
+        actorName: users.name,
+        metadata: auditEvents.metadata,
+        createdAt: auditEvents.createdAt,
+      })
+      .from(auditEvents)
+      .leftJoin(users, eq(auditEvents.actorUserId, users.id))
+      .where(and(eq(auditEvents.entityType, 'daily-report'), inArray(auditEvents.entityId, reportIds)))
+      .orderBy(desc(auditEvents.createdAt)),
+  ]);
+
+  const salesByReport = new Map<number, typeof sales>();
+  const paymentsByReport = new Map<number, typeof payments>();
+  const productsByReportCategory = new Map<string, typeof reportProducts>();
+  const activityByReport = new Map<number, typeof activity>();
+  for (const line of sales) salesByReport.set(line.dailyReportId, [...(salesByReport.get(line.dailyReportId) ?? []), line]);
+  for (const line of payments) {
+    paymentsByReport.set(line.dailyReportId, [...(paymentsByReport.get(line.dailyReportId) ?? []), line]);
+  }
+  for (const line of reportProducts) {
+    const key = `${line.dailyReportId}:${line.categoryId}`;
+    productsByReportCategory.set(key, [...(productsByReportCategory.get(key) ?? []), line]);
+  }
+  for (const event of activity) {
+    activityByReport.set(event.dailyReportId, [...(activityByReport.get(event.dailyReportId) ?? []), event]);
+  }
+
+  return baseReports.map((report) => ({
+    ...report,
+    sales: (salesByReport.get(report.id) ?? []).map((line) => ({
+      ...line,
+      products: (productsByReportCategory.get(`${report.id}:${line.categoryId}`) ?? []).map((item) => ({
+        productId: item.productId,
+        productName: item.productName ?? item.customName ?? '',
+        sku: item.sku,
+        brandName: item.brandName,
+      })),
+    })),
+    payments: paymentsByReport.get(report.id) ?? [],
+    activity: (activityByReport.get(report.id) ?? []).map((event) => ({
+      id: event.id,
+      action: event.action,
+      actorName: event.actorName,
+      reason: typeof event.metadata?.reason === 'string' ? event.metadata.reason : null,
+      createdAt: event.createdAt.toISOString(),
+    })),
+  }));
+}
+
+export async function getDailyReportById(reportId: number): Promise<DailyReportRecord | null> {
+  const baseReports = await db
+    .select({
+      id: dailyReports.id,
+      storeId: dailyReports.storeId,
+      storeCode: stores.code,
+      storeName: stores.name,
+      managerName: managerNameColumn,
+      businessDate: dailyReports.businessDate,
+      status: dailyReports.status,
+      transactions: dailyReports.transactions,
+      footfall: dailyReports.footfall,
+      totalCustomers: dailyReports.totalCustomers,
+      newCustomers: dailyReports.newCustomers,
+      returningCustomers: dailyReports.returningCustomers,
+      notes: dailyReports.notes,
+      staffPerformanceNote: dailyReports.staffPerformanceNote,
+      closingFacilityStatus: dailyReports.closingFacilityStatus,
+      lockVersion: dailyReports.lockVersion,
+      submittedAt: dailyReports.submittedAt,
+      approvedAt: dailyReports.approvedAt,
+      updatedAt: dailyReports.updatedAt,
+    })
+    .from(dailyReports)
+    .innerJoin(stores, eq(dailyReports.storeId, stores.id))
+    .leftJoin(submittedUsers, eq(dailyReports.submittedByUserId, submittedUsers.id))
+    .leftJoin(createdUsers, eq(dailyReports.createdByUserId, createdUsers.id))
+    .where(eq(dailyReports.id, reportId))
+    .limit(1);
+  if (!baseReports.length) return null;
+  const [full] = await attachDailyReportDetails(baseReports as unknown as DailyReportBaseRow[]);
+  return full ?? null;
 }

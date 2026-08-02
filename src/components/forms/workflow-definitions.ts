@@ -494,6 +494,7 @@ export const storeWorkflows: WorkflowDefinition[] = [
       { name: 'sizePreference', label: 'Size preference', type: 'text' },
       { name: 'productId', label: 'Product interest', type: 'product', fullWidth: true },
       { name: 'interestText', label: 'Other interest', type: 'textarea', fullWidth: true },
+      { name: 'fulfillmentStatus', label: 'Could not fulfill?', type: 'select', options: [option('in_stock', 'In stock'), option('stock_gap', 'Stock gap')] },
       notesField(),
     ],
   },

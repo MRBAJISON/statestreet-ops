@@ -33,3 +33,7 @@ export function formatShortDate(value: string) {
 export function titleCase(value: string) {
   return value.replaceAll('-', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
+
+export function truncateLabel(value: string, maxLength = 12) {
+  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
+}

@@ -1,19 +1,31 @@
 import { sql } from 'drizzle-orm';
 import type { SaveDailyReportInput } from './contracts/daily-report';
 
+function flattenProductsByCategory(sales: SaveDailyReportInput['sales']) {
+  return sales.flatMap((line) =>
+    line.products.map((product) => ({
+      categoryId: line.categoryId,
+      productId: product.productId ?? null,
+      customName: product.customName ?? null,
+    }))
+  );
+}
+
 export function buildCreateDailyReportQuery(userId: number, storeId: number, input: SaveDailyReportInput) {
   const sales = JSON.stringify(input.sales);
   const payments = JSON.stringify(input.payments);
+  const products = JSON.stringify(flattenProductsByCategory(input.sales));
   const submitted = input.status === 'submitted';
   return sql`
     with new_report as (
       insert into daily_reports (
         store_id, business_date, status, transactions, footfall, total_customers,
-        new_customers, returning_customers, notes, created_by_user_id, updated_by_user_id,
-        submitted_by_user_id, submitted_at
+        new_customers, returning_customers, notes, staff_performance_note, closing_facility_status,
+        created_by_user_id, updated_by_user_id, submitted_by_user_id, submitted_at
       ) values (
         ${storeId}, ${input.businessDate}, ${input.status}, ${input.transactions}, ${input.footfall},
         ${input.totalCustomers}, ${input.newCustomers}, ${input.returningCustomers}, ${input.notes ?? null},
+        ${input.staffPerformanceNote ?? null}, ${input.closingFacilityStatus ?? null},
         ${userId}, ${userId}, ${submitted ? userId : null}, ${submitted ? sql`now()` : null}
       )
       returning *
@@ -45,11 +57,24 @@ export function buildCreateDailyReportQuery(userId: number, storeId: number, inp
         amount numeric(14, 2)
       )
       returning id
+    ), new_products as (
+      insert into daily_report_products (daily_report_id, category_id, product_id, custom_name)
+      select report.id, line."categoryId", line."productId", line."customName"
+      from new_report report
+      cross join jsonb_to_recordset(${products}::jsonb) as line(
+        "categoryId" bigint,
+        "productId" bigint,
+        "customName" text
+      )
+      returning id
     ), new_audit as (
       insert into audit_events (entity_type, entity_id, action, actor_user_id, after)
       select
         'daily-report', report.id, ${submitted ? 'submit' : 'create'}, ${userId},
-        jsonb_build_object('report', to_jsonb(report), 'sales', ${sales}::jsonb, 'payments', ${payments}::jsonb)
+        jsonb_build_object(
+          'report', to_jsonb(report), 'sales', ${sales}::jsonb,
+          'payments', ${payments}::jsonb, 'products', ${products}::jsonb
+        )
       from new_report report
       returning id
     )
@@ -69,6 +94,7 @@ export function buildReplaceDailyReportQuery(
 ) {
   const sales = JSON.stringify(input.sales);
   const payments = JSON.stringify(input.payments);
+  const products = JSON.stringify(flattenProductsByCategory(input.sales));
   const submitted = input.status === 'submitted';
   return sql`
     with before_report as materialized (
@@ -82,6 +108,10 @@ export function buildReplaceDailyReportQuery(
           ),
           'payments', coalesce(
             (select jsonb_agg(to_jsonb(line) order by line.id) from daily_payment_lines line where line.daily_report_id = report.id),
+            '[]'::jsonb
+          ),
+          'products', coalesce(
+            (select jsonb_agg(to_jsonb(line) order by line.id) from daily_report_products line where line.daily_report_id = report.id),
             '[]'::jsonb
           )
         ) as snapshot
@@ -102,6 +132,8 @@ export function buildReplaceDailyReportQuery(
         new_customers = ${input.newCustomers},
         returning_customers = ${input.returningCustomers},
         notes = ${input.notes ?? null},
+        staff_performance_note = ${input.staffPerformanceNote ?? null},
+        closing_facility_status = ${input.closingFacilityStatus ?? null},
         updated_by_user_id = ${userId},
         submitted_by_user_id = case when ${submitted} then coalesce(report.submitted_by_user_id, ${userId}) else null end,
         submitted_at = case when ${submitted} then coalesce(report.submitted_at, now()) else null end,
@@ -170,11 +202,29 @@ export function buildReplaceDailyReportQuery(
           where line."paymentMethodId" = existing.payment_method_id
         )
       returning existing.id
+    ), delete_products as (
+      delete from daily_report_products existing
+      using updated_report report
+      where existing.daily_report_id = report.id
+      returning existing.id
+    ), new_products as (
+      insert into daily_report_products (daily_report_id, category_id, product_id, custom_name)
+      select report.id, line."categoryId", line."productId", line."customName"
+      from updated_report report
+      cross join jsonb_to_recordset(${products}::jsonb) as line(
+        "categoryId" bigint,
+        "productId" bigint,
+        "customName" text
+      )
+      returning id
     ), new_audit as (
       insert into audit_events (entity_type, entity_id, action, actor_user_id, before, after)
       select
         'daily-report', report.id, 'update', ${userId}, before.snapshot,
-        jsonb_build_object('report', to_jsonb(report), 'sales', ${sales}::jsonb, 'payments', ${payments}::jsonb)
+        jsonb_build_object(
+          'report', to_jsonb(report), 'sales', ${sales}::jsonb,
+          'payments', ${payments}::jsonb, 'products', ${products}::jsonb
+        )
       from updated_report report
       join before_report before on before.id = report.id
       returning id

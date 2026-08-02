@@ -169,15 +169,31 @@ export async function getInventoryDomain(scope: AnalyticsScope): Promise<Invento
         case request.status when 'requested' then 1 when 'approved' then 2 else 3 end,
         request.business_date
       limit 15
+    ), receipt_trend_months as (
+      select month.date
+      from (
+        select generate_series(
+          date_trunc('month', ${scope.from}::date),
+          date_trunc('month', ${scope.to}::date),
+          interval '1 month'
+        )::date as date
+      ) month
+      where exists (
+        select 1 from goods_receipts receipt
+        where receipt.status = 'received'
+          and receipt.business_date between ${scope.from}::date and ${scope.to}::date ${receiptStore}
+      )
     ), receipt_trend_rows as (
-      select date_trunc('month', receipt.business_date)::date as date,
-        sum(line.quantity * coalesce(line.unit_cost, product.unit_cost, 0)) as value
-      from goods_receipts receipt
-      join goods_receipt_lines line on line.goods_receipt_id = receipt.id
-      join products product on product.id = line.product_id
-      where receipt.status = 'received'
-        and receipt.business_date between ${scope.from}::date and ${scope.to}::date ${receiptStore}
-      group by date_trunc('month', receipt.business_date)::date
+      select month.date,
+        coalesce(sum(line.quantity * coalesce(line.unit_cost, product.unit_cost, 0)), 0) as value
+      from receipt_trend_months month
+      left join goods_receipts receipt
+        on date_trunc('month', receipt.business_date)::date = month.date
+       and receipt.status = 'received'
+       and receipt.business_date between ${scope.from}::date and ${scope.to}::date ${receiptStore}
+      left join goods_receipt_lines line on line.goods_receipt_id = receipt.id
+      left join products product on product.id = line.product_id
+      group by month.date
     ), typed_count_accuracy as (
       select
         count.store_id,
