@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ArrowLeft, Check, Clock3, LoaderCircle, LockOpen, RotateCcw } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Check, Clock3, Download, LoaderCircle, LockOpen, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -12,13 +12,16 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { ShowMoreButton } from '@/components/ui/show-more-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useOrg } from '@/components/providers/OrgProvider';
+import { useExpandable } from '@/hooks/use-expandable';
 import type { DailyReportRecord, DailyReportsResponse, DailyReportStatus } from '@/lib/contracts/daily-report';
 import type { ReferenceDataResponse } from '@/lib/contracts/reference-data';
+import { downloadFile } from '@/lib/download-file';
 import { cn } from '@/lib/utils';
 
 async function responseError(response: Response) {
@@ -59,18 +62,36 @@ function ReportDetail({
   currency,
   busy,
   onDecision,
+  onSaveCogs,
 }: {
   report: DailyReportRecord;
   references: DailyReportsResponse['references'];
   currency: string;
   busy: boolean;
   onDecision: (action: 'approve' | 'reopen', reason?: string) => void;
+  onSaveCogs: (cogsByCategoryId: Record<number, string>) => void;
 }) {
   const [reopenReason, setReopenReason] = useState('');
+  const [cogsEdits, setCogsEdits] = useState<Record<number, string>>({});
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const categoryNames = useMemo(() => new Map(references.categories.map((item) => [item.id, item.name])), [references.categories]);
   const paymentNames = useMemo(() => new Map(references.paymentMethods.map((item) => [item.id, item.name])), [references.paymentMethods]);
   const totals = reportTotals(report);
   const formatMoney = (value: number) => new Intl.NumberFormat('en-GH', { style: 'currency', currency, maximumFractionDigits: 2 }).format(value);
+  const canEditCogs = report.status === 'submitted';
+  const hasCogsEdits = Object.keys(cogsEdits).length > 0;
+
+  async function downloadPdf() {
+    if (downloadingPdf) return;
+    setDownloadingPdf(true);
+    try {
+      await downloadFile(`/api/daily-reports/${report.id}/pdf`, `daily-report-${report.storeCode}-${report.businessDate}.pdf`);
+    } catch (downloadError) {
+      toast.error((downloadError as Error).message);
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -98,8 +119,25 @@ function ReportDetail({
           <h3 className="mb-2 text-sm font-semibold">Category sales</h3>
           <div className="overflow-x-auto rounded-md border">
             <Table>
-              <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Net sales</TableHead><TableHead className="text-right">Units</TableHead></TableRow></TableHeader>
-              <TableBody>{report.sales.map((line) => <TableRow key={line.categoryId}><TableCell>{categoryNames.get(line.categoryId) ?? `Category ${line.categoryId}`}</TableCell><TableCell className="text-right">{formatMoney(Number(line.grossRevenue) - Number(line.discounts) - Number(line.returns))}</TableCell><TableCell className="text-right">{line.unitsSold}</TableCell></TableRow>)}</TableBody>
+              <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Net sales</TableHead><TableHead className="text-right">Units</TableHead><TableHead className="text-right">COGS</TableHead></TableRow></TableHeader>
+              <TableBody>{report.sales.map((line) => <TableRow key={line.categoryId}>
+                <TableCell>{categoryNames.get(line.categoryId) ?? `Category ${line.categoryId}`}</TableCell>
+                <TableCell className="text-right">{formatMoney(Number(line.grossRevenue) - Number(line.discounts) - Number(line.returns))}</TableCell>
+                <TableCell className="text-right">{line.unitsSold}</TableCell>
+                <TableCell className="text-right">
+                  {canEditCogs ? (
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      className="ml-auto w-28 text-right"
+                      disabled={busy}
+                      value={cogsEdits[line.categoryId] ?? line.cogs}
+                      onChange={(event) => setCogsEdits((current) => ({ ...current, [line.categoryId]: event.target.value }))}
+                    />
+                  ) : formatMoney(Number(line.cogs))}
+                </TableCell>
+              </TableRow>)}</TableBody>
             </Table>
           </div>
         </section>
@@ -110,8 +148,6 @@ function ReportDetail({
             {report.payments.map((line) => <div key={line.paymentMethodId} className="flex items-center justify-between border-b py-2 text-sm"><span className="text-muted-foreground">{paymentNames.get(line.paymentMethodId) ?? `Method ${line.paymentMethodId}`}</span><span className="font-medium">{formatMoney(Number(line.amount))}</span></div>)}
           </div>
         </section>
-
-        {report.notes ? <section><h3 className="mb-2 text-sm font-semibold">Store note</h3><p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{report.notes}</p></section> : null}
 
         <Separator className="mt-6" />
         <section className="pt-5">
@@ -140,7 +176,12 @@ function ReportDetail({
         ) : null}
       </div>
       <SheetFooter className="border-t bg-background px-5 py-4 sm:flex-row sm:justify-end">
-        {report.status === 'submitted' ? <Button disabled={busy || Math.abs(totals.variance) > 0.005} onClick={() => onDecision('approve')}>{busy ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Check data-icon="inline-start" />}Approve report</Button> : null}
+        <Button variant="outline" disabled={downloadingPdf} onClick={() => void downloadPdf()}>
+          {downloadingPdf ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Download data-icon="inline-start" />}
+          Download PDF
+        </Button>
+        {canEditCogs && hasCogsEdits ? <Button variant="outline" disabled={busy} onClick={() => { onSaveCogs(cogsEdits); setCogsEdits({}); }}>{busy ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : null}Save COGS changes</Button> : null}
+        {report.status === 'submitted' ? <Button disabled={busy || hasCogsEdits || Math.abs(totals.variance) > 0.005} onClick={() => onDecision('approve')}>{busy ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Check data-icon="inline-start" />}Approve report</Button> : null}
         {report.status === 'approved' ? <Button variant="outline" disabled={busy || !reopenReason.trim()} onClick={() => onDecision('reopen', reopenReason)}>{busy ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <LockOpen data-icon="inline-start" />}Reopen report</Button> : null}
       </SheetFooter>
     </div>
@@ -158,6 +199,7 @@ export default function DailyReportReview() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const reportRows = useExpandable(data?.reports ?? []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -216,6 +258,62 @@ export default function DailyReportReview() {
     }
   }
 
+  async function saveCogs(cogsByCategoryId: Record<number, string>) {
+    if (!selected) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/daily-reports/${selected.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessDate: selected.businessDate,
+          storeId: selected.storeId,
+          status: 'submitted',
+          transactions: selected.transactions,
+          footfall: selected.footfall,
+          totalCustomers: selected.totalCustomers,
+          newCustomers: selected.newCustomers,
+          returningCustomers: selected.returningCustomers,
+          notes: selected.notes,
+          staffPerformanceNote: selected.staffPerformanceNote,
+          closingFacilityStatus: selected.closingFacilityStatus,
+          lockVersion: selected.lockVersion,
+          sales: selected.sales.map((line) => ({
+            categoryId: line.categoryId,
+            openingStock: line.openingStock,
+            unitsSold: line.unitsSold,
+            grossRevenue: line.grossRevenue,
+            cogs: cogsByCategoryId[line.categoryId] ?? line.cogs,
+            discounts: line.discounts,
+            returns: line.returns,
+            creditSales: line.creditSales,
+            products: line.products.map((product) =>
+              product.productId ? { productId: product.productId } : { customName: product.productName }
+            ),
+          })),
+          payments: selected.payments,
+        }),
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+      const { report } = (await response.json()) as { report: { lockVersion: number } };
+      toast.success('COGS updated');
+      setSelected((current) => (current ? {
+        ...current,
+        lockVersion: report.lockVersion,
+        sales: current.sales.map((line) => ({
+          ...line,
+          cogs: cogsByCategoryId[line.categoryId] ?? line.cogs,
+        })),
+      } : current));
+      await load();
+    } catch (saveError) {
+      setError((saveError as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="page-shell flex flex-col gap-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
@@ -244,12 +342,13 @@ export default function DailyReportReview() {
           <Table>
             <TableHeader><TableRow><TableHead>Store</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Net sales</TableHead><TableHead className="text-right">Transactions</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
             <TableBody>
-              {data?.reports.length ? data.reports.map((report) => {
+              {data?.reports.length ? reportRows.visible.map((report) => {
                 const totals = reportTotals(report);
                 return <TableRow key={report.id} className="cursor-pointer" tabIndex={0} onClick={() => setSelected(report)} onKeyDown={(event) => { if (event.key === 'Enter') setSelected(report); }}><TableCell className="font-medium">{report.storeName}</TableCell><TableCell>{report.businessDate}</TableCell><TableCell className="text-right">{new Intl.NumberFormat('en-GH', { style: 'currency', currency: org.currency, maximumFractionDigits: 0 }).format(totals.net)}</TableCell><TableCell className="text-right">{report.transactions}</TableCell><TableCell><StatusBadge status={report.status} /></TableCell></TableRow>;
               }) : <TableRow><TableCell colSpan={5} className="h-28 text-center text-muted-foreground">No reports in this view.</TableCell></TableRow>}
             </TableBody>
           </Table>
+          <ShowMoreButton expanded={reportRows.expanded} hiddenCount={reportRows.hiddenCount} canExpand={reportRows.canExpand} onClick={reportRows.toggle} />
         </div>
       )}
 
@@ -261,7 +360,7 @@ export default function DailyReportReview() {
                 <div className="flex items-center gap-2"><SheetTitle>{selected.storeName}</SheetTitle><StatusBadge status={selected.status} /></div>
                 <SheetDescription>{selected.businessDate}</SheetDescription>
               </SheetHeader>
-              <ReportDetail report={selected} references={data.references} currency={org.currency} busy={busy} onDecision={decide} />
+              <ReportDetail key={selected.id} report={selected} references={data.references} currency={org.currency} busy={busy} onDecision={decide} onSaveCogs={saveCogs} />
             </>
           ) : null}
         </SheetContent>

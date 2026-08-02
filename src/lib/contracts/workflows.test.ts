@@ -104,6 +104,21 @@ describe('typed workflow contracts', () => {
     expect(customerCaptureSchema.safeParse(base).success).toBe(false);
     expect(customerCaptureSchema.safeParse({ ...base, productId: 3 }).success).toBe(true);
   });
+
+  it('accepts an optional in-stock/stock-gap fulfillment status', () => {
+    const base = {
+      businessDate: '2026-07-11',
+      name: 'Demo Customer',
+      phone: '+233200000000',
+      lifecycle: 'lead',
+      source: 'walk-in',
+      productId: 3,
+    } as const;
+    expect(customerCaptureSchema.parse(base).fulfillmentStatus).toBeUndefined();
+    expect(customerCaptureSchema.parse({ ...base, fulfillmentStatus: 'in_stock' }).fulfillmentStatus).toBe('in_stock');
+    expect(customerCaptureSchema.parse({ ...base, fulfillmentStatus: 'stock_gap' }).fulfillmentStatus).toBe('stock_gap');
+    expect(customerCaptureSchema.safeParse({ ...base, fulfillmentStatus: 'backordered' }).success).toBe(false);
+  });
 });
 
 describe('document contracts', () => {

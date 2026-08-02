@@ -17,6 +17,7 @@ export interface DailySalesDraftRow {
   discounts: string;
   returns: string;
   creditSales: string;
+  productNames: string;
 }
 
 export interface DailyPaymentDraftRow {
@@ -32,6 +33,8 @@ export interface DailyReportDraft {
   newCustomers: string;
   returningCustomers: string;
   notes: string;
+  staffPerformanceNote: string;
+  closingFacilityStatus: string;
   sales: DailySalesDraftRow[];
   payments: DailyPaymentDraftRow[];
 }
@@ -45,6 +48,7 @@ const emptySalesRow = (categoryId: number): DailySalesDraftRow => ({
   discounts: '',
   returns: '',
   creditSales: '',
+  productNames: '',
 });
 
 const countValue = (value: number | undefined) => (value === undefined ? '' : String(value));
@@ -73,6 +77,8 @@ export function createDailyReportDraft(
     newCustomers: countValue(report?.newCustomers),
     returningCustomers: countValue(report?.returningCustomers),
     notes: report?.notes ?? '',
+    staffPerformanceNote: report?.staffPerformanceNote ?? '',
+    closingFacilityStatus: report?.closingFacilityStatus ?? '',
     sales: categoryIds.map((categoryId) => {
       const line = existingSales.get(categoryId);
       return line
@@ -85,6 +91,7 @@ export function createDailyReportDraft(
             discounts: line.discounts,
             returns: line.returns,
             creditSales: line.creditSales,
+            productNames: line.products.map((item) => item.productName).join('\n'),
           }
         : emptySalesRow(categoryId);
     }),
@@ -95,7 +102,14 @@ export function createDailyReportDraft(
   };
 }
 
+const parseProductNames = (value: string) =>
+  value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+
 const salesRowHasValue = (row: DailySalesDraftRow) =>
+  parseProductNames(row.productNames).length > 0 ||
   [row.openingStock, row.unitsSold, row.grossRevenue, row.cogs, row.discounts, row.returns, row.creditSales].some(
     (value) => value.trim() !== ''
   );
@@ -114,6 +128,8 @@ export function buildDailyReportInput(
     newCustomers: Number(draft.newCustomers || 0),
     returningCustomers: Number(draft.returningCustomers || 0),
     notes: draft.notes.trim() || null,
+    staffPerformanceNote: draft.staffPerformanceNote.trim() || null,
+    closingFacilityStatus: draft.closingFacilityStatus.trim() || null,
     lockVersion,
     sales: draft.sales.filter(salesRowHasValue).map((row) => ({
       categoryId: row.categoryId,
@@ -124,6 +140,7 @@ export function buildDailyReportInput(
       discounts: row.discounts.trim() || '0',
       returns: row.returns.trim() || '0',
       creditSales: row.creditSales.trim() || '0',
+      products: parseProductNames(row.productNames).map((customName) => ({ customName })),
     })),
     payments: draft.payments
       .filter((row) => row.amount.trim() !== '')
@@ -151,6 +168,7 @@ export function createSavedDailyReportRecord(
     storeId: store.id,
     storeCode: store.code,
     storeName: store.name,
+    managerName: existing?.managerName ?? null,
     businessDate: input.businessDate,
     status: mutation.status,
     transactions: input.transactions,
@@ -159,12 +177,22 @@ export function createSavedDailyReportRecord(
     newCustomers: input.newCustomers,
     returningCustomers: input.returningCustomers,
     notes: input.notes ?? null,
+    staffPerformanceNote: input.staffPerformanceNote ?? null,
+    closingFacilityStatus: input.closingFacilityStatus ?? null,
     lockVersion: mutation.lockVersion,
     submittedAt:
       mutation.status === 'submitted' ? existing?.submittedAt ?? savedAt : null,
     approvedAt: null,
     updatedAt: savedAt,
-    sales: input.sales.map((line) => ({ ...line })),
+    sales: input.sales.map((line) => ({
+      ...line,
+      products: line.products.map((item) => ({
+        productId: item.productId ?? null,
+        productName: item.customName ?? '',
+        sku: null,
+        brandName: null,
+      })),
+    })),
     payments: input.payments.map((line) => ({ ...line })),
     activity: existing?.activity ?? [],
   };

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, ArrowLeft, CheckCircle2, LoaderCircle, LockKeyhole, RotateCcw, Save, Send, Trash2 } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CheckCircle2, Download, LoaderCircle, LockKeyhole, RotateCcw, Save, Send, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -10,11 +10,13 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ShowMoreButton } from '@/components/ui/show-more-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useOrg } from '@/components/providers/OrgProvider';
+import { useExpandable } from '@/hooks/use-expandable';
 import type { DailyReportMutationResponse, DailyReportRecord, DailyReportsResponse, DailyReportStatus } from '@/lib/contracts/daily-report';
 import {
   buildDailyReportInput,
@@ -26,13 +28,13 @@ import {
   type DailySalesDraftRow,
   upsertDailyReport,
 } from '@/lib/daily-report-form';
+import { downloadFile } from '@/lib/download-file';
 import { cn } from '@/lib/utils';
 
-type SalesField = Exclude<keyof DailySalesDraftRow, 'categoryId'>;
+type SalesField = Exclude<keyof DailySalesDraftRow, 'categoryId' | 'products'>;
 type HeaderField = Exclude<keyof DailyReportDraft, 'businessDate' | 'sales' | 'payments'>;
 
 const SALES_FIELDS: Array<{ key: SalesField; label: string; step: number }> = [
-  { key: 'openingStock', label: 'Opening stock', step: 1 },
   { key: 'unitsSold', label: 'Units sold', step: 1 },
   { key: 'grossRevenue', label: 'Gross sales', step: 0.01 },
   { key: 'cogs', label: 'COGS', step: 0.01 },
@@ -81,6 +83,7 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
   const [categoryToAdd, setCategoryToAdd] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<'draft' | 'submitted' | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const loadSequence = useRef(0);
 
@@ -156,6 +159,13 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
     } : current);
   }
 
+  function updateProductNames(categoryId: number, productNames: string) {
+    setDraft((current) => current ? {
+      ...current,
+      sales: current.sales.map((line) => line.categoryId === categoryId ? { ...line, productNames } : line),
+    } : current);
+  }
+
   function resetDraft() {
     if (!data) return;
     setDraft(createDailyReportDraft(selectedDate, data.references, currentReport));
@@ -168,13 +178,13 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
       ...current,
       sales: current.sales.map((line) => line.categoryId === categoryId ? {
         ...line,
-        openingStock: '',
         unitsSold: '',
         grossRevenue: '',
         cogs: '',
         discounts: '',
         returns: '',
         creditSales: '',
+        productNames: '',
       } : line),
     } : current);
     setVisibleCategoryIds((current) => {
@@ -182,6 +192,22 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
       next.delete(categoryId);
       return next;
     });
+  }
+
+  async function downloadPdf() {
+    if (!currentReport || downloadingPdf) return;
+    setDownloadingPdf(true);
+    setError(null);
+    try {
+      await downloadFile(
+        `/api/daily-reports/${currentReport.id}/pdf`,
+        `daily-report-${currentReport.storeCode}-${currentReport.businessDate}.pdf`
+      );
+    } catch (downloadError) {
+      setError((downloadError as Error).message);
+    } finally {
+      setDownloadingPdf(false);
+    }
   }
 
   async function save(status: 'draft' | 'submitted') {
@@ -210,6 +236,8 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
       setBusy(null);
     }
   }
+
+  const historyRows = useExpandable(data?.reports ?? []);
 
   if (loading && !data) {
     return (
@@ -261,6 +289,12 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
               setError(null);
             }}
           />
+          {currentReport ? (
+            <Button variant="outline" disabled={downloadingPdf} onClick={() => void downloadPdf()}>
+              {downloadingPdf ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Download data-icon="inline-start" />}
+              Download PDF
+            </Button>
+          ) : null}
           <Button variant="outline" disabled={disabled || correctingSubmission} onClick={() => void save('draft')}>
             {busy === 'draft' ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Save data-icon="inline-start" />}
             Save draft
@@ -320,11 +354,13 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
               <SelectContent><SelectGroup>{availableCategories.map((category) => <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>)}</SelectGroup></SelectContent>
             </Select>
           </div>
-          <div className="hidden overflow-x-auto rounded-md border bg-card shadow-sm md:block">
-            <Table className="min-w-[1120px]">
+
+          <div className="overflow-x-auto rounded-md border bg-card shadow-sm hidden md:block">
+            <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-44">Category</TableHead>
+                  <TableHead className="min-w-32">Category</TableHead>
+                  <TableHead className="min-w-40">Product name</TableHead>
                   {SALES_FIELDS.map((field) => <TableHead key={field.key}>{field.label}</TableHead>)}
                   <TableHead className="w-12"><span className="sr-only">Remove</span></TableHead>
                 </TableRow>
@@ -335,6 +371,17 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
                   return (
                     <TableRow key={line.categoryId}>
                       <TableCell className="font-medium">{category}</TableCell>
+                      <TableCell>
+                        <Textarea
+                          aria-label={`${category}: Product name`}
+                          placeholder="Product name, one per line"
+                          rows={1}
+                          className="min-h-9 min-w-40 resize-none py-1.5"
+                          value={line.productNames}
+                          disabled={disabled}
+                          onChange={(event) => updateProductNames(line.categoryId, event.target.value)}
+                        />
+                      </TableCell>
                       {SALES_FIELDS.map((field) => (
                         <TableCell key={field.key}>
                           <Input
@@ -343,7 +390,7 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
                             inputMode={field.step === 1 ? 'numeric' : 'decimal'}
                             min={0}
                             step={field.step}
-                            className="min-w-28"
+                            className="min-w-24"
                             value={line[field.key]}
                             disabled={disabled}
                             onChange={(event) => updateSales(line.categoryId, field.key, event.target.value)}
@@ -367,6 +414,10 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
                 <section key={line.categoryId} className="border-b pb-5 last:border-b-0">
                   <div className="mb-3 flex items-center justify-between gap-3"><h2 className="text-sm font-semibold">{category}</h2><Button type="button" variant="ghost" size="icon" aria-label={`Remove ${category}`} disabled={disabled} onClick={() => removeCategory(line.categoryId)}><Trash2 /></Button></div>
                   <FieldGroup className="grid grid-cols-2 gap-4">
+                    <Field className="col-span-2">
+                      <FieldLabel>Product name</FieldLabel>
+                      <Textarea placeholder="Product name, one per line" rows={1} className="min-h-9 resize-none py-1.5" value={line.productNames} disabled={disabled} onChange={(event) => updateProductNames(line.categoryId, event.target.value)} />
+                    </Field>
                     {SALES_FIELDS.map((field) => (
                       <Field key={field.key}>
                         <FieldLabel>{field.label}</FieldLabel>
@@ -400,6 +451,14 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
                 <FieldLabel htmlFor="report-notes">Notes</FieldLabel>
                 <Textarea id="report-notes" value={draft.notes} disabled={disabled} onChange={(event) => updateHeader('notes', event.target.value)} />
               </Field>
+              <Field className="sm:col-span-2 lg:col-span-5">
+                <FieldLabel htmlFor="report-staffPerformanceNote">Staff performance note</FieldLabel>
+                <Textarea id="report-staffPerformanceNote" value={draft.staffPerformanceNote} disabled={disabled} onChange={(event) => updateHeader('staffPerformanceNote', event.target.value)} />
+              </Field>
+              <Field className="sm:col-span-2 lg:col-span-5">
+                <FieldLabel htmlFor="report-closingFacilityStatus">Closing &amp; facility status</FieldLabel>
+                <Textarea id="report-closingFacilityStatus" value={draft.closingFacilityStatus} disabled={disabled} onChange={(event) => updateHeader('closingFacilityStatus', event.target.value)} />
+              </Field>
             </FieldGroup>
           </section>
         </TabsContent>
@@ -431,7 +490,7 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
             <Table>
               <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Net sales</TableHead><TableHead className="text-right">Transactions</TableHead></TableRow></TableHeader>
               <TableBody>
-                {data.reports.slice(0, 12).map((report) => (
+                {historyRows.visible.map((report) => (
                   <TableRow key={report.id} data-state={report.businessDate === selectedDate ? 'selected' : undefined}>
                     <TableCell><Button variant="link" className="h-auto px-0" onClick={() => setSelectedDate(report.businessDate)}>{report.businessDate}</Button></TableCell>
                     <TableCell><StatusBadge status={report.status} /></TableCell>
@@ -441,6 +500,7 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
                 ))}
               </TableBody>
             </Table>
+            <ShowMoreButton expanded={historyRows.expanded} hiddenCount={historyRows.hiddenCount} canExpand={historyRows.canExpand} onClick={historyRows.toggle} />
           </div>
         </TabsContent>
       </Tabs>

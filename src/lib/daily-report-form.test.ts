@@ -31,6 +31,7 @@ const report: DailyReportRecord = {
   storeId: 5,
   storeCode: 'labone-men',
   storeName: 'Labone Men',
+  managerName: 'Labone Men Manager',
   businessDate: '2026-07-10',
   status: 'draft',
   transactions: 3,
@@ -39,6 +40,8 @@ const report: DailyReportRecord = {
   newCustomers: 1,
   returningCustomers: 2,
   notes: 'Quiet morning',
+  staffPerformanceNote: 'Team handled the morning rush well',
+  closingFacilityStatus: 'Locked and alarmed at 9pm',
   lockVersion: 2,
   submittedAt: null,
   approvedAt: null,
@@ -53,6 +56,10 @@ const report: DailyReportRecord = {
       discounts: '20.00',
       returns: '0.00',
       creditSales: '80.00',
+      products: [
+        { productId: 501, productName: 'Test Product', sku: 'TP-1', brandName: 'TestBrand' },
+        { productId: null, productName: 'Custom item', sku: null, brandName: null },
+      ],
     },
   ],
   payments: [{ paymentMethodId: 20, amount: '400.00' }],
@@ -67,6 +74,9 @@ describe('daily report form helpers', () => {
     expect(draft.sales[1]).toMatchObject({ categoryId: 11, grossRevenue: '' });
     expect(draft.payments).toHaveLength(2);
     expect(draft.transactions).toBe('3');
+    expect(draft.staffPerformanceNote).toBe('Team handled the morning rush well');
+    expect(draft.closingFacilityStatus).toBe('Locked and alarmed at 9pm');
+    expect(draft.sales[0].productNames).toBe('Test Product\nCustom item');
   });
 
   it('keeps unavailable historical options only on reports that already use them', () => {
@@ -104,6 +114,7 @@ describe('daily report form helpers', () => {
       discounts: '',
       returns: '',
       creditSales: '80',
+      productNames: '',
     };
     draft.payments[0].amount = '420';
     const input = buildDailyReportInput(draft, 'submitted');
@@ -118,6 +129,7 @@ describe('daily report form helpers', () => {
         discounts: '0.00',
         returns: '0.00',
         creditSales: '80.00',
+        products: [],
       },
     ]);
     expect(input.payments).toEqual([{ paymentMethodId: 20, amount: '420.00' }]);
@@ -149,11 +161,8 @@ describe('daily report form helpers', () => {
   });
 
   it('creates and upserts a local saved record when a refresh cannot complete', () => {
-    const input = buildDailyReportInput(
-      createDailyReportDraft('2026-07-10', references, report),
-      'submitted',
-      report.lockVersion
-    );
+    const draft = createDailyReportDraft('2026-07-10', references, report);
+    const input = buildDailyReportInput(draft, 'submitted', report.lockVersion);
     const mutation: DailyReportMutationRecord = {
       id: report.id,
       lockVersion: 3,
@@ -175,7 +184,23 @@ describe('daily report form helpers', () => {
       lockVersion: 3,
       submittedAt: '2026-07-10T13:00:00.000Z',
     });
+    expect(saved.sales[0].products).toEqual([
+      { productId: null, productName: 'Test Product', sku: null, brandName: null },
+      { productId: null, productName: 'Custom item', sku: null, brandName: null },
+    ]);
     expect(upsertDailyReport([report], saved)).toEqual([saved]);
+  });
+
+  it('splits multi-line product names into separate products, trimming blank lines', () => {
+    const draft = createDailyReportDraft('2026-07-10', references);
+    draft.sales[0] = {
+      ...draft.sales[0],
+      grossRevenue: '500',
+      cogs: '250',
+      productNames: '  Blue Oxford Shirt  \n\nGrey Blazer\n',
+    };
+    const input = buildDailyReportInput(draft, 'draft');
+    expect(input.sales[0].products).toEqual([{ customName: 'Blue Oxford Shirt' }, { customName: 'Grey Blazer' }]);
   });
 
   it('merges an explicitly selected historical report into capped recent history', () => {

@@ -16,7 +16,9 @@ import {
   WalletCards,
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { ShowMoreButton } from '@/components/ui/show-more-button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useExpandable } from '@/hooks/use-expandable';
 import type { AnalyticsMeta, ExecutiveDomain, TradingOverview } from '@/lib/contracts/analytics';
 import { EmptyPanel, EmptyTableRow, MetricRail, SectionHeading, StatusBadge } from './DashboardPrimitives';
 import {
@@ -93,13 +95,6 @@ export function ExecutiveOverview({
       tone: 'amber' as const,
     },
     {
-      label: 'Sell-through',
-      value: formatPercent(summary.sellThrough),
-      detail: `${formatNumber(summary.unitsSold)} units sold`,
-      icon: ShoppingBag,
-      tone: 'coral' as const,
-    },
-    {
       label: 'People health',
       value: formatPercent(domain.peopleHealth.score),
       detail: `${formatNumber(domain.staffing.total)} employees`,
@@ -115,6 +110,14 @@ export function ExecutiveOverview({
     { label: 'ROCE', value: domain.finance.roce },
     { label: 'ROI', value: domain.finance.roi },
   ];
+
+  const stores = useExpandable(trading.stores);
+  const categoryRows = useExpandable(trading.categories);
+  const attention = useExpandable(trading.attention);
+  const activity = useExpandable(domain.activity);
+  const actions = useExpandable(trading.actions);
+  const managerVoices = useExpandable(domain.managerVoices);
+  const weeklyReviews = useExpandable(domain.weeklyReviews);
 
   return (
     <div className="flex flex-col gap-5">
@@ -152,7 +155,7 @@ export function ExecutiveOverview({
           <Table>
             <TableHeader><TableRow><TableHead>Store</TableHead><TableHead>Brand</TableHead><TableHead className="text-right">Revenue</TableHead><TableHead className="text-right">Target</TableHead><TableHead className="text-right">Operations</TableHead><TableHead className="text-right">VM</TableHead></TableRow></TableHeader>
             <TableBody>
-              {trading.stores.length ? trading.stores.map((store) => (
+              {trading.stores.length ? stores.visible.map((store) => (
                 <TableRow key={store.id}>
                   <TableCell className="font-medium">{store.name}</TableCell>
                   <TableCell className="text-muted-foreground">{store.brandName ?? 'Unassigned'}</TableCell>
@@ -164,26 +167,27 @@ export function ExecutiveOverview({
               )) : <EmptyTableRow colSpan={6} message="No approved store sales for this period" />}
             </TableBody>
           </Table>
+          <ShowMoreButton expanded={stores.expanded} hiddenCount={stores.hiddenCount} canExpand={stores.canExpand} onClick={stores.toggle} />
         </section>
       </div>
 
       <section className="surface min-w-0 overflow-hidden">
-        <div className="p-5 pb-3"><SectionHeading title="Sales by Category" description="Revenue, units, sell-through, and period movement" /></div>
+        <div className="p-5 pb-3"><SectionHeading title="Sales by Category" description="Revenue, units, and period movement" /></div>
         <Table>
-          <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Revenue</TableHead><TableHead className="text-right">Share</TableHead><TableHead className="text-right">Units</TableHead><TableHead className="text-right">Sell-through</TableHead><TableHead className="text-right">Change</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Revenue</TableHead><TableHead className="text-right">Share</TableHead><TableHead className="text-right">Units</TableHead><TableHead className="text-right">Change</TableHead></TableRow></TableHeader>
           <TableBody>
-            {trading.categories.length ? trading.categories.map((category) => (
+            {trading.categories.length ? categoryRows.visible.map((category) => (
               <TableRow key={category.id}>
                 <TableCell className="font-medium">{category.name}</TableCell>
                 <TableCell className="text-right">{formatCurrency(category.revenue, meta.currency)}</TableCell>
                 <TableCell className="text-right">{formatPercent(category.share)}</TableCell>
                 <TableCell className="text-right">{formatNumber(category.units)}</TableCell>
-                <TableCell className="text-right">{formatPercent(category.sellThrough)}</TableCell>
                 <TableCell className="text-right font-medium">{percentageChange(category.revenue, category.previousRevenue)?.toFixed(1) ?? '0.0'}%</TableCell>
               </TableRow>
-            )) : <EmptyTableRow colSpan={6} message="No approved category sales for this period" />}
+            )) : <EmptyTableRow colSpan={5} message="No approved category sales for this period" />}
           </TableBody>
         </Table>
+        <ShowMoreButton expanded={categoryRows.expanded} hiddenCount={categoryRows.hiddenCount} canExpand={categoryRows.canExpand} onClick={categoryRows.toggle} />
       </section>
 
       <div className="grid gap-5 xl:grid-cols-12">
@@ -234,26 +238,26 @@ export function ExecutiveOverview({
       <div className="grid gap-5 xl:grid-cols-2">
         <section className="surface min-w-0 p-5">
           <SectionHeading title="CEO Attention Index" description="The highest-priority risks requiring leadership attention" action={<span className="text-xs font-semibold text-destructive">{trading.summary.openActions} open</span>} />
-          {trading.attention.length ? <div className="mt-4 divide-y">
-            {trading.attention.slice(0, 8).map((item) => (
+          {trading.attention.length ? <><div className="mt-4 divide-y">
+            {attention.visible.map((item) => (
               <div key={item.id} className="flex gap-3 py-3 first:pt-0 last:pb-0">
                 <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-chart-3/10 text-destructive"><CircleAlert className="size-4" /></span>
                 <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{item.title}</span><span className="block truncate text-xs text-muted-foreground">{[item.department, item.storeName, item.ownerName].filter(Boolean).join(' / ')}</span></span>
                 <StatusBadge value={item.priority} />
               </div>
             ))}
-          </div> : <EmptyPanel message="No issues currently require CEO attention" />}
+          </div><ShowMoreButton expanded={attention.expanded} hiddenCount={attention.hiddenCount} canExpand={attention.canExpand} onClick={attention.toggle} /></> : <EmptyPanel message="No issues currently require CEO attention" />}
         </section>
         <section className="surface min-w-0 p-5">
           <SectionHeading title="Operations Feed" description="Recent submissions and workflow changes from the audit trail" />
-          {domain.activity.length ? <div className="mt-4 divide-y">
-            {domain.activity.map((item) => (
+          {domain.activity.length ? <><div className="mt-4 divide-y">
+            {activity.visible.map((item) => (
               <div key={item.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-chart-1/10 text-chart-1"><ClipboardCheck className="size-4" /></span>
                 <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium capitalize">{item.action} {item.entityType.replaceAll('-', ' ')}</span><span className="text-xs text-muted-foreground">{item.actorName} / {new Date(item.createdAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</span></span>
               </div>
             ))}
-          </div> : <EmptyPanel message="No recent workflow activity" />}
+          </div><ShowMoreButton expanded={activity.expanded} hiddenCount={activity.hiddenCount} canExpand={activity.canExpand} onClick={activity.toggle} /></> : <EmptyPanel message="No recent workflow activity" />}
         </section>
       </div>
 
@@ -262,36 +266,37 @@ export function ExecutiveOverview({
         <Table>
           <TableHeader><TableRow><TableHead>Action</TableHead><TableHead>Department</TableHead><TableHead>Owner</TableHead><TableHead>Store</TableHead><TableHead>Due</TableHead><TableHead>Priority</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
           <TableBody>
-            {trading.actions.length ? trading.actions.map((item) => (
+            {trading.actions.length ? actions.visible.map((item) => (
               <TableRow key={item.id}><TableCell className="max-w-80 truncate font-medium">{item.title}</TableCell><TableCell className="capitalize">{item.department}</TableCell><TableCell>{item.ownerName}</TableCell><TableCell>{item.storeName ?? 'Group'}</TableCell><TableCell>{item.dueDate ?? 'Not set'}</TableCell><TableCell><StatusBadge value={item.priority} /></TableCell><TableCell><StatusBadge value={item.status} /></TableCell></TableRow>
             )) : <EmptyTableRow colSpan={7} message="No cross-functional actions recorded" />}
           </TableBody>
         </Table>
+        <ShowMoreButton expanded={actions.expanded} hiddenCount={actions.hiddenCount} canExpand={actions.canExpand} onClick={actions.toggle} />
       </section>
 
       <div className="grid gap-5 xl:grid-cols-2">
         <section className="surface p-5">
           <SectionHeading title="Manager Voices" description="What store managers want leadership to hear" />
-          {domain.managerVoices.length ? <div className="mt-4 divide-y">
-            {domain.managerVoices.slice(0, 8).map((voice) => (
+          {domain.managerVoices.length ? <><div className="mt-4 divide-y">
+            {managerVoices.visible.map((voice) => (
               <div key={voice.reviewId} className="flex gap-3 py-3 first:pt-0 last:pb-0">
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-chart-5/10 text-chart-5"><UserRoundCheck className="size-4" /></span>
                 <span className="min-w-0 flex-1"><span className="block text-sm font-medium">{voice.storeName} / {voice.managerName}</span><span className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{voice.marketingAmplify ?? voice.differentThisWeek ?? 'No management note submitted.'}</span></span>
               </div>
             ))}
-          </div> : <EmptyPanel message="No manager observations have been submitted" />}
+          </div><ShowMoreButton expanded={managerVoices.expanded} hiddenCount={managerVoices.hiddenCount} canExpand={managerVoices.canExpand} onClick={managerVoices.toggle} /></> : <EmptyPanel message="No manager observations have been submitted" />}
         </section>
         <section className="surface p-5">
           <SectionHeading title="Store Manager - Key Insights" description="Latest store judgement, risks, and target delivery" />
-          {domain.weeklyReviews.length ? <div className="mt-4 divide-y">
-            {domain.weeklyReviews.slice(0, 8).map((review) => (
+          {domain.weeklyReviews.length ? <><div className="mt-4 divide-y">
+            {weeklyReviews.visible.map((review) => (
               <div key={review.id} className="flex gap-3 py-3 first:pt-0 last:pb-0">
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"><Building2 className="size-4" /></span>
                 <span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="truncate text-sm font-medium">{review.storeName}</span><StatusBadge value={review.status} /></span><span className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{review.summary ?? review.risks ?? review.differentThisWeek ?? 'No insight submitted.'}</span></span>
                 <span className="text-xs font-semibold">{formatPercent(review.achievement)}</span>
               </div>
             ))}
-          </div> : <EmptyPanel message="No store-manager insights have been submitted" />}
+          </div><ShowMoreButton expanded={weeklyReviews.expanded} hiddenCount={weeklyReviews.hiddenCount} canExpand={weeklyReviews.canExpand} onClick={weeklyReviews.toggle} /></> : <EmptyPanel message="No store-manager insights have been submitted" />}
         </section>
       </div>
     </div>

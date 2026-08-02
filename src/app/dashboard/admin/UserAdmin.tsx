@@ -81,6 +81,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { ShowMoreButton } from '@/components/ui/show-more-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -91,6 +92,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { useExpandable } from '@/hooks/use-expandable';
 import type { UserRole } from '@/lib/types';
 
 interface UserAccount {
@@ -299,6 +301,7 @@ export default function UserAdmin({ currentUserId, passwordMinLength, stores }: 
       return matchesQuery && matchesStatus && matchesRole;
     });
   }, [query, roleFilter, statusFilter, users]);
+  const visibleUsers = useExpandable(filteredUsers);
 
   const editorUser = editor?.mode === 'edit' ? editor.user : null;
   const protectedOwner = Boolean(
@@ -652,7 +655,7 @@ export default function UserAdmin({ currentUserId, passwordMinLength, stores }: 
                 <LoadingRows />
               ) : (
                 <TableBody>
-                  {filteredUsers.map((user) => {
+                  {visibleUsers.visible.map((user) => {
                     const isCurrentUser = user.id === currentUserId;
                     const isLastActiveOwner = user.active && user.role === 'owner' && activeOwnerCount <= 1;
                     const statusActionDisabled = isCurrentUser || isLastActiveOwner;
@@ -757,6 +760,7 @@ export default function UserAdmin({ currentUserId, passwordMinLength, stores }: 
               )}
             </Table>
           )}
+          {!loading ? <ShowMoreButton expanded={visibleUsers.expanded} hiddenCount={visibleUsers.hiddenCount} canExpand={visibleUsers.canExpand} onClick={visibleUsers.toggle} /> : null}
         </section>
       </div>
 

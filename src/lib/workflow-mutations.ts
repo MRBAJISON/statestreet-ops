@@ -176,11 +176,11 @@ async function captureCustomer(user: AppUser, input: z.infer<typeof customerCapt
     ), interaction as (
       insert into customer_interactions (
         customer_id, store_id, business_date, lifecycle, source, source_detail,
-        product_id, interest_text, notes, captured_by_user_id
+        product_id, interest_text, fulfillment_status, notes, captured_by_user_id
       )
       select customer.id, ${store.id}, ${input.businessDate}, ${input.lifecycle}, ${input.source},
              ${input.sourceDetail ?? null}, ${input.productId ?? null}, ${input.interestText ?? null},
-             ${input.notes ?? null}, ${actorUserId}
+             ${input.fulfillmentStatus ?? null}, ${input.notes ?? null}, ${actorUserId}
       from customer_record customer
       returning *
     ), interaction_audit as (

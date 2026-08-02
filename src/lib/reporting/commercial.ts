@@ -309,10 +309,14 @@ export async function getCommercialDomain(scope: AnalyticsScope): Promise<Commer
           'attainment', item.attainment
         ) order by item.week_end)
         from (
-          select review.week_end,
+          select week.date as week_end,
             coalesce(round(100 * sum(review.actual_revenue) / nullif(sum(review.target_revenue), 0), 1), 0)::float8 as attainment
-          from review_rows review
-          group by review.week_end
+          from (
+            select generate_series(${scope.compareFrom}::date, ${scope.to}::date, interval '1 week')::date as date
+            where exists (select 1 from review_rows)
+          ) week
+          left join review_rows review on review.week_end = week.date
+          group by week.date
         ) item
       ), '[]'::jsonb),
       'actions', coalesce((

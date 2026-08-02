@@ -4,22 +4,18 @@ import { getSession } from '@/lib/auth';
 import { saveDailyReportSchema } from '@/lib/contracts/daily-report';
 import { dateSchema, formatContractError } from '@/lib/contracts/shared';
 import {
+  attachDailyReportDetails,
   createDailyReport,
+  createdUsers,
   getDailyReportReferenceData,
+  managerNameColumn,
   resolveDailyReportStore,
+  submittedUsers,
   validateDailyReportReferences,
+  type DailyReportBaseRow,
 } from '@/lib/daily-reports';
 import { db } from '@/lib/db';
-import {
-  categories,
-  auditEvents,
-  dailyPaymentLines,
-  dailyReports,
-  dailySalesLines,
-  paymentMethods,
-  stores,
-} from '@/lib/db/foundation-schema';
-import { users } from '@/lib/db/schema';
+import { categories, dailyReports, paymentMethods, stores } from '@/lib/db/foundation-schema';
 import { databaseErrorCode, HttpError } from '@/lib/server-errors';
 
 const DAILY_REPORT_READERS = new Set(['owner', 'finance', 'commercial', 'operations', 'store-manager']);
@@ -83,13 +79,14 @@ export async function GET(req: NextRequest) {
     if (from) conditions.push(gte(dailyReports.businessDate, from));
     if (to) conditions.push(lte(dailyReports.businessDate, to));
     if (status) conditions.push(eq(dailyReports.status, status));
-    const [reports, references] = await Promise.all([
+    const [baseReports, references] = await Promise.all([
       db
         .select({
           id: dailyReports.id,
           storeId: dailyReports.storeId,
           storeCode: stores.code,
           storeName: stores.name,
+          managerName: managerNameColumn,
           businessDate: dailyReports.businessDate,
           status: dailyReports.status,
           transactions: dailyReports.transactions,
@@ -98,6 +95,8 @@ export async function GET(req: NextRequest) {
           newCustomers: dailyReports.newCustomers,
           returningCustomers: dailyReports.returningCustomers,
           notes: dailyReports.notes,
+          staffPerformanceNote: dailyReports.staffPerformanceNote,
+          closingFacilityStatus: dailyReports.closingFacilityStatus,
           lockVersion: dailyReports.lockVersion,
           submittedAt: dailyReports.submittedAt,
           approvedAt: dailyReports.approvedAt,
@@ -105,70 +104,25 @@ export async function GET(req: NextRequest) {
         })
         .from(dailyReports)
         .innerJoin(stores, eq(dailyReports.storeId, stores.id))
+        .leftJoin(submittedUsers, eq(dailyReports.submittedByUserId, submittedUsers.id))
+        .leftJoin(createdUsers, eq(dailyReports.createdByUserId, createdUsers.id))
         .where(conditions.length ? and(...conditions) : undefined)
         .orderBy(desc(dailyReports.businessDate), desc(dailyReports.updatedAt))
         .limit(366),
       getDailyReportReferenceData(storeId),
     ]);
-    const reportIds = reports.map((report) => report.id);
-    const [sales, payments, activity] = reportIds.length
-      ? await Promise.all([
-          db
-            .select({
-              dailyReportId: dailySalesLines.dailyReportId,
-              categoryId: dailySalesLines.categoryId,
-              openingStock: dailySalesLines.openingStock,
-              unitsSold: dailySalesLines.unitsSold,
-              grossRevenue: dailySalesLines.grossRevenue,
-              cogs: dailySalesLines.cogs,
-              discounts: dailySalesLines.discounts,
-              returns: dailySalesLines.returns,
-              creditSales: dailySalesLines.creditSales,
-            })
-            .from(dailySalesLines)
-            .where(inArray(dailySalesLines.dailyReportId, reportIds)),
-          db
-            .select({
-              dailyReportId: dailyPaymentLines.dailyReportId,
-              paymentMethodId: dailyPaymentLines.paymentMethodId,
-              amount: dailyPaymentLines.amount,
-            })
-            .from(dailyPaymentLines)
-            .where(inArray(dailyPaymentLines.dailyReportId, reportIds)),
-          db
-            .select({
-              id: auditEvents.id,
-              dailyReportId: auditEvents.entityId,
-              action: auditEvents.action,
-              actorName: users.name,
-              metadata: auditEvents.metadata,
-              createdAt: auditEvents.createdAt,
-            })
-            .from(auditEvents)
-            .leftJoin(users, eq(auditEvents.actorUserId, users.id))
-            .where(and(eq(auditEvents.entityType, 'daily-report'), inArray(auditEvents.entityId, reportIds)))
-            .orderBy(desc(auditEvents.createdAt)),
-        ])
-      : [[], [], []];
-    const salesByReport = new Map<number, typeof sales>();
-    const paymentsByReport = new Map<number, typeof payments>();
-    const activityByReport = new Map<number, typeof activity>();
-    for (const line of sales) salesByReport.set(line.dailyReportId, [...(salesByReport.get(line.dailyReportId) ?? []), line]);
-    for (const line of payments) {
-      paymentsByReport.set(line.dailyReportId, [...(paymentsByReport.get(line.dailyReportId) ?? []), line]);
-    }
-    for (const event of activity) {
-      activityByReport.set(event.dailyReportId, [...(activityByReport.get(event.dailyReportId) ?? []), event]);
-    }
+    const reports = await attachDailyReportDetails(baseReports as unknown as DailyReportBaseRow[]);
     const knownCategoryIds = new Set(references.categories.map((category) => category.id));
     const knownPaymentMethodIds = new Set(references.paymentMethods.map((method) => method.id));
     const historicalCategoryIds = [
-      ...new Set(sales.map((line) => line.categoryId).filter((categoryId) => !knownCategoryIds.has(categoryId))),
+      ...new Set(
+        reports.flatMap((report) => report.sales.map((line) => line.categoryId)).filter((categoryId) => !knownCategoryIds.has(categoryId))
+      ),
     ];
     const historicalPaymentMethodIds = [
       ...new Set(
-        payments
-          .map((line) => line.paymentMethodId)
+        reports
+          .flatMap((report) => report.payments.map((line) => line.paymentMethodId))
           .filter((paymentMethodId) => !knownPaymentMethodIds.has(paymentMethodId))
       ),
     ];
@@ -198,18 +152,7 @@ export async function GET(req: NextRequest) {
           ...historicalPaymentMethods.map((method) => ({ ...method, available: false })),
         ],
       },
-      reports: reports.map((report) => ({
-        ...report,
-        sales: salesByReport.get(report.id) ?? [],
-        payments: paymentsByReport.get(report.id) ?? [],
-        activity: (activityByReport.get(report.id) ?? []).map((event) => ({
-          id: event.id,
-          action: event.action,
-          actorName: event.actorName,
-          reason: typeof event.metadata?.reason === 'string' ? event.metadata.reason : null,
-          createdAt: event.createdAt.toISOString(),
-        })),
-      })),
+      reports,
     });
   } catch (error) {
     if (error instanceof HttpError) return NextResponse.json({ error: error.message }, { status: error.status });

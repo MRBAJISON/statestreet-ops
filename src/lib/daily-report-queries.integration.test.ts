@@ -23,6 +23,7 @@ describeWithDatabase('daily report SQL integration', () => {
   let categoryTwoId: number;
   let paymentOneId: number;
   let paymentTwoId: number;
+  let productOneId: number;
 
   async function execute(query: SQL) {
     const compiled = dialect.sqlToQuery(query);
@@ -35,8 +36,8 @@ describeWithDatabase('daily report SQL integration', () => {
     await client.connect();
     await client.query(`
       truncate table
-        audit_events, daily_payment_lines, daily_sales_lines, daily_reports,
-        payment_methods, categories, stores, users
+        audit_events, daily_payment_lines, daily_sales_lines, daily_report_products, daily_reports,
+        payment_methods, categories, products, brands, stores, users
       restart identity cascade
     `);
     userId = Number(
@@ -72,6 +73,17 @@ describeWithDatabase('daily report SQL integration', () => {
     );
     paymentOneId = Number(paymentRows.rows.find((row) => row.code === 'cash')?.id);
     paymentTwoId = Number(paymentRows.rows.find((row) => row.code === 'card')?.id);
+    const brandId = Number(
+      (await client.query(`insert into brands (code, name) values ('test-brand', 'Test Brand') returning id`)).rows[0].id
+    );
+    productOneId = Number(
+      (
+        await client.query(
+          `insert into products (sku, name, brand_id, category_id) values ('SKU-1', 'Test Product', $1, $2) returning id`,
+          [brandId, categoryOneId]
+        )
+      ).rows[0].id
+    );
   });
 
   afterAll(async () => {
@@ -219,5 +231,52 @@ describeWithDatabase('daily report SQL integration', () => {
     expect(audit.rows[3].before.status).toBe('submitted');
     expect(audit.rows[3].after.status).toBe('approved');
     expect(audit.rows[4].metadata).toEqual({ reason: 'Correcting the payment split' });
+  });
+
+  it('persists key products sold per category and fully replaces them on save', async () => {
+    const initial = saveDailyReportSchema.parse({
+      businessDate: '2026-07-11',
+      status: 'draft',
+      sales: [
+        {
+          categoryId: categoryOneId,
+          grossRevenue: '100',
+          cogs: '50',
+          products: [{ productId: productOneId }, { customName: 'Not in catalog item' }],
+        },
+      ],
+      payments: [],
+    });
+    const created = await execute(buildCreateDailyReportQuery(userId, storeId, initial));
+    const reportId = Number(created.rows[0].id);
+
+    const initialProducts = await client.query(
+      'select category_id::integer, product_id::integer, custom_name from daily_report_products where daily_report_id = $1 order by id',
+      [reportId]
+    );
+    expect(initialProducts.rows).toEqual([
+      { category_id: categoryOneId, product_id: productOneId, custom_name: null },
+      { category_id: categoryOneId, product_id: null, custom_name: 'Not in catalog item' },
+    ]);
+
+    const replaced = await execute(
+      buildReplaceDailyReportQuery(userId, reportId, {
+        ...initial,
+        sales: [
+          {
+            ...initial.sales[0],
+            products: [{ customName: 'Only this one now' }],
+          },
+        ],
+        lockVersion: 1,
+      })
+    );
+    expect(replaced.rows[0]).toMatchObject({ lock_version: 2 });
+
+    const replacedProducts = await client.query(
+      'select category_id::integer, product_id::integer, custom_name from daily_report_products where daily_report_id = $1 order by id',
+      [reportId]
+    );
+    expect(replacedProducts.rows).toEqual([{ category_id: categoryOneId, product_id: null, custom_name: 'Only this one now' }]);
   });
 });

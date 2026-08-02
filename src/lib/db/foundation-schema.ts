@@ -212,6 +212,8 @@ export const dailyReports = pgTable(
     newCustomers: integer('new_customers').notNull().default(0),
     returningCustomers: integer('returning_customers').notNull().default(0),
     notes: text('notes'),
+    staffPerformanceNote: text('staff_performance_note'),
+    closingFacilityStatus: text('closing_facility_status'),
     lockVersion: integer('lock_version').notNull().default(1),
     createdByUserId: integer('created_by_user_id')
       .notNull()
@@ -294,6 +296,28 @@ export const dailyPaymentLines = pgTable(
     uniqueIndex('daily_payment_lines_report_method_uidx').on(t.dailyReportId, t.paymentMethodId),
     index('daily_payment_lines_method_idx').on(t.paymentMethodId),
     check('daily_payment_lines_amount_check', sql`${t.amount} >= 0`),
+  ]
+);
+
+export const dailyReportProducts = pgTable(
+  'daily_report_products',
+  {
+    id: id(),
+    dailyReportId: bigint('daily_report_id', { mode: 'number' })
+      .notNull()
+      .references(() => dailyReports.id, { onDelete: 'cascade' }),
+    categoryId: bigint('category_id', { mode: 'number' })
+      .notNull()
+      .references(() => categories.id, { onDelete: 'restrict' }),
+    productId: bigint('product_id', { mode: 'number' }).references(() => products.id, { onDelete: 'set null' }),
+    customName: text('custom_name'),
+    ...timestamps(),
+  },
+  (t) => [
+    index('daily_report_products_report_idx').on(t.dailyReportId),
+    index('daily_report_products_category_idx').on(t.categoryId),
+    index('daily_report_products_product_idx').on(t.productId),
+    check('daily_report_products_name_check', sql`${t.productId} is not null or ${t.customName} is not null`),
   ]
 );
 
@@ -730,6 +754,7 @@ export const customerInteractions = pgTable(
     sourceDetail: text('source_detail'),
     productId: bigint('product_id', { mode: 'number' }).references(() => products.id, { onDelete: 'restrict' }),
     interestText: text('interest_text'),
+    fulfillmentStatus: text('fulfillment_status'),
     notes: text('notes'),
     capturedByUserId: integer('captured_by_user_id')
       .notNull()
@@ -742,6 +767,10 @@ export const customerInteractions = pgTable(
     index('customer_interactions_product_idx').on(t.productId),
     index('customer_interactions_captured_by_idx').on(t.capturedByUserId),
     check('customer_interactions_lifecycle_check', sql`${t.lifecycle} in ('lead', 'buyer')`),
+    check(
+      'customer_interactions_fulfillment_status_check',
+      sql`${t.fulfillmentStatus} is null or ${t.fulfillmentStatus} in ('in_stock', 'stock_gap')`
+    ),
   ]
 );
 

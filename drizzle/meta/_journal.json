@@ -78,6 +78,20 @@
       "when": 1783970000000,
       "tag": "0010_legacy_migration_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1783970100000,
+      "tag": "0011_daily_report_notes",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1783970200000,
+      "tag": "0012_daily_report_products_fulfillment",
+      "breakpoints": true
     }
   ]
 }

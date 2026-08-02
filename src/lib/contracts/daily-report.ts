@@ -5,6 +5,16 @@ const countSchema = z.number().int().min(0).max(10_000_000);
 
 export const dailyReportStatusSchema = z.enum(['draft', 'submitted', 'approved']);
 
+export const dailyReportProductSchema = z
+  .object({
+    productId: positiveIdSchema.optional(),
+    customName: z.string().trim().max(160).optional(),
+  })
+  .refine((value) => Boolean(value.productId || value.customName), {
+    path: ['customName'],
+    message: 'Choose a product or type a name',
+  });
+
 export const dailySalesLineSchema = z
   .object({
     categoryId: positiveIdSchema,
@@ -15,6 +25,7 @@ export const dailySalesLineSchema = z
     discounts: moneySchema.default('0.00'),
     returns: moneySchema.default('0.00'),
     creditSales: moneySchema.default('0.00'),
+    products: z.array(dailyReportProductSchema).max(20).default([]),
   })
   .superRefine((line, ctx) => {
     const gross = moneyToCents(line.grossRevenue);
@@ -49,6 +60,8 @@ export const saveDailyReportSchema = z
     newCustomers: countSchema.default(0),
     returningCustomers: countSchema.default(0),
     notes: z.string().trim().max(2000).optional().nullable(),
+    staffPerformanceNote: z.string().trim().max(2000).optional().nullable(),
+    closingFacilityStatus: z.string().trim().max(2000).optional().nullable(),
     lockVersion: z.number().int().positive().optional(),
     sales: z.array(dailySalesLineSchema).min(1).max(200),
     payments: z.array(dailyPaymentLineSchema).max(30).default([]),
@@ -129,6 +142,13 @@ export interface DailyReportOption extends DailyReportReference {
   available: boolean;
 }
 
+export interface DailyReportProductRecord {
+  productId: number | null;
+  productName: string;
+  sku: string | null;
+  brandName: string | null;
+}
+
 export interface DailyReportSalesRecord {
   categoryId: number;
   openingStock: number;
@@ -138,6 +158,7 @@ export interface DailyReportSalesRecord {
   discounts: string;
   returns: string;
   creditSales: string;
+  products: DailyReportProductRecord[];
 }
 
 export interface DailyReportPaymentRecord {
@@ -158,6 +179,7 @@ export interface DailyReportRecord {
   storeId: number;
   storeCode: string;
   storeName: string;
+  managerName: string | null;
   businessDate: string;
   status: DailyReportStatus;
   transactions: number;
@@ -166,6 +188,8 @@ export interface DailyReportRecord {
   newCustomers: number;
   returningCustomers: number;
   notes: string | null;
+  staffPerformanceNote: string | null;
+  closingFacilityStatus: string | null;
   lockVersion: number;
   submittedAt: string | null;
   approvedAt: string | null;

@@ -7,7 +7,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
-interface ProductOption {
+export interface ProductOption {
   id: number;
   sku: string;
   name: string;
@@ -22,11 +22,13 @@ async function responseError(response: Response) {
 export function ProductCombobox({
   value,
   onChange,
+  onSelect,
   disabled,
   allowedBrandIds,
 }: {
   value: string;
   onChange: (value: string) => void;
+  onSelect?: (product: ProductOption) => void;
   disabled?: boolean;
   allowedBrandIds?: readonly number[];
 }) {
@@ -90,6 +92,7 @@ export function ProductCombobox({
                   data-checked={String(product.id) === value}
                   onSelect={() => {
                     onChange(String(product.id));
+                    onSelect?.(product);
                     setOpen(false);
                   }}
                 >
