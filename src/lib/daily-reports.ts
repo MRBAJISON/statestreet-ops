@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { AppUser } from './auth';
 import type {
@@ -331,35 +331,57 @@ export async function attachDailyReportDetails(baseReports: DailyReportBaseRow[]
   }));
 }
 
-export async function getDailyReportById(reportId: number): Promise<DailyReportRecord | null> {
-  const baseReports = await db
-    .select({
-      id: dailyReports.id,
-      storeId: dailyReports.storeId,
-      storeCode: stores.code,
-      storeName: stores.name,
-      managerName: managerNameColumn,
-      businessDate: dailyReports.businessDate,
-      status: dailyReports.status,
-      transactions: dailyReports.transactions,
-      footfall: dailyReports.footfall,
-      totalCustomers: dailyReports.totalCustomers,
-      newCustomers: dailyReports.newCustomers,
-      returningCustomers: dailyReports.returningCustomers,
-      notes: dailyReports.notes,
-      staffPerformanceNote: dailyReports.staffPerformanceNote,
-      closingFacilityStatus: dailyReports.closingFacilityStatus,
-      lockVersion: dailyReports.lockVersion,
-      submittedAt: dailyReports.submittedAt,
-      approvedAt: dailyReports.approvedAt,
-      updatedAt: dailyReports.updatedAt,
-    })
+const dailyReportBaseColumns = {
+  id: dailyReports.id,
+  storeId: dailyReports.storeId,
+  storeCode: stores.code,
+  storeName: stores.name,
+  managerName: managerNameColumn,
+  businessDate: dailyReports.businessDate,
+  status: dailyReports.status,
+  transactions: dailyReports.transactions,
+  footfall: dailyReports.footfall,
+  totalCustomers: dailyReports.totalCustomers,
+  newCustomers: dailyReports.newCustomers,
+  returningCustomers: dailyReports.returningCustomers,
+  notes: dailyReports.notes,
+  staffPerformanceNote: dailyReports.staffPerformanceNote,
+  closingFacilityStatus: dailyReports.closingFacilityStatus,
+  lockVersion: dailyReports.lockVersion,
+  submittedAt: dailyReports.submittedAt,
+  approvedAt: dailyReports.approvedAt,
+  updatedAt: dailyReports.updatedAt,
+};
+
+function dailyReportBaseQuery() {
+  return db
+    .select(dailyReportBaseColumns)
     .from(dailyReports)
     .innerJoin(stores, eq(dailyReports.storeId, stores.id))
     .leftJoin(submittedUsers, eq(dailyReports.submittedByUserId, submittedUsers.id))
-    .leftJoin(createdUsers, eq(dailyReports.createdByUserId, createdUsers.id))
-    .where(eq(dailyReports.id, reportId))
-    .limit(1);
+    .leftJoin(createdUsers, eq(dailyReports.createdByUserId, createdUsers.id));
+}
+
+/** Every report a store filed across an inclusive date range, oldest first. */
+export async function getDailyReportsForStorePeriod(
+  storeId: number,
+  from: string,
+  to: string
+): Promise<DailyReportRecord[]> {
+  const baseReports = await dailyReportBaseQuery()
+    .where(
+      and(
+        eq(dailyReports.storeId, storeId),
+        gte(dailyReports.businessDate, from),
+        lte(dailyReports.businessDate, to)
+      )
+    )
+    .orderBy(asc(dailyReports.businessDate));
+  return attachDailyReportDetails(baseReports as unknown as DailyReportBaseRow[]);
+}
+
+export async function getDailyReportById(reportId: number): Promise<DailyReportRecord | null> {
+  const baseReports = await dailyReportBaseQuery().where(eq(dailyReports.id, reportId)).limit(1);
   if (!baseReports.length) return null;
   const [full] = await attachDailyReportDetails(baseReports as unknown as DailyReportBaseRow[]);
   return full ?? null;

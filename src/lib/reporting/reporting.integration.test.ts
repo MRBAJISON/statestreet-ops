@@ -208,10 +208,15 @@ describeWithDatabase('reporting SQL integration', () => {
       }),
     ]);
 
+    // July 2026 holds 27 trading days (31 less 4 Sundays), so a month target is spread
+    // 3100/27 and 6200/27 across the days the stores actually open. The window totals
+    // still reconcile to the full target because the window covers the whole period.
     expect(group.summary.targetRevenue).toBe(3100);
-    expect(group.trend.find((point) => point.date === '2026-07-10')?.target).toBe(100);
+    expect(group.trend.find((point) => point.date === '2026-07-10')?.target).toBe(114.81);
     expect(store.summary.targetRevenue).toBe(6200);
-    expect(store.trend.find((point) => point.date === '2026-07-10')?.target).toBe(200);
+    expect(store.trend.find((point) => point.date === '2026-07-10')?.target).toBe(229.63);
+    // Sunday 05 Jul is closed, so it carries no target at all.
+    expect(store.trend.find((point) => point.date === '2026-07-05')?.target).toBe(0);
   });
 
   it('uses group budgets when present and otherwise sums store budgets for group reporting', async () => {

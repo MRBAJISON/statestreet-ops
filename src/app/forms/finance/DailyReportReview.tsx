@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { PeriodReportDownload } from '@/components/reports/PeriodReportDownload';
 import { useOrg } from '@/components/providers/OrgProvider';
 import { useExpandable } from '@/hooks/use-expandable';
 import type { DailyReportRecord, DailyReportsResponse, DailyReportStatus } from '@/lib/contracts/daily-report';
@@ -176,10 +177,18 @@ function ReportDetail({
         ) : null}
       </div>
       <SheetFooter className="border-t bg-background px-5 py-4 sm:flex-row sm:justify-end">
-        <Button variant="outline" disabled={downloadingPdf} onClick={() => void downloadPdf()}>
-          {downloadingPdf ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Download data-icon="inline-start" />}
-          Download PDF
-        </Button>
+        {report.status !== 'draft' ? (
+          <Button variant="outline" disabled={downloadingPdf} onClick={() => void downloadPdf()}>
+            {downloadingPdf ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Download data-icon="inline-start" />}
+            Download PDF
+          </Button>
+        ) : null}
+        <PeriodReportDownload
+          storeId={report.storeId}
+          storeCode={report.storeCode}
+          anchorDate={report.businessDate}
+          disabled={busy}
+        />
         {canEditCogs && hasCogsEdits ? <Button variant="outline" disabled={busy} onClick={() => { onSaveCogs(cogsEdits); setCogsEdits({}); }}>{busy ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : null}Save COGS changes</Button> : null}
         {report.status === 'submitted' ? <Button disabled={busy || hasCogsEdits || Math.abs(totals.variance) > 0.005} onClick={() => onDecision('approve')}>{busy ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Check data-icon="inline-start" />}Approve report</Button> : null}
         {report.status === 'approved' ? <Button variant="outline" disabled={busy || !reopenReason.trim()} onClick={() => onDecision('reopen', reopenReason)}>{busy ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <LockOpen data-icon="inline-start" />}Reopen report</Button> : null}

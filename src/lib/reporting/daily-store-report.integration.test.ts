@@ -45,7 +45,9 @@ describeWithDatabase('daily store report supplement', () => {
         )
       ).rows[0].id
     );
-    // A 10-day store target covering 2026-07-10: 10,000 total -> 1,000/day.
+    // 2026-07-01..07-10 spans 10 calendar days but only 9 trading days (Sun 05 Jul is
+    // closed), so a 10,000 target is worth 1,111.11 on each trading day and nothing on
+    // the Sunday.
     await client.query(
       `insert into performance_targets (metric, scope_type, store_id, period_type, period_start, period_end, value, unit, created_by_user_id, updated_by_user_id)
        values ('net-revenue', 'store', $1, 'month', '2026-07-01', '2026-07-10', '10000', 'money', $2, $2)`,
@@ -74,14 +76,14 @@ describeWithDatabase('daily store report supplement', () => {
     await client.end();
   });
 
-  it('prorates the daily target and computes achievement, surplus, and customer requests for one store-day', async () => {
+  it('prorates the daily target across trading days and computes achievement, surplus, and customer requests for one store-day', async () => {
     const { getDailyStoreReportSupplement } = await import('./daily-store-report');
     const supplement = await getDailyStoreReportSupplement(storeId, '2026-07-10', 1450, 5);
 
-    expect(supplement.dailyTarget).toBe(1000);
-    expect(supplement.achievementPercent).toBeCloseTo(145, 0);
-    expect(supplement.surplus).toBe(450);
-    expect(supplement.statusText).toBe('Target Exceeded (+45.0%)');
+    expect(supplement.dailyTarget).toBeCloseTo(1111.11, 2);
+    expect(supplement.achievementPercent).toBeCloseTo(130.5, 1);
+    expect(supplement.surplus).toBeCloseTo(338.89, 2);
+    expect(supplement.statusText).toBe('Target Exceeded (+30.5%)');
     expect(supplement.avgTicketValue).toBe(290);
     expect(supplement.leadsCount).toBe(1);
     expect(supplement.followUpText).toContain('1 new lead captured');
@@ -91,6 +93,15 @@ describeWithDatabase('daily store report supplement', () => {
         expect.objectContaining({ interest: 'Report Product', fulfillmentStatus: 'in_stock' }),
       ])
     );
+  });
+
+  it('carries no target on a Sunday even when a target period covers it', async () => {
+    const { getDailyStoreReportSupplement } = await import('./daily-store-report');
+    // Sun 05 Jul 2026 sits inside the seeded 01-10 Jul target period, but stores are closed.
+    const supplement = await getDailyStoreReportSupplement(storeId, '2026-07-05', 0, 0);
+
+    expect(supplement.dailyTarget).toBe(0);
+    expect(supplement.statusText).toBe('No target set');
   });
 
   it('reports no target set when nothing covers the date', async () => {

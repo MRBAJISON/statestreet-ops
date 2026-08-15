@@ -3,6 +3,7 @@ import type { CommercialDomain } from '../contracts/analytics';
 import { db } from '../db';
 import type { AnalyticsScope } from './shared';
 import { jsonResult } from './shared';
+import { targetWithinWindow, weekEndFor, weekStartFor } from './trading-days';
 
 export async function getCommercialDomain(scope: AnalyticsScope): Promise<CommercialDomain> {
   const movementStore = scope.store ? sql`and movement.store_id = ${scope.store.id}` : sql``;
@@ -99,20 +100,24 @@ export async function getCommercialDomain(scope: AnalyticsScope): Promise<Commer
         join daily_sales_lines line on line.daily_report_id = report.id
         where report.status = 'approved'
           and report.store_id = review.store_id
-          and report.business_date between review.week_end - 6 and review.week_end
+          and report.business_date between ${weekStartFor(sql`review.week_end`)} and ${weekEndFor(sql`review.week_end`)}
       ) trading on true
       left join lateral (
         select sum(
-          target.value *
-          ((least(target.period_end, review.week_end) - greatest(target.period_start, review.week_end - 6)) + 1)::numeric /
-          ((target.period_end - target.period_start) + 1)::numeric
+          ${targetWithinWindow(
+            sql`target.value`,
+            sql`target.period_start`,
+            sql`target.period_end`,
+            weekStartFor(sql`review.week_end`),
+            weekEndFor(sql`review.week_end`)
+          )}
         ) as target_revenue
         from performance_targets target
         where target.metric = 'net-revenue'
           and target.scope_type = 'store'
           and target.store_id = review.store_id
-          and target.period_start <= review.week_end
-          and target.period_end >= review.week_end - 6
+          and target.period_start <= ${weekEndFor(sql`review.week_end`)}
+          and target.period_end >= ${weekStartFor(sql`review.week_end`)}
       ) target on true
       left join lateral (
         select sum(note.value_at_risk) as stock_at_risk,

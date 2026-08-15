@@ -3,6 +3,7 @@ import type { TradingOverview } from '../contracts/analytics';
 import { db } from '../db';
 import type { AnalyticsScope } from './shared';
 import { jsonResult } from './shared';
+import { isTradingDay, targetPerTradingDay, targetWithinWindow } from './trading-days';
 
 export async function getTradingOverview(scope: AnalyticsScope): Promise<TradingOverview> {
   const reportStore = scope.store ? sql`and report.store_id = ${scope.store.id}` : sql``;
@@ -96,13 +97,18 @@ export async function getTradingOverview(scope: AnalyticsScope): Promise<Trading
     ), target_dates as (
       select generated.date::date
       from generate_series(${scope.from}::date, ${scope.to}::date, interval '1 day') generated(date)
+      where ${isTradingDay(sql`generated.date`)}
     ), target_by_store as (
       select
         target.store_id,
         sum(
-          target.value *
-          ((least(target.period_end, ${scope.to}::date) - greatest(target.period_start, ${scope.from}::date)) + 1)::numeric /
-          ((target.period_end - target.period_start) + 1)::numeric
+          ${targetWithinWindow(
+            sql`target.value`,
+            sql`target.period_start`,
+            sql`target.period_end`,
+            sql`${scope.from}::date`,
+            sql`${scope.to}::date`
+          )}
         ) as value
       from performance_targets target
       where target.metric = 'net-revenue'
@@ -173,10 +179,10 @@ export async function getTradingOverview(scope: AnalyticsScope): Promise<Trading
         date.date,
         coalesce(
           case when ${scope.store === null}::boolean then
-            sum(target.value / ((target.period_end - target.period_start) + 1)::numeric)
+            sum(${targetPerTradingDay(sql`target.value`, sql`target.period_start`, sql`target.period_end`)})
               filter (where target.scope_type = 'group')
           end,
-          sum(target.value / ((target.period_end - target.period_start) + 1)::numeric)
+          sum(${targetPerTradingDay(sql`target.value`, sql`target.period_start`, sql`target.period_end`)})
             filter (where target.scope_type = 'store'),
           0
         ) as value
