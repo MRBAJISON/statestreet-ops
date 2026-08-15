@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { PeriodReportDownload } from '@/components/reports/PeriodReportDownload';
 import { useOrg } from '@/components/providers/OrgProvider';
 import { useExpandable } from '@/hooks/use-expandable';
 import type { DailyReportMutationResponse, DailyReportRecord, DailyReportsResponse, DailyReportStatus } from '@/lib/contracts/daily-report';
@@ -195,7 +196,7 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
   }
 
   async function downloadPdf() {
-    if (!currentReport || downloadingPdf) return;
+    if (!currentReport || currentReport.status === 'draft' || downloadingPdf) return;
     setDownloadingPdf(true);
     setError(null);
     try {
@@ -289,11 +290,19 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
               setError(null);
             }}
           />
-          {currentReport ? (
+          {currentReport && currentReport.status !== 'draft' ? (
             <Button variant="outline" disabled={downloadingPdf} onClick={() => void downloadPdf()}>
               {downloadingPdf ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Download data-icon="inline-start" />}
               Download PDF
             </Button>
+          ) : null}
+          {data.references.store ? (
+            <PeriodReportDownload
+              storeId={data.references.store.id}
+              storeCode={data.references.store.code}
+              anchorDate={selectedDate}
+              disabled={Boolean(busy)}
+            />
           ) : null}
           <Button variant="outline" disabled={disabled || correctingSubmission} onClick={() => void save('draft')}>
             {busy === 'draft' ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Save data-icon="inline-start" />}

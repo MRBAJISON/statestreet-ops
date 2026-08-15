@@ -40,6 +40,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (session.user.role === 'store-manager' && report.storeCode !== session.user.store) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+    // A draft is still being worked on, so it is not a report anyone should be circulating.
+    if (report.status === 'draft') {
+      return NextResponse.json({ error: 'Submit this report before downloading it' }, { status: 409 });
+    }
 
     const netRevenue = report.sales.reduce(
       (sum, line) => sum + Number(line.grossRevenue) - Number(line.discounts) - Number(line.returns),

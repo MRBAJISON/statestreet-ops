@@ -1,6 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { customerInteractions, products } from '../db/foundation-schema';
+import { isTradingDay, targetPerTradingDay } from './trading-days';
 
 export interface DailyStoreReportCustomerRequest {
   id: number;
@@ -31,7 +32,7 @@ export async function getDailyStoreReportSupplement(
   const [targetResult, interactionRows] = await Promise.all([
     db.execute(sql`
       select coalesce(
-        sum(target.value / ((target.period_end - target.period_start) + 1)::numeric),
+        sum(${targetPerTradingDay(sql`target.value`, sql`target.period_start`, sql`target.period_end`)}),
         0
       ) as daily_target
       from performance_targets target
@@ -39,6 +40,7 @@ export async function getDailyStoreReportSupplement(
         and target.scope_type = 'store'
         and target.store_id = ${storeId}
         and ${businessDate}::date between target.period_start and target.period_end
+        and ${isTradingDay(sql`${businessDate}::date`)}
     `),
     db
       .select({
