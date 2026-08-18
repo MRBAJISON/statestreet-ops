@@ -8,6 +8,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { downloadFile } from '@/lib/download-file';
@@ -18,29 +20,43 @@ import { resolveStorePeriod, type StorePeriodType } from '@/lib/reporting/store-
  * `anchorDate`. The API refuses a period that still has unsubmitted days and says
  * which ones, so that message is surfaced straight to the user.
  */
+export interface DownloadableStoreGroup {
+  id: number;
+  code: string;
+  name: string;
+}
+
 export function PeriodReportDownload({
   storeId,
   storeCode,
   anchorDate,
   disabled,
+  group,
 }: {
   storeId: number;
   storeCode: string;
   anchorDate: string;
   disabled?: boolean;
+  /** Offered only when the reader can open every store in the group. */
+  group?: DownloadableStoreGroup | null;
 }) {
-  const [busy, setBusy] = useState<StorePeriodType | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
 
-  async function download(periodType: StorePeriodType) {
+  async function download(periodType: StorePeriodType, scope: 'store' | 'group' = 'store') {
     if (busy) return;
-    setBusy(periodType);
+    setBusy(`${scope}-${periodType}`);
     try {
       const { range } = resolveStorePeriod(periodType, anchorDate);
       const query = new URLSearchParams({ period: periodType, date: anchorDate });
-      await downloadFile(
-        `/api/stores/${storeId}/period-report/pdf?${query}`,
-        `${periodType}-report-${storeCode}-${range.from}.pdf`
-      );
+      const url =
+        scope === 'group' && group
+          ? `/api/store-groups/${group.id}/period-report/pdf?${query}`
+          : `/api/stores/${storeId}/period-report/pdf?${query}`;
+      const name =
+        scope === 'group' && group
+          ? `${periodType}-cluster-report-${group.code}-${range.from}.pdf`
+          : `${periodType}-report-${storeCode}-${range.from}.pdf`;
+      await downloadFile(url, name);
     } catch (error) {
       toast.error((error as Error).message);
     } finally {
@@ -64,12 +80,25 @@ export function PeriodReportDownload({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        <DropdownMenuLabel>This store</DropdownMenuLabel>
         <DropdownMenuItem onSelect={() => void download('week')}>
           Week — {week.label}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void download('month')}>
           Month — {month.label}
         </DropdownMenuItem>
+        {group ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>{group.name} combined</DropdownMenuLabel>
+            <DropdownMenuItem onSelect={() => void download('week', 'group')}>
+              Week — {week.label}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void download('month', 'group')}>
+              Month — {month.label}
+            </DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -15,7 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { PeriodReportDownload } from '@/components/reports/PeriodReportDownload';
+import { PeriodReportDownload, type DownloadableStoreGroup } from '@/components/reports/PeriodReportDownload';
 import { useOrg } from '@/components/providers/OrgProvider';
 import { useExpandable } from '@/hooks/use-expandable';
 import type { DailyReportMutationResponse, DailyReportRecord, DailyReportsResponse, DailyReportStatus } from '@/lib/contracts/daily-report';
@@ -82,9 +82,12 @@ function StatusBadge({ status }: { status: DailyReportStatus }) {
 export default function TypedDailyReport({
   assignedStore,
   stores = [],
+  storeGroup = null,
 }: {
   assignedStore: string;
   stores?: Array<{ id: number; code: string; name: string }>;
+  // Present only when this manager can open every store in the group.
+  storeGroup?: DownloadableStoreGroup | null;
 }) {
   const { org } = useOrg();
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -358,6 +361,7 @@ export default function TypedDailyReport({
               storeCode={data.references.store.code}
               anchorDate={selectedDate}
               disabled={Boolean(busy)}
+              group={storeGroup}
             />
           ) : null}
           <Button variant="outline" disabled={disabled || correctingSubmission} onClick={() => void save('draft')}>

@@ -18,7 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useExpandable } from '@/hooks/use-expandable';
 import type { AnalyticsMeta, CommercialDomain, TradingOverview } from '@/lib/contracts/analytics';
 import { EmptyPanel, EmptyTableRow, MetricRail, SectionHeading, StatusBadge } from './DashboardPrimitives';
-import { ComparisonBarChart, NamedBarChart, ValueTrendChart } from './Charts';
+import { ComparisonBarChart, HorizontalBarChart, NamedBarChart, ValueTrendChart } from './Charts';
 import { formatCurrency, formatNumber, formatPercent } from './format';
 import { TradingSnapshot } from './TradingSnapshot';
 
@@ -131,10 +131,23 @@ export function CommercialOverview({
         { label: 'New arrivals', value: formatNumber(domain.newArrivals.reduce((sum, item) => sum + item.units, 0)), detail: 'Units received', icon: PackagePlus, tone: 'teal' },
       ]} className="xl:grid-cols-4 2xl:grid-cols-4" />
 
-      <section className="surface min-w-0 p-5">
-        <SectionHeading title="Category Target vs Actual" description="Revenue delivery against the active target plan" />
-        <ComparisonBarChart data={domain.categoryTargets.map((item) => ({ name: item.name, primary: item.actualRevenue, secondary: item.targetRevenue }))} valueFormatter={(value) => formatCurrency(value, meta.currency)} />
-      </section>
+      <div className="grid gap-5 xl:grid-cols-2">
+        <section className="surface min-w-0 p-5">
+          <SectionHeading title="Sell-Through by Category" description="Units sold against opening stock" />
+          {/* Only categories with a real opening figure: a category with no stock
+              loaded would otherwise sit at 0% and read as a failure to sell. */}
+          <HorizontalBarChart
+            data={trading.categories
+              .filter((item) => item.openingStock > 0)
+              .map((item) => ({ name: item.name, value: item.sellThrough }))}
+            valueFormatter={formatPercent}
+          />
+        </section>
+        <section className="surface min-w-0 p-5">
+          <SectionHeading title="Category Target vs Actual" description="Revenue delivery against the active target plan" />
+          <ComparisonBarChart data={domain.categoryTargets.map((item) => ({ name: item.name, primary: item.actualRevenue, secondary: item.targetRevenue }))} valueFormatter={(value) => formatCurrency(value, meta.currency)} />
+        </section>
+      </div>
 
       <section className="surface min-w-0 overflow-hidden">
         <div className="p-5 pb-3"><SectionHeading title="SKU Performance" description="Velocity, current stock, movement age, and commercial judgement" /></div>
