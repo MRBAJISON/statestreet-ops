@@ -7,10 +7,10 @@ import { db } from '@/lib/db';
 import {
   auditEvents,
   brandCategories,
-  brandStores,
   brands,
   categories,
   products,
+  storeStockLevels,
   subcategories,
 } from '@/lib/db/foundation-schema';
 import { databaseErrorCode, sessionUserId } from '@/lib/server-errors';
@@ -59,15 +59,19 @@ export async function GET(req: NextRequest) {
   if (requestedBrandIds.length) conditions.push(inArray(products.brandId, requestedBrandIds));
   const where = conditions.length ? and(...conditions) : undefined;
 
-  // A store's own products rank first. Ranked rather than filtered: a store can
-  // legitimately sell something outside its brand mapping, and hiding it would
-  // push a real sale into the untracked "Other" line.
+  // A store's own products rank first. "Its own" means the products that store
+  // actually carries — the stock rows loaded for it by the catalogue import — not
+  // whatever its brand happens to sell group-wide.
+  //
+  // Ranked rather than filtered: a store can legitimately sell something it has no
+  // stock row for, and hiding it would push a real sale into the untracked "Other"
+  // line, which is worse than showing one extra result.
   const storeIdParam = Number(req.nextUrl.searchParams.get('storeId') ?? '');
   const storeId = Number.isSafeInteger(storeIdParam) && storeIdParam > 0 ? storeIdParam : null;
   const storeRank = storeId
     ? sql<number>`case when exists (
-        select 1 from ${brandStores} bs
-        where bs.brand_id = ${products.brandId} and bs.store_id = ${storeId}
+        select 1 from ${storeStockLevels} level
+        where level.product_id = ${products.id} and level.store_id = ${storeId}
       ) then 0 else 1 end`
     : sql<number>`0`;
   // Exact barcode beats a partial one, and any barcode hit beats a name hit.

@@ -514,6 +514,7 @@ export const inventoryShortcuts: WorkflowShortcut[] = [
   { href: '/forms/inventory/stock-transfer', title: 'Stock transfer', group: 'Inventory documents', icon: ArrowRightLeft, tone: 'blue' },
   { href: '/forms/inventory/stock-count', title: 'Stock count', group: 'Inventory documents', icon: ScanLine, tone: 'amber' },
   { href: '/forms/inventory/replenishment', title: 'Replenishment request', group: 'Inventory documents', icon: RefreshCcw, tone: 'teal' },
+  { href: '/forms/inventory/catalog-import', title: 'Product catalogue import', group: 'Catalogue', icon: FileSpreadsheet, tone: 'blue' },
 ];
 
 export const storeShortcuts: WorkflowShortcut[] = [
