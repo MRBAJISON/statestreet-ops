@@ -135,18 +135,18 @@ export async function GET(req: NextRequest) {
         updatedAt: products.updatedAt,
         // Stock on hand. Scoped to the same stores as the listing, so a manager
         // sees their own shop's quantity rather than the group total.
-        quantity: scopedStoreIds
-          ? sql<number>`(
-              select coalesce(sum(level.quantity), 0)::integer
-              from ${storeStockLevels} level
-              where level.product_id = ${products.id}
-                and level.store_id = any(${scopedStoreIds})
-            )`
-          : sql<number>`(
-              select coalesce(sum(level.quantity), 0)::integer
-              from ${storeStockLevels} level
-              where level.product_id = ${products.id}
-            )`,
+        //
+        // The store list is spread into its own placeholders rather than bound as
+        // one array parameter: a JS array handed to a raw template arrives as a
+        // scalar, and Postgres rejects it as a malformed array literal.
+        quantity: sql<number>`(
+          select coalesce(sum(level.quantity), 0)::integer
+          from ${storeStockLevels} level
+          where level.product_id = ${products.id}
+            ${scopedStoreIds
+              ? sql`and level.store_id in (${sql.join(scopedStoreIds.map((id) => sql`${id}`), sql`, `)})`
+              : sql``}
+        )`,
       })
       .from(products)
       .innerJoin(brands, eq(products.brandId, brands.id))
