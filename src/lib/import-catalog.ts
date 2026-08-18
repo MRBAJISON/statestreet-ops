@@ -110,11 +110,30 @@ function cellStr(value: unknown): string {
   return String(value).trim();
 }
 
-/** Matches a reference by code or name, case-insensitively. */
-function matchReference<T extends CatalogReference>(rows: T[], value: string): T | undefined {
-  const needle = value.trim().toLowerCase();
+/**
+ * Reduces a name to its words so spelling variants that mean the same thing match.
+ *
+ * "Bags & Wallets", "Bags and Wallets" and the code "bags-wallets" all land on
+ * "bags wallets". Without this, a file rejects rows over an ampersand or a hyphen,
+ * which tells the person filling it nothing useful.
+ */
+export function normaliseReferenceName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter((word) => word && word !== 'and')
+    .join(' ');
+}
+
+/** Matches a reference by code or name, ignoring case, punctuation and "and". */
+export function matchReference<T extends CatalogReference>(rows: T[], value: string): T | undefined {
+  const needle = normaliseReferenceName(value);
   if (!needle) return undefined;
-  return rows.find((row) => row.code.toLowerCase() === needle || row.name.toLowerCase() === needle);
+  return rows.find(
+    (row) => normaliseReferenceName(row.code) === needle || normaliseReferenceName(row.name) === needle
+  );
 }
 
 function money(value: string, label: string, errors: string[]): string | null {
@@ -161,8 +180,17 @@ export async function parseCatalogFile(
     if (!name) rowErrors.push('Product name is required');
     if (sku && seenSkus.has(sku.toLowerCase())) rowErrors.push(`SKU ${sku} appears more than once in the file`);
 
-    const category = matchReference(references.categories, cellStr(row.getCell(3).value));
-    if (!category) rowErrors.push('Category was not recognised');
+    // Naming the value that failed matters more than saying it failed: without it
+    // the person has to guess which of five columns the importer disliked.
+    const categoryValue = cellStr(row.getCell(3).value);
+    const category = matchReference(references.categories, categoryValue);
+    if (!category) {
+      rowErrors.push(
+        categoryValue
+          ? `Category "${categoryValue}" was not recognised`
+          : 'Category is required'
+      );
+    }
 
     const sellingPrice = money(cellStr(row.getCell(4).value), 'Selling price', rowErrors);
 
@@ -259,7 +287,10 @@ const PRODUCT_COLUMNS = [
   { header: 'Quantity', width: 12 },
 ];
 
-export async function buildCatalogTemplate(references: CatalogImportReferences): Promise<Buffer> {
+export async function buildCatalogTemplate(
+  references: CatalogImportReferences,
+  categories: CatalogReference[] = references.categories
+): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
 
   const products = workbook.addWorksheet('Products');
@@ -267,15 +298,31 @@ export async function buildCatalogTemplate(references: CatalogImportReferences):
   products.getRow(1).font = { bold: true };
 
   // Reference sheet so the person filling the file can see the exact accepted
-  // category spellings rather than guessing and getting a row rejected.
+  // category names rather than guessing and getting a row rejected. Scoped to the
+  // chosen store where one is known: listing every category in the group invites
+  // someone to pick one this store does not sell.
   const reference = workbook.addWorksheet('Categories');
-  reference.columns = [
-    { header: 'Category', width: 32 },
-    { header: 'Code', width: 24 },
-  ];
+  reference.columns = [{ header: 'Category', width: 32 }];
   reference.getRow(1).font = { bold: true };
-  for (const category of references.categories) reference.addRow([category.name, category.code]);
+  for (const category of categories) reference.addRow([category.name]);
 
   const output = await workbook.xlsx.writeBuffer();
   return Buffer.from(output);
+}
+
+/** The categories a store's brand actually sells, for the template and for guidance. */
+export async function categoriesForStore(storeId: number): Promise<CatalogReference[]> {
+  const [{ db }, schema] = await Promise.all([import('./db'), import('./db/foundation-schema')]);
+  const { and, asc, eq } = await import('drizzle-orm');
+  return db
+    .selectDistinct({
+      id: schema.categories.id,
+      code: schema.categories.code,
+      name: schema.categories.name,
+    })
+    .from(schema.categories)
+    .innerJoin(schema.brandCategories, eq(schema.brandCategories.categoryId, schema.categories.id))
+    .innerJoin(schema.brandStores, eq(schema.brandStores.brandId, schema.brandCategories.brandId))
+    .where(and(eq(schema.brandStores.storeId, storeId), eq(schema.categories.active, true)))
+    .orderBy(asc(schema.categories.name));
 }

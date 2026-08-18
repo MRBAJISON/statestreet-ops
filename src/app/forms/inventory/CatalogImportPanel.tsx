@@ -122,14 +122,21 @@ export default function CatalogImportPanel() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => downloadFile('/api/import/catalog/template', 'product-catalog-template.xlsx')}
+              onClick={() =>
+                downloadFile(
+                  storeId ? `/api/import/catalog/template?storeId=${storeId}` : '/api/import/catalog/template',
+                  'product-catalog-template.xlsx'
+                )
+              }
             >
               <Download /> Download the template
             </Button>
             <p className="mt-2 text-sm text-muted-foreground">
               One Products sheet — SKU/Barcode, Product Name, Category, Selling Price and Quantity — plus a Categories
-              sheet listing the exact names the file will accept. The store and brand are not in the file; they come
-              from the choice above.
+              sheet. The store and brand are not in the file; they come from the choice above.
+              {storeId
+                ? ' The Categories sheet lists only the categories this store sells.'
+                : ' Choose a store first and the Categories sheet will list only the ones that store sells.'}
             </p>
           </div>
 
