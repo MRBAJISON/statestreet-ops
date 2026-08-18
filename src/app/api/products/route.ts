@@ -4,7 +4,15 @@ import { getSession } from '@/lib/auth';
 import { createProductSchema } from '@/lib/contracts/product';
 import { formatContractError } from '@/lib/contracts/shared';
 import { db } from '@/lib/db';
-import { auditEvents, brandCategories, brands, categories, products, subcategories } from '@/lib/db/foundation-schema';
+import {
+  auditEvents,
+  brandCategories,
+  brandStores,
+  brands,
+  categories,
+  products,
+  subcategories,
+} from '@/lib/db/foundation-schema';
 import { databaseErrorCode, sessionUserId } from '@/lib/server-errors';
 import { canReadUnitCost } from '@/lib/access';
 
@@ -35,12 +43,43 @@ export async function GET(req: NextRequest) {
   const pageSize = Number.isInteger(requestedPageSize) ? Math.min(Math.max(requestedPageSize, 1), 100) : 50;
   const requestedPage = Number(req.nextUrl.searchParams.get('page') ?? 1);
   const page = Number.isInteger(requestedPage) ? Math.max(requestedPage, 1) : 1;
+  // Staff type part of a barcode — typically the last few digits — rather than
+  // scanning a whole one, so a digit query matches the end of the barcode as well
+  // as anywhere inside it. A hardware scanner sends the full digits and lands on
+  // the same path.
+  const isDigitQuery = q.length > 0 && /^\d+$/.test(q);
   const conditions = [];
   if (status === 'active') conditions.push(eq(products.active, true));
   if (status === 'inactive') conditions.push(eq(products.active, false));
-  if (q) conditions.push(or(ilike(products.sku, `%${q}%`), ilike(products.name, `%${q}%`))!);
+  if (q) {
+    conditions.push(
+      or(ilike(products.sku, `%${q}%`), ilike(products.name, `%${q}%`), ilike(products.barcode, `%${q}%`))!
+    );
+  }
   if (requestedBrandIds.length) conditions.push(inArray(products.brandId, requestedBrandIds));
   const where = conditions.length ? and(...conditions) : undefined;
+
+  // A store's own products rank first. Ranked rather than filtered: a store can
+  // legitimately sell something outside its brand mapping, and hiding it would
+  // push a real sale into the untracked "Other" line.
+  const storeIdParam = Number(req.nextUrl.searchParams.get('storeId') ?? '');
+  const storeId = Number.isSafeInteger(storeIdParam) && storeIdParam > 0 ? storeIdParam : null;
+  const storeRank = storeId
+    ? sql<number>`case when exists (
+        select 1 from ${brandStores} bs
+        where bs.brand_id = ${products.brandId} and bs.store_id = ${storeId}
+      ) then 0 else 1 end`
+    : sql<number>`0`;
+  // Exact barcode beats a partial one, and any barcode hit beats a name hit.
+  const matchRank = q
+    ? sql<number>`case
+        when lower(${products.barcode}) = lower(${q}) then 0
+        when ${isDigitQuery} and ${products.barcode} like ${`%${q}`} then 1
+        when ${products.barcode} is not null and lower(${products.barcode}) like lower(${`%${q}%`}) then 2
+        when lower(${products.sku}) like lower(${`%${q}%`}) then 3
+        else 4
+      end`
+    : sql<number>`0`;
   const [rows, totals] = await Promise.all([
     db
       .select({
@@ -56,6 +95,7 @@ export async function GET(req: NextRequest) {
         subcategoryName: subcategories.name,
         size: products.size,
         color: products.color,
+        barcode: products.barcode,
         unitCost: products.unitCost,
         sellingPrice: products.sellingPrice,
         active: products.active,
@@ -66,7 +106,7 @@ export async function GET(req: NextRequest) {
       .innerJoin(categories, eq(products.categoryId, categories.id))
       .leftJoin(subcategories, eq(products.subcategoryId, subcategories.id))
       .where(where)
-      .orderBy(desc(products.updatedAt), products.sku)
+      .orderBy(storeRank, matchRank, desc(products.updatedAt), products.sku)
       .limit(pageSize)
       .offset((page - 1) * pageSize),
     db.select({ value: sql<number>`count(*)::integer` }).from(products).where(where),
