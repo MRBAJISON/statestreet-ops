@@ -25,14 +25,18 @@ import {
   createDailyReportDraft,
   createSavedDailyReportRecord,
   mergeDailyReportsResponses,
+  sumProductUnits,
+  sumProductValue,
+  type DailyProductDraftRow,
   type DailyReportDraft,
   type DailySalesDraftRow,
   upsertDailyReport,
 } from '@/lib/daily-report-form';
+import { CategoryProductLines } from './CategoryProductLines';
 import { downloadFile } from '@/lib/download-file';
 import { cn } from '@/lib/utils';
 
-type SalesField = Exclude<keyof DailySalesDraftRow, 'categoryId' | 'products'>;
+type SalesField = Exclude<keyof DailySalesDraftRow, 'categoryId' | 'products' | 'totalsOverridden'>;
 type HeaderField = Exclude<keyof DailyReportDraft, 'businessDate' | 'sales' | 'payments'>;
 
 const SALES_FIELDS: Array<{ key: SalesField; label: string; step: number }> = [
@@ -147,9 +151,14 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
   }
 
   function updateSales(categoryId: number, field: SalesField, value: string) {
+    // Editing units or gross by hand is the manager overriding the computed total,
+    // and is recorded as such so it survives further product edits.
+    const overridesTotals = field === 'unitsSold' || field === 'grossRevenue';
     setDraft((current) => current ? {
       ...current,
-      sales: current.sales.map((line) => line.categoryId === categoryId ? { ...line, [field]: value } : line),
+      sales: current.sales.map((line) => line.categoryId === categoryId
+        ? { ...line, [field]: value, ...(overridesTotals ? { totalsOverridden: true } : {}) }
+        : line),
     } : current);
   }
 
@@ -160,10 +169,21 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
     } : current);
   }
 
-  function updateProductNames(categoryId: number, productNames: string) {
+  function updateProducts(categoryId: number, products: DailyProductDraftRow[]) {
     setDraft((current) => current ? {
       ...current,
-      sales: current.sales.map((line) => line.categoryId === categoryId ? { ...line, productNames } : line),
+      sales: current.sales.map((line) => {
+        if (line.categoryId !== categoryId) return line;
+        // Category totals track the product lines until someone corrects a total by
+        // hand, after which adding a product must not overwrite their figure.
+        if (line.totalsOverridden) return { ...line, products };
+        return {
+          ...line,
+          products,
+          unitsSold: products.length ? String(sumProductUnits(products)) : line.unitsSold,
+          grossRevenue: products.length ? sumProductValue(products) : line.grossRevenue,
+        };
+      }),
     } : current);
   }
 
@@ -185,7 +205,8 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
         discounts: '',
         returns: '',
         creditSales: '',
-        productNames: '',
+        products: [],
+        totalsOverridden: false,
       } : line),
     } : current);
     setVisibleCategoryIds((current) => {
@@ -379,16 +400,14 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
                   const category = categoryNames.get(line.categoryId) ?? `Category ${line.categoryId}`;
                   return (
                     <TableRow key={line.categoryId}>
-                      <TableCell className="font-medium">{category}</TableCell>
-                      <TableCell>
-                        <Textarea
-                          aria-label={`${category}: Product name`}
-                          placeholder="Product name, one per line"
-                          rows={1}
-                          className="min-h-9 min-w-40 resize-none py-1.5"
-                          value={line.productNames}
+                      <TableCell className="font-medium align-top">{category}</TableCell>
+                      <TableCell className="min-w-80">
+                        <CategoryProductLines
+                          categoryName={category}
+                          products={line.products}
+                          storeId={data?.references.store?.id ?? null}
                           disabled={disabled}
-                          onChange={(event) => updateProductNames(line.categoryId, event.target.value)}
+                          onChange={(products) => updateProducts(line.categoryId, products)}
                         />
                       </TableCell>
                       {SALES_FIELDS.map((field) => (
@@ -424,8 +443,14 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
                   <div className="mb-3 flex items-center justify-between gap-3"><h2 className="text-sm font-semibold">{category}</h2><Button type="button" variant="ghost" size="icon" aria-label={`Remove ${category}`} disabled={disabled} onClick={() => removeCategory(line.categoryId)}><Trash2 /></Button></div>
                   <FieldGroup className="grid grid-cols-2 gap-4">
                     <Field className="col-span-2">
-                      <FieldLabel>Product name</FieldLabel>
-                      <Textarea placeholder="Product name, one per line" rows={1} className="min-h-9 resize-none py-1.5" value={line.productNames} disabled={disabled} onChange={(event) => updateProductNames(line.categoryId, event.target.value)} />
+                      <FieldLabel>Products sold</FieldLabel>
+                      <CategoryProductLines
+                        categoryName={category}
+                        products={line.products}
+                        storeId={data?.references.store?.id ?? null}
+                        disabled={disabled}
+                        onChange={(products) => updateProducts(line.categoryId, products)}
+                      />
                     </Field>
                     {SALES_FIELDS.map((field) => (
                       <Field key={field.key}>

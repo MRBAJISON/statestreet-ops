@@ -58,13 +58,20 @@ export function buildCreateDailyReportQuery(userId: number, storeId: number, inp
       )
       returning id
     ), new_products as (
-      insert into daily_report_products (daily_report_id, category_id, product_id, custom_name)
-      select report.id, line."categoryId", line."productId", line."customName"
+      insert into daily_report_products (
+        daily_report_id, category_id, product_id, custom_name, units, line_value, value_overridden
+      )
+      select
+        report.id, line."categoryId", line."productId", line."customName",
+        coalesce(line."unitsSold", 0), coalesce(line."lineValue", 0), coalesce(line."valueOverridden", false)
       from new_report report
       cross join jsonb_to_recordset(${products}::jsonb) as line(
         "categoryId" bigint,
         "productId" bigint,
-        "customName" text
+        "customName" text,
+        "unitsSold" integer,
+        "lineValue" numeric(14, 2),
+        "valueOverridden" boolean
       )
       returning id
     ), new_audit as (
@@ -208,13 +215,20 @@ export function buildReplaceDailyReportQuery(
       where existing.daily_report_id = report.id
       returning existing.id
     ), new_products as (
-      insert into daily_report_products (daily_report_id, category_id, product_id, custom_name)
-      select report.id, line."categoryId", line."productId", line."customName"
+      insert into daily_report_products (
+        daily_report_id, category_id, product_id, custom_name, units, line_value, value_overridden
+      )
+      select
+        report.id, line."categoryId", line."productId", line."customName",
+        coalesce(line."unitsSold", 0), coalesce(line."lineValue", 0), coalesce(line."valueOverridden", false)
       from updated_report report
       cross join jsonb_to_recordset(${products}::jsonb) as line(
         "categoryId" bigint,
         "productId" bigint,
-        "customName" text
+        "customName" text,
+        "unitsSold" integer,
+        "lineValue" numeric(14, 2),
+        "valueOverridden" boolean
       )
       returning id
     ), new_audit as (

@@ -272,6 +272,9 @@ export async function attachDailyReportDetails(baseReports: DailyReportBaseRow[]
         productName: products.name,
         sku: products.sku,
         brandName: brands.name,
+        unitsSold: dailyReportProducts.unitsSold,
+        lineValue: dailyReportProducts.lineValue,
+        valueOverridden: dailyReportProducts.valueOverridden,
       })
       .from(dailyReportProducts)
       .leftJoin(products, eq(dailyReportProducts.productId, products.id))
@@ -318,6 +321,9 @@ export async function attachDailyReportDetails(baseReports: DailyReportBaseRow[]
         productName: item.productName ?? item.customName ?? '',
         sku: item.sku,
         brandName: item.brandName,
+        unitsSold: item.unitsSold,
+        lineValue: item.lineValue,
+        valueOverridden: item.valueOverridden,
       })),
     })),
     payments: paymentsByReport.get(report.id) ?? [],

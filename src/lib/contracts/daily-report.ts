@@ -9,6 +9,11 @@ export const dailyReportProductSchema = z
   .object({
     productId: positiveIdSchema.optional(),
     customName: z.string().trim().max(160).optional(),
+    unitsSold: countSchema.default(0),
+    lineValue: moneySchema.default('0.00'),
+    // Set when the manager corrected the value away from units x catalogue price,
+    // so a deliberate markdown can be told apart from a derived figure.
+    valueOverridden: z.boolean().default(false),
   })
   .refine((value) => Boolean(value.productId || value.customName), {
     path: ['customName'],
@@ -25,13 +30,34 @@ export const dailySalesLineSchema = z
     discounts: moneySchema.default('0.00'),
     returns: moneySchema.default('0.00'),
     creditSales: moneySchema.default('0.00'),
-    products: z.array(dailyReportProductSchema).max(20).default([]),
+    products: z.array(dailyReportProductSchema).max(100).default([]),
   })
   .superRefine((line, ctx) => {
     const gross = moneyToCents(line.grossRevenue);
     const discounts = moneyToCents(line.discounts);
     const returns = moneyToCents(line.returns);
     const credit = moneyToCents(line.creditSales);
+
+    // Product lines are an attributed subset of the category, so they may add up to
+    // less than the category total — a manager who forgets one item should not be
+    // blocked from closing the day. They must never add up to more, which would
+    // mean the category understates what was actually sold.
+    const productUnits = line.products.reduce((total, product) => total + product.unitsSold, 0);
+    const productValue = line.products.reduce((total, product) => total + moneyToCents(product.lineValue), BigInt(0));
+    if (productUnits > line.unitsSold) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['unitsSold'],
+        message: 'Product lines add up to more units than the category total',
+      });
+    }
+    if (productValue > gross) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['grossRevenue'],
+        message: 'Product lines add up to more than the category gross revenue',
+      });
+    }
     if (discounts + returns > gross) {
       ctx.addIssue({
         code: 'custom',
@@ -147,6 +173,9 @@ export interface DailyReportProductRecord {
   productName: string;
   sku: string | null;
   brandName: string | null;
+  unitsSold: number;
+  lineValue: string;
+  valueOverridden: boolean;
 }
 
 export interface DailyReportSalesRecord {

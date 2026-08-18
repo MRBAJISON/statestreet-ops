@@ -57,8 +57,8 @@ const report: DailyReportRecord = {
       returns: '0.00',
       creditSales: '80.00',
       products: [
-        { productId: 501, productName: 'Test Product', sku: 'TP-1', brandName: 'TestBrand' },
-        { productId: null, productName: 'Custom item', sku: null, brandName: null },
+        { productId: 501, productName: 'Test Product', sku: 'TP-1', brandName: 'TestBrand', unitsSold: 1, lineValue: '150.00', valueOverridden: false },
+        { productId: null, productName: 'Custom item', sku: null, brandName: null, unitsSold: 1, lineValue: '200.00', valueOverridden: true },
       ],
     },
   ],
@@ -76,7 +76,11 @@ describe('daily report form helpers', () => {
     expect(draft.transactions).toBe('3');
     expect(draft.staffPerformanceNote).toBe('Team handled the morning rush well');
     expect(draft.closingFacilityStatus).toBe('Locked and alarmed at 9pm');
-    expect(draft.sales[0].productNames).toBe('Test Product\nCustom item');
+    expect(draft.sales[0].products.map((product) => product.name)).toEqual(['Test Product', 'Custom item']);
+    expect(draft.sales[0].products.map((product) => product.unitsSold)).toEqual(['1', '1']);
+    // The saved value carries no catalogue price, so it is recovered from the line
+    // so that changing the units still recalculates.
+    expect(draft.sales[0].products[0].unitPrice).toBe('150.00');
   });
 
   it('keeps unavailable historical options only on reports that already use them', () => {
@@ -114,7 +118,8 @@ describe('daily report form helpers', () => {
       discounts: '',
       returns: '',
       creditSales: '80',
-      productNames: '',
+      products: [],
+      totalsOverridden: false,
     };
     draft.payments[0].amount = '420';
     const input = buildDailyReportInput(draft, 'submitted');
@@ -184,23 +189,66 @@ describe('daily report form helpers', () => {
       lockVersion: 3,
       submittedAt: '2026-07-10T13:00:00.000Z',
     });
+    // The offline record is built from the save payload, which carries a catalogue
+    // product by id rather than by name, so the name is blank until the next
+    // successful refresh replaces this record with the server's.
     expect(saved.sales[0].products).toEqual([
-      { productId: null, productName: 'Test Product', sku: null, brandName: null },
-      { productId: null, productName: 'Custom item', sku: null, brandName: null },
+      { productId: 501, productName: '', sku: null, brandName: null, unitsSold: 1, lineValue: '150.00', valueOverridden: false },
+      { productId: null, productName: 'Custom item', sku: null, brandName: null, unitsSold: 1, lineValue: '200.00', valueOverridden: true },
     ]);
     expect(upsertDailyReport([report], saved)).toEqual([saved]);
   });
 
-  it('splits multi-line product names into separate products, trimming blank lines', () => {
+  it('rejects product lines that add up to more than the category total', () => {
     const draft = createDailyReportDraft('2026-07-10', references);
     draft.sales[0] = {
       ...draft.sales[0],
+      unitsSold: '2',
       grossRevenue: '500',
       cogs: '250',
-      productNames: '  Blue Oxford Shirt  \n\nGrey Blazer\n',
+      products: [
+        { key: 'a', productId: 601, name: 'Blue Oxford Shirt', sku: 'BOS-1', unitsSold: '5', lineValue: '100.00', valueOverridden: false, unitPrice: '20.00' },
+      ],
+      totalsOverridden: true,
+    };
+    expect(() => buildDailyReportInput(draft, 'draft')).toThrow('more units than the category total');
+  });
+
+  it('allows product lines that add up to less than the category total', () => {
+    const draft = createDailyReportDraft('2026-07-10', references);
+    draft.sales[0] = {
+      ...draft.sales[0],
+      unitsSold: '5',
+      grossRevenue: '500',
+      cogs: '250',
+      products: [
+        { key: 'a', productId: 601, name: 'Blue Oxford Shirt', sku: 'BOS-1', unitsSold: '2', lineValue: '100.00', valueOverridden: false, unitPrice: '50.00' },
+      ],
+      totalsOverridden: true,
+    };
+    // Attribution is partial by design: a manager who forgets an item must still be
+    // able to close the day.
+    expect(buildDailyReportInput(draft, 'draft').sales[0].unitsSold).toBe(5);
+  });
+
+  it('maps catalogue and free-typed product lines onto the saved shape', () => {
+    const draft = createDailyReportDraft('2026-07-10', references);
+    draft.sales[0] = {
+      ...draft.sales[0],
+      unitsSold: '3',
+      grossRevenue: '500',
+      cogs: '250',
+      products: [
+        { key: 'a', productId: 601, name: 'Blue Oxford Shirt', sku: 'BOS-1', unitsSold: '2', lineValue: '300.00', valueOverridden: false, unitPrice: '150.00' },
+        { key: 'b', productId: null, name: '  Grey Blazer  ', sku: null, unitsSold: '1', lineValue: '200.00', valueOverridden: true, unitPrice: null },
+      ],
+      totalsOverridden: true,
     };
     const input = buildDailyReportInput(draft, 'draft');
-    expect(input.sales[0].products).toEqual([{ customName: 'Blue Oxford Shirt' }, { customName: 'Grey Blazer' }]);
+    expect(input.sales[0].products).toEqual([
+      { productId: 601, unitsSold: 2, lineValue: '300.00', valueOverridden: false },
+      { customName: 'Grey Blazer', unitsSold: 1, lineValue: '200.00', valueOverridden: true },
+    ]);
   });
 
   it('merges an explicitly selected historical report into capped recent history', () => {
