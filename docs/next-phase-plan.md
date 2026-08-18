@@ -117,15 +117,31 @@ can seed every store.
 
 This is what makes workstream 3 real rather than decorative.
 
-## Barcode search
+## Barcode search — partial match, suggest as they type
 
-- Exact lookup on `products.barcode`, falling back to SKU then name.
-- **Hardware scanners need no special support** — they type the digits and press
-  Enter, so a focused search box handles them as-is.
-- **Phone camera scanning is a separate build** (camera permission, a scanning
-  library, a device-tested UI). Not included here. Worth confirming whether
-  stores have USB or Bluetooth scanners before assuming camera scanning is
-  needed.
+Confirmed: staff type **part** of the barcode, typically the last four digits,
+and matching products appear as they type. So this is a search box, not a
+scan-and-jump.
+
+- One box, matching across **barcode, SKU and product name** at once. Digits
+  clearly mean barcode or SKU; letters mean a name.
+- **Partial match, anchored at the end for digits** — typing `4821` finds any
+  barcode ending in 4821, then any containing it.
+- **Always a list, never an auto-pick.** Four digits will often match more than
+  one product, and silently selecting the wrong one puts the sale against the
+  wrong item at the wrong price. The list shows name, size, colour and price so
+  the right row is obvious.
+- Results are **scoped to the store's own products first** (via the brands
+  mapped to that store), then the rest of the catalogue.
+- **Hardware scanners still work** with no extra code — they type the full
+  digits and press Enter, which the same box handles. Scanners are an
+  optimisation here, not a requirement.
+- **Phone camera scanning is not included** and is a separate build if wanted.
+
+**Performance note.** A trailing or containing match cannot use an ordinary
+index. At a few thousand products this does not matter — a straight scan is
+fast. If the catalogue grows past roughly fifty thousand rows, add a `pg_trgm`
+index or store the barcode reversed for a prefix match. Not worth doing now.
 
 ---
 
@@ -245,13 +261,36 @@ monthly combined reports have no stable subject.
 - **Sales are still filed per store.** One form, two tabs — or a store selector
   on each line. This matters: if the two are entered as a single blended figure,
   per-store revenue is gone forever and per-store targets stop meaning anything.
-- **Reports are produced for the group.** A group daily, weekly and monthly PDF
-  showing combined totals with a per-store split, matching the cluster report
-  format already supplied as the reference. The existing
-  `DailyStoreReportDocument` and `StorePeriodReportDocument` gain a group
-  variant rather than being replaced.
+- **Reports are produced for the group.** See below.
 - The readiness rule carries over unchanged: a group weekly report unlocks when
   **every trading day of every member store** has been submitted.
+
+## The cluster PDF
+
+Yes — recorded per store, reported as one document. Daily, weekly and monthly
+each produce a **single PDF for the group**, not two stapled together. This is
+the format of the cluster report originally supplied as the reference; the
+single-store version already built keeps working unchanged for every other store.
+
+Structure, following that reference:
+
+- **Header** — group name, date or period, the one manager, status.
+- **KPI row** — target, net sales, achievement, surplus, all **combined**.
+- **Store split** — one row per store: net sales, transactions, achievement.
+  This is the section that makes it a cluster report rather than a merge, and it
+  is only possible because sales stay recorded per store.
+- **Sales breakdown and category sales** — combined, since that is how the
+  buying decisions get made.
+- **Day by day** (weekly and monthly) — combined totals per trading day.
+- **Merchandise, customer requests, observations** — pooled from both stores,
+  each tagged with which store it came from.
+
+The individual store PDFs stay available for anyone who wants them — Finance and
+Commercial still see the two stores separately everywhere else in the system.
+
+`DailyStoreReportDocument` and `StorePeriodReportDocument` gain a group variant
+rather than being replaced, and `store-period-report.ts` gains a group-scoped
+query beside the store-scoped one.
 
 ## Targets
 
@@ -273,11 +312,21 @@ Confirm if the singular lowercase form is deliberate.)
 
 ## The catch
 
-`categories` is a **single global list**, unique on lower(code). It is not
-per-brand. Renaming one renames it for every brand that uses it.
+Confirmed: Woodpeckers carries a different category set from the other stores.
+The system already supports that — `brand_categories` maps brands to categories,
+so each brand shows only its own subset.
 
-However `brand_categories` already maps brands to categories, so each brand
-already shows its own subset. That gives a clean route:
+The catch is one level down. `categories` itself is a **single global list**,
+unique on lower(code), shared by every brand that maps to a row in it. Renaming
+a row renames it for all of them.
+
+Most of the eleven are probably Woodpeckers-only and rename cleanly. **Footwear
+is the obvious exception** — Carbon Shoe Store certainly sells shoes, so it very
+likely maps to the same category row. Renaming it there may be perfectly fine,
+or may not be what Carbon wants to see on its own reports. That is a decision
+per category, not a blanket one, which is why the mapping report comes first.
+
+Two routes, chosen per category:
 
 - A category used **only by Woodpeckers** → rename in place. Ids are unchanged,
   so all history follows the new name automatically. This is the good case.
@@ -323,17 +372,22 @@ in parallel or first if the Carbon / D Angelo situation is urgent.
 
 # Open questions
 
-1. Do the stores have USB or Bluetooth barcode scanners, or is phone-camera
-   scanning expected? Camera scanning is a separate build.
-2. Is `selling_price` the shelf price including any tax, and is it the same in
+1. Is `selling_price` the shelf price including any tax, and is it the same in
    every store?
-3. For Carbon and D Angelo — should the manager file **one form with two store
+2. For Carbon and D Angelo — should the manager file **one form with two store
    tabs**, or **two separate reports**? Recommendation is one form, two tabs,
-   with sales still stored per store.
-4. Should the group get its own revenue target, or remain the sum of the two
+   with sales still stored per store either way.
+3. Should the group get its own revenue target, or remain the sum of the two
    store targets?
-5. Confirm the eleven category names, casing, and that the overlapping apparel
-   ones are genuinely distinct.
+4. Confirm the eleven category names, casing, and that the overlapping apparel
+   ones (Jersey / Tops & Tees / Premium T-Shirts / Shirts) are genuinely
+   distinct.
+5. If Footwear turns out to be shared with Carbon Shoe Store, does Carbon mind
+   the shared name, or does Woodpeckers need its own separate category?
+
+Answered: barcodes are searched by partial digits with live suggestions;
+Woodpeckers carries its own category set; cluster reports are one combined PDF
+per group.
 
 # Risks
 
