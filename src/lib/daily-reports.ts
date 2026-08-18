@@ -379,6 +379,7 @@ const dailyReportBaseColumns = {
   notes: dailyReports.notes,
   staffPerformanceNote: dailyReports.staffPerformanceNote,
   closingFacilityStatus: dailyReports.closingFacilityStatus,
+  noSales: dailyReports.noSales,
   lockVersion: dailyReports.lockVersion,
   submittedAt: dailyReports.submittedAt,
   approvedAt: dailyReports.approvedAt,

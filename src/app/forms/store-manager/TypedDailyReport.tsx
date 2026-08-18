@@ -37,7 +37,7 @@ import { downloadFile } from '@/lib/download-file';
 import { cn } from '@/lib/utils';
 
 type SalesField = Exclude<keyof DailySalesDraftRow, 'categoryId' | 'products' | 'totalsOverridden'>;
-type HeaderField = Exclude<keyof DailyReportDraft, 'businessDate' | 'sales' | 'payments'>;
+type HeaderField = Exclude<keyof DailyReportDraft, 'businessDate' | 'sales' | 'payments' | 'noSales'>;
 
 const SALES_FIELDS: Array<{ key: SalesField; label: string; step: number }> = [
   { key: 'unitsSold', label: 'Units sold', step: 1 },
@@ -404,8 +404,29 @@ export default function TypedDailyReport({
         </TabsList>
 
         <TabsContent value="sales">
+          <label className="mb-3 flex items-start gap-3 rounded-md border bg-muted/35 px-4 py-3">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4"
+              checked={draft.noSales}
+              disabled={disabled}
+              onChange={(event) => setDraft((current) => (current ? { ...current, noSales: event.target.checked } : current))}
+            />
+            <span className="text-sm">
+              <span className="font-medium">Nothing sold today</span>
+              <span className="mt-0.5 block text-muted-foreground">
+                Records the day as traded with no sales, so it still counts as filed. Tick this instead of adding a
+                category and typing zeros.
+              </span>
+            </span>
+          </label>
+
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">{visibleSales.length} {visibleSales.length === 1 ? 'category' : 'categories'} in this report</p>
+            <p className="text-sm text-muted-foreground">
+              {draft.noSales
+                ? 'No sales recorded for this day'
+                : `${visibleSales.length} ${visibleSales.length === 1 ? 'category' : 'categories'} in this report`}
+            </p>
             <Select
               value={categoryToAdd}
               onValueChange={(value) => {
@@ -413,13 +434,14 @@ export default function TypedDailyReport({
                 setVisibleCategoryIds((current) => new Set([...current, categoryId]));
                 setCategoryToAdd('');
               }}
-              disabled={disabled || !availableCategories.length}
+              disabled={disabled || draft.noSales || !availableCategories.length}
             >
               <SelectTrigger className="w-52"><SelectValue placeholder="Add category" /></SelectTrigger>
               <SelectContent><SelectGroup>{availableCategories.map((category) => <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>)}</SelectGroup></SelectContent>
             </Select>
           </div>
 
+          {draft.noSales ? null : (
           <div className="overflow-x-auto rounded-md border bg-card shadow-sm hidden md:block">
             <Table>
               <TableHeader>
@@ -469,6 +491,8 @@ export default function TypedDailyReport({
               </TableBody>
             </Table>
           </div>
+          )}
+          {draft.noSales ? null : (
 
           <div className="flex flex-col gap-5 md:hidden">
             {visibleSales.map((line) => {
@@ -499,6 +523,7 @@ export default function TypedDailyReport({
             })}
             {!visibleSales.length ? <p className="py-12 text-center text-sm text-muted-foreground">Add the first category sold today.</p> : null}
           </div>
+          )}
         </TabsContent>
 
         <TabsContent value="store">

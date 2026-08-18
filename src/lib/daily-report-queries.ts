@@ -21,11 +21,11 @@ export function buildCreateDailyReportQuery(userId: number, storeId: number, inp
       insert into daily_reports (
         store_id, business_date, status, transactions, footfall, total_customers,
         new_customers, returning_customers, notes, staff_performance_note, closing_facility_status,
-        created_by_user_id, updated_by_user_id, submitted_by_user_id, submitted_at
+        no_sales, created_by_user_id, updated_by_user_id, submitted_by_user_id, submitted_at
       ) values (
         ${storeId}, ${input.businessDate}, ${input.status}, ${input.transactions}, ${input.footfall},
         ${input.totalCustomers}, ${input.newCustomers}, ${input.returningCustomers}, ${input.notes ?? null},
-        ${input.staffPerformanceNote ?? null}, ${input.closingFacilityStatus ?? null},
+        ${input.staffPerformanceNote ?? null}, ${input.closingFacilityStatus ?? null}, ${input.noSales},
         ${userId}, ${userId}, ${submitted ? userId : null}, ${submitted ? sql`now()` : null}
       )
       returning *
@@ -141,6 +141,7 @@ export function buildReplaceDailyReportQuery(
         notes = ${input.notes ?? null},
         staff_performance_note = ${input.staffPerformanceNote ?? null},
         closing_facility_status = ${input.closingFacilityStatus ?? null},
+        no_sales = ${input.noSales},
         updated_by_user_id = ${userId},
         submitted_by_user_id = case when ${submitted} then coalesce(report.submitted_by_user_id, ${userId}) else null end,
         submitted_at = case when ${submitted} then coalesce(report.submitted_at, now()) else null end,

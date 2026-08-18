@@ -42,6 +42,7 @@ const report: DailyReportRecord = {
   notes: 'Quiet morning',
   staffPerformanceNote: 'Team handled the morning rush well',
   closingFacilityStatus: 'Locked and alarmed at 9pm',
+  noSales: false,
   lockVersion: 2,
   submittedAt: null,
   approvedAt: null,
@@ -163,6 +164,27 @@ describe('daily report form helpers', () => {
       returningCustomers: '1',
     };
     expect(() => buildDailyReportInput(draft, 'draft')).toThrow('Total customers cannot be less');
+  });
+
+  it('refuses an empty report unless the day is marked as having no sales', () => {
+    const draft = createDailyReportDraft('2026-07-10', references);
+    expect(() => buildDailyReportInput(draft, 'submitted')).toThrow('mark the day as having no sales');
+  });
+
+  it('submits a no-sales day with no lines at all', () => {
+    const draft: DailyReportDraft = { ...createDailyReportDraft('2026-07-10', references), noSales: true };
+    const input = buildDailyReportInput(draft, 'submitted');
+    expect(input.noSales).toBe(true);
+    // No phantom zero row against a category that never traded, which is the
+    // whole reason the flag exists.
+    expect(input.sales).toEqual([]);
+  });
+
+  it('drops half-typed sales when the day is marked as having no sales', () => {
+    const draft = createDailyReportDraft('2026-07-10', references);
+    draft.sales[0] = { ...draft.sales[0], unitsSold: '3', grossRevenue: '120' };
+    draft.noSales = true;
+    expect(buildDailyReportInput(draft, 'draft').sales).toEqual([]);
   });
 
   it('creates and upserts a local saved record when a refresh cannot complete', () => {

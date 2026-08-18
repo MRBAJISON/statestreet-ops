@@ -89,10 +89,30 @@ export const saveDailyReportSchema = z
     staffPerformanceNote: z.string().trim().max(2000).optional().nullable(),
     closingFacilityStatus: z.string().trim().max(2000).optional().nullable(),
     lockVersion: z.number().int().positive().optional(),
-    sales: z.array(dailySalesLineSchema).min(1).max(200),
+    // The store opened and sold nothing. Declared rather than implied so a day
+    // with no sales can be filed without inventing a zero category line.
+    noSales: z.boolean().default(false),
+    sales: z.array(dailySalesLineSchema).max(200),
     payments: z.array(dailyPaymentLineSchema).max(30).default([]),
   })
   .superRefine((report, ctx) => {
+    // Sales lines are still required on an ordinary day: an empty list is almost
+    // always an unfinished report, and silently accepting it would lose a day's
+    // trading. Saying "no sales" is the deliberate way through.
+    if (!report.noSales && !report.sales.length) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['sales'],
+        message: 'Add what sold, or mark the day as having no sales',
+      });
+    }
+    if (report.noSales && report.sales.some((line) => line.unitsSold > 0 || moneyToCents(line.grossRevenue) > BigInt(0))) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['noSales'],
+        message: 'This day is marked as no sales but has sales recorded',
+      });
+    }
     if (report.newCustomers + report.returningCustomers > report.totalCustomers) {
       ctx.addIssue({
         code: 'custom',
@@ -219,6 +239,7 @@ export interface DailyReportRecord {
   notes: string | null;
   staffPerformanceNote: string | null;
   closingFacilityStatus: string | null;
+  noSales: boolean;
   lockVersion: number;
   submittedAt: string | null;
   approvedAt: string | null;

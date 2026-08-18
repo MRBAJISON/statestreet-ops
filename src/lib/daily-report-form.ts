@@ -53,6 +53,7 @@ export interface DailyReportDraft {
   notes: string;
   staffPerformanceNote: string;
   closingFacilityStatus: string;
+  noSales: boolean;
   sales: DailySalesDraftRow[];
   payments: DailyPaymentDraftRow[];
 }
@@ -118,6 +119,7 @@ export function createDailyReportDraft(
     notes: report?.notes ?? '',
     staffPerformanceNote: report?.staffPerformanceNote ?? '',
     closingFacilityStatus: report?.closingFacilityStatus ?? '',
+    noSales: report?.noSales ?? false,
     sales: categoryIds.map((categoryId) => {
       const line = existingSales.get(categoryId);
       if (!line) return emptySalesRow(categoryId);
@@ -182,8 +184,12 @@ export function buildDailyReportInput(
     notes: draft.notes.trim() || null,
     staffPerformanceNote: draft.staffPerformanceNote.trim() || null,
     closingFacilityStatus: draft.closingFacilityStatus.trim() || null,
+    noSales: draft.noSales,
     lockVersion,
-    sales: draft.sales.filter(salesRowHasValue).map((row) => ({
+    // A no-sales day sends no lines at all. Anything half-typed before the toggle
+    // was flipped is dropped rather than saved as a zero row, which is the phantom
+    // category the flag exists to avoid.
+    sales: (draft.noSales ? [] : draft.sales.filter(salesRowHasValue)).map((row) => ({
       categoryId: row.categoryId,
       openingStock: Number(row.openingStock || 0),
       unitsSold: Number(row.unitsSold || 0),
@@ -236,6 +242,7 @@ export function createSavedDailyReportRecord(
     notes: input.notes ?? null,
     staffPerformanceNote: input.staffPerformanceNote ?? null,
     closingFacilityStatus: input.closingFacilityStatus ?? null,
+    noSales: input.noSales,
     lockVersion: mutation.lockVersion,
     submittedAt:
       mutation.status === 'submitted' ? existing?.submittedAt ?? savedAt : null,

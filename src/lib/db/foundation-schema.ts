@@ -220,6 +220,9 @@ export const dailyReports = pgTable(
     notes: text('notes'),
     staffPerformanceNote: text('staff_performance_note'),
     closingFacilityStatus: text('closing_facility_status'),
+    // The store traded but sold nothing. Lets the day be filed with no sales lines
+    // rather than a phantom zero row against a category that never traded.
+    noSales: boolean('no_sales').notNull().default(false),
     lockVersion: integer('lock_version').notNull().default(1),
     createdByUserId: integer('created_by_user_id')
       .notNull()
