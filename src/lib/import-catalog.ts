@@ -263,9 +263,13 @@ export function buildCommitCatalogImportQuery(input: CatalogCommitInput): SQL {
       returning id, sku
     ), upserted_stock as (
       insert into store_stock_levels (store_id, product_id, quantity, as_of_date)
-      select ${input.storeId}, p.id, row."quantity", ${input.asOfDate}::date
+      select ${input.storeId}, written.id, row."quantity", ${input.asOfDate}::date
       from jsonb_to_recordset(${products}::jsonb) as row("sku" text, "quantity" integer)
-      join products p on lower(p.sku) = lower(row."sku")
+      -- Joined against the CTE, not the products table. Every CTE in a statement
+      -- sees the snapshot from before the statement ran, so a plain products
+      -- reference cannot see the rows just inserted above — which silently wrote
+      -- no stock at all for a first import, where every SKU is new.
+      join upserted_products written on lower(written.sku) = lower(row."sku")
       on conflict (store_id, product_id) do update set
         quantity = excluded.quantity,
         as_of_date = excluded.as_of_date,
