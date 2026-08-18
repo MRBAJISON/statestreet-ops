@@ -116,7 +116,13 @@ export async function resolveDailyReportStore(user: AppUser, requestedStoreId?: 
     // With a single store the request is ignored and the one store is used, so
     // nothing changes for the accounts that have always had exactly one.
     const allowed = await accessibleStores(user);
-    if (!allowed.length) throw new HttpError(403, 'No store is assigned to this account');
+    if (!allowed.length) {
+      // These need different fixes, so they keep different errors: an account with
+      // nothing assigned needs a store setting, whereas one pointed at a warehouse
+      // or a store missing from the catalogue needs that assignment corrected.
+      if (user.store) throw new HttpError(409, 'Assigned store is not available in the new store catalog');
+      throw new HttpError(403, 'No store is assigned to this account');
+    }
     if (requestedStoreId) {
       const match = allowed.find((store) => store.id === requestedStoreId);
       if (!match) throw new HttpError(403, 'That store is not assigned to this account');
