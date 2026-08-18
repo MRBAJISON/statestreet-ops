@@ -15,6 +15,7 @@ import {
   subcategories,
 } from '@/lib/db/foundation-schema';
 import { databaseErrorCode, sessionUserId } from '@/lib/server-errors';
+import { accessibleStores } from '@/lib/store-access';
 import { canReadUnitCost } from '@/lib/access';
 
 const PRODUCT_EDITORS = new Set(['owner', 'commercial', 'operations', 'inventory']);
@@ -58,23 +59,45 @@ export async function GET(req: NextRequest) {
     );
   }
   if (requestedBrandIds.length) conditions.push(inArray(products.brandId, requestedBrandIds));
+
+  // Products belong to a store through the stock loaded for it. A store sees its
+  // own and nobody else's.
+  const storeIdParam = Number(req.nextUrl.searchParams.get('storeId') ?? '');
+  const requestedStoreId = Number.isSafeInteger(storeIdParam) && storeIdParam > 0 ? storeIdParam : null;
+
+  // A store manager is confined to the stores assigned to them whatever they ask
+  // for, so the scope is decided here rather than taken from the query string.
+  let scopedStoreIds: number[] | null = requestedStoreId ? [requestedStoreId] : null;
+  if (session.user.role === 'store-manager') {
+    const allowed = (await accessibleStores(session.user)).map((store) => store.id);
+    scopedStoreIds = requestedStoreId
+      ? allowed.filter((id) => id === requestedStoreId)
+      : allowed;
+    // No assigned store means no catalogue, rather than the whole group's.
+    if (!scopedStoreIds.length) {
+      return NextResponse.json({ products: [], pagination: { page, pageSize, total: 0, totalPages: 1 } });
+    }
+  }
+  if (scopedStoreIds) {
+    conditions.push(
+      inArray(
+        products.id,
+        db
+          .select({ id: storeStockLevels.productId })
+          .from(storeStockLevels)
+          .where(inArray(storeStockLevels.storeId, scopedStoreIds))
+      )
+    );
+  }
+
+  // Picking a product under a category should only offer that category's products.
+  const categoryIdParam = Number(req.nextUrl.searchParams.get('categoryId') ?? '');
+  if (Number.isSafeInteger(categoryIdParam) && categoryIdParam > 0) {
+    conditions.push(eq(products.categoryId, categoryIdParam));
+  }
+
   const where = conditions.length ? and(...conditions) : undefined;
 
-  // A store's own products rank first. "Its own" means the products that store
-  // actually carries — the stock rows loaded for it by the catalogue import — not
-  // whatever its brand happens to sell group-wide.
-  //
-  // Ranked rather than filtered: a store can legitimately sell something it has no
-  // stock row for, and hiding it would push a real sale into the untracked "Other"
-  // line, which is worse than showing one extra result.
-  const storeIdParam = Number(req.nextUrl.searchParams.get('storeId') ?? '');
-  const storeId = Number.isSafeInteger(storeIdParam) && storeIdParam > 0 ? storeIdParam : null;
-  const storeRank = storeId
-    ? sql<number>`case when exists (
-        select 1 from ${storeStockLevels} level
-        where level.product_id = ${products.id} and level.store_id = ${storeId}
-      ) then 0 else 1 end`
-    : null;
   // Exact barcode beats a partial one, and any barcode hit beats a name hit.
   const matchRank = q
     ? sql<number>`case
@@ -87,7 +110,7 @@ export async function GET(req: NextRequest) {
     : null;
   // Left out entirely rather than ordered by a constant: Postgres reads a bare
   // integer in ORDER BY as a column position, and there is no position zero.
-  const orderBy = [storeRank, matchRank, desc(products.updatedAt), products.sku].filter(
+  const orderBy = [matchRank, desc(products.updatedAt), products.sku].filter(
     (term) => term !== null
   );
   const [rows, totals] = await Promise.all([
@@ -110,13 +133,20 @@ export async function GET(req: NextRequest) {
         sellingPrice: products.sellingPrice,
         active: products.active,
         updatedAt: products.updatedAt,
-        // Stock held across every store, so the catalogue list shows what exists
-        // without needing a second request per row.
-        quantity: sql<number>`(
-          select coalesce(sum(level.quantity), 0)::integer
-          from ${storeStockLevels} level
-          where level.product_id = ${products.id}
-        )`,
+        // Stock on hand. Scoped to the same stores as the listing, so a manager
+        // sees their own shop's quantity rather than the group total.
+        quantity: scopedStoreIds
+          ? sql<number>`(
+              select coalesce(sum(level.quantity), 0)::integer
+              from ${storeStockLevels} level
+              where level.product_id = ${products.id}
+                and level.store_id = any(${scopedStoreIds})
+            )`
+          : sql<number>`(
+              select coalesce(sum(level.quantity), 0)::integer
+              from ${storeStockLevels} level
+              where level.product_id = ${products.id}
+            )`,
       })
       .from(products)
       .innerJoin(brands, eq(products.brandId, brands.id))

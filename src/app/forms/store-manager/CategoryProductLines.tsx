@@ -32,12 +32,14 @@ function describe(product: SearchResult) {
  * rather than blocking the day.
  */
 export function CategoryProductLines({
+  categoryId,
   categoryName,
   products,
   storeId,
   disabled,
   onChange,
 }: {
+  categoryId: number;
   categoryName: string;
   products: DailyProductDraftRow[];
   storeId: number | null;
@@ -58,6 +60,8 @@ export function CategoryProductLines({
         const params = new URLSearchParams({ limit: '25' });
         if (query.trim()) params.set('q', query.trim());
         if (storeId) params.set('storeId', String(storeId));
+        // Only this category's products: picking under Shirts must not offer Footwear.
+        params.set('categoryId', String(categoryId));
         const response = await fetch(`/api/products?${params}`, { signal: controller.signal, cache: 'no-store' });
         if (!response.ok) return;
         const payload = (await response.json()) as { products: SearchResult[] };
@@ -72,7 +76,7 @@ export function CategoryProductLines({
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [open, query, storeId]);
+  }, [categoryId, open, query, storeId]);
 
   function update(key: string, patch: Partial<DailyProductDraftRow>) {
     onChange(products.map((row) => (row.key === key ? { ...row, ...patch } : row)));

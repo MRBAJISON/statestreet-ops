@@ -460,6 +460,7 @@ export default function TypedDailyReport({
                       <TableCell className="font-medium align-top">{category}</TableCell>
                       <TableCell className="min-w-80">
                         <CategoryProductLines
+                          categoryId={line.categoryId}
                           categoryName={category}
                           products={line.products}
                           storeId={data?.references.store?.id ?? null}
@@ -504,6 +505,7 @@ export default function TypedDailyReport({
                     <Field className="col-span-2">
                       <FieldLabel>Products sold</FieldLabel>
                       <CategoryProductLines
+                        categoryId={line.categoryId}
                         categoryName={category}
                         products={line.products}
                         storeId={data?.references.store?.id ?? null}
