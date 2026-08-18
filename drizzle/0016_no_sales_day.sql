@@ -1,0 +1,11 @@
+-- A trading day on which nothing sold.
+--
+-- Until now the sales list had to hold at least one line, so a store with no
+-- sales had to pick a category and type zeros into it. That put a phantom row in
+-- daily_sales_lines for a category that did not trade, which then counted as a
+-- category with activity everywhere downstream.
+--
+-- Flagging the day instead keeps the report submittable with no sales lines at
+-- all, so the day still counts as filed — which matters, because the weekly and
+-- monthly reports only unlock once every trading day has been submitted.
+ALTER TABLE "daily_reports" ADD COLUMN "no_sales" boolean DEFAULT false NOT NULL;

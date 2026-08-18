@@ -4,8 +4,18 @@ import { getSession } from '@/lib/auth';
 import { createProductSchema } from '@/lib/contracts/product';
 import { formatContractError } from '@/lib/contracts/shared';
 import { db } from '@/lib/db';
-import { auditEvents, brandCategories, brands, categories, products, subcategories } from '@/lib/db/foundation-schema';
+import {
+  auditEvents,
+  brandCategories,
+  brands,
+  categories,
+  products,
+  storeStockLevels,
+  stores,
+  subcategories,
+} from '@/lib/db/foundation-schema';
 import { databaseErrorCode, sessionUserId } from '@/lib/server-errors';
+import { accessibleStores } from '@/lib/store-access';
 import { canReadUnitCost } from '@/lib/access';
 
 const PRODUCT_EDITORS = new Set(['owner', 'commercial', 'operations', 'inventory']);
@@ -35,12 +45,74 @@ export async function GET(req: NextRequest) {
   const pageSize = Number.isInteger(requestedPageSize) ? Math.min(Math.max(requestedPageSize, 1), 100) : 50;
   const requestedPage = Number(req.nextUrl.searchParams.get('page') ?? 1);
   const page = Number.isInteger(requestedPage) ? Math.max(requestedPage, 1) : 1;
+  // Staff type part of a barcode — typically the last few digits — rather than
+  // scanning a whole one, so a digit query matches the end of the barcode as well
+  // as anywhere inside it. A hardware scanner sends the full digits and lands on
+  // the same path.
+  const isDigitQuery = q.length > 0 && /^\d+$/.test(q);
   const conditions = [];
   if (status === 'active') conditions.push(eq(products.active, true));
   if (status === 'inactive') conditions.push(eq(products.active, false));
-  if (q) conditions.push(or(ilike(products.sku, `%${q}%`), ilike(products.name, `%${q}%`))!);
+  if (q) {
+    conditions.push(
+      or(ilike(products.sku, `%${q}%`), ilike(products.name, `%${q}%`), ilike(products.barcode, `%${q}%`))!
+    );
+  }
   if (requestedBrandIds.length) conditions.push(inArray(products.brandId, requestedBrandIds));
+
+  // Products belong to a store through the stock loaded for it. A store sees its
+  // own and nobody else's.
+  const storeIdParam = Number(req.nextUrl.searchParams.get('storeId') ?? '');
+  const requestedStoreId = Number.isSafeInteger(storeIdParam) && storeIdParam > 0 ? storeIdParam : null;
+
+  // A store manager is confined to the stores assigned to them whatever they ask
+  // for, so the scope is decided here rather than taken from the query string.
+  let scopedStoreIds: number[] | null = requestedStoreId ? [requestedStoreId] : null;
+  if (session.user.role === 'store-manager') {
+    const allowed = (await accessibleStores(session.user)).map((store) => store.id);
+    scopedStoreIds = requestedStoreId
+      ? allowed.filter((id) => id === requestedStoreId)
+      : allowed;
+    // No assigned store means no catalogue, rather than the whole group's.
+    if (!scopedStoreIds.length) {
+      return NextResponse.json({ products: [], pagination: { page, pageSize, total: 0, totalPages: 1 } });
+    }
+  }
+  if (scopedStoreIds) {
+    conditions.push(
+      inArray(
+        products.id,
+        db
+          .select({ id: storeStockLevels.productId })
+          .from(storeStockLevels)
+          .where(inArray(storeStockLevels.storeId, scopedStoreIds))
+      )
+    );
+  }
+
+  // Picking a product under a category should only offer that category's products.
+  const categoryIdParam = Number(req.nextUrl.searchParams.get('categoryId') ?? '');
+  if (Number.isSafeInteger(categoryIdParam) && categoryIdParam > 0) {
+    conditions.push(eq(products.categoryId, categoryIdParam));
+  }
+
   const where = conditions.length ? and(...conditions) : undefined;
+
+  // Exact barcode beats a partial one, and any barcode hit beats a name hit.
+  const matchRank = q
+    ? sql<number>`case
+        when lower(${products.barcode}) = lower(${q}) then 0
+        when ${isDigitQuery} and ${products.barcode} like ${`%${q}`} then 1
+        when ${products.barcode} is not null and lower(${products.barcode}) like lower(${`%${q}%`}) then 2
+        when lower(${products.sku}) like lower(${`%${q}%`}) then 3
+        else 4
+      end`
+    : null;
+  // Left out entirely rather than ordered by a constant: Postgres reads a bare
+  // integer in ORDER BY as a column position, and there is no position zero.
+  const orderBy = [matchRank, desc(products.updatedAt), products.sku].filter(
+    (term) => term !== null
+  );
   const [rows, totals] = await Promise.all([
     db
       .select({
@@ -56,17 +128,32 @@ export async function GET(req: NextRequest) {
         subcategoryName: subcategories.name,
         size: products.size,
         color: products.color,
+        barcode: products.barcode,
         unitCost: products.unitCost,
         sellingPrice: products.sellingPrice,
         active: products.active,
         updatedAt: products.updatedAt,
+        // Stock on hand. Scoped to the same stores as the listing, so a manager
+        // sees their own shop's quantity rather than the group total.
+        //
+        // The store list is spread into its own placeholders rather than bound as
+        // one array parameter: a JS array handed to a raw template arrives as a
+        // scalar, and Postgres rejects it as a malformed array literal.
+        quantity: sql<number>`(
+          select coalesce(sum(level.quantity), 0)::integer
+          from ${storeStockLevels} level
+          where level.product_id = ${products.id}
+            ${scopedStoreIds
+              ? sql`and level.store_id in (${sql.join(scopedStoreIds.map((id) => sql`${id}`), sql`, `)})`
+              : sql``}
+        )`,
       })
       .from(products)
       .innerJoin(brands, eq(products.brandId, brands.id))
       .innerJoin(categories, eq(products.categoryId, categories.id))
       .leftJoin(subcategories, eq(products.subcategoryId, subcategories.id))
       .where(where)
-      .orderBy(desc(products.updatedAt), products.sku)
+      .orderBy(...orderBy)
       .limit(pageSize)
       .offset((page - 1) * pageSize),
     db.select({ value: sql<number>`count(*)::integer` }).from(products).where(where),
@@ -99,7 +186,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: formatContractError(parsed.error) }, { status: 400 });
     }
     const input = parsed.data;
-    const [brandRows, categoryRows, subcategoryRows, brandCategoryRows] = await Promise.all([
+    const [brandRows, categoryRows, subcategoryRows, storeRows, brandCategoryRows] = await Promise.all([
       db.select({ id: brands.id }).from(brands).where(and(eq(brands.id, input.brandId), eq(brands.active, true))).limit(1),
       db
         .select({ id: categories.id })
@@ -111,6 +198,13 @@ export async function POST(req: NextRequest) {
             .select({ id: subcategories.id, categoryId: subcategories.categoryId })
             .from(subcategories)
             .where(and(eq(subcategories.id, input.subcategoryId), eq(subcategories.active, true)))
+            .limit(1)
+        : Promise.resolve([]),
+      input.storeId
+        ? db
+            .select({ id: stores.id })
+            .from(stores)
+            .where(and(eq(stores.id, input.storeId), eq(stores.active, true), eq(stores.type, 'store')))
             .limit(1)
         : Promise.resolve([]),
       db
@@ -126,18 +220,33 @@ export async function POST(req: NextRequest) {
     if (input.subcategoryId && subcategoryRows[0]?.categoryId !== input.categoryId) {
       return NextResponse.json({ error: 'Subcategory does not belong to the selected category' }, { status: 400 });
     }
+    if (input.storeId && !storeRows.length) {
+      return NextResponse.json({ error: 'Store was not found or is inactive' }, { status: 400 });
+    }
+    if (input.quantity != null && !input.storeId) {
+      return NextResponse.json({ error: 'Choose the store this quantity is held in' }, { status: 400 });
+    }
     const userId = sessionUserId(session.user.id);
+    const stocked = input.storeId != null && input.quantity != null;
     const result = await db.execute(sql`
       with new_product as (
         insert into products (
-          sku, name, description, brand_id, category_id, subcategory_id, size, color,
+          sku, barcode, name, description, brand_id, category_id, subcategory_id, size, color,
           unit_cost, selling_price, created_by_user_id, updated_by_user_id
         ) values (
-          ${input.sku}, ${input.name}, ${input.description ?? null}, ${input.brandId}, ${input.categoryId},
-          ${input.subcategoryId ?? null}, ${input.size ?? null}, ${input.color ?? null}, ${input.unitCost ?? null},
-          ${input.sellingPrice ?? null}, ${userId}, ${userId}
+          ${input.sku}, ${input.sku}, ${input.name}, ${input.description ?? null}, ${input.brandId},
+          ${input.categoryId}, ${input.subcategoryId ?? null}, ${input.size ?? null}, ${input.color ?? null},
+          ${input.unitCost ?? null}, ${input.sellingPrice ?? null}, ${userId}, ${userId}
         )
         returning *
+      ), new_stock as (
+        insert into store_stock_levels (store_id, product_id, quantity, as_of_date)
+        select ${input.storeId ?? null}, product.id, ${input.quantity ?? 0}, current_date
+        from new_product product
+        where ${stocked}
+        on conflict (store_id, product_id) do update set
+          quantity = excluded.quantity, as_of_date = excluded.as_of_date, updated_at = now()
+        returning id
       ), new_audit as (
         insert into ${auditEvents} (entity_type, entity_id, action, actor_user_id, after)
         select 'product', product.id, 'create', ${userId}, to_jsonb(product)

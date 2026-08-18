@@ -265,7 +265,7 @@ describeWithDatabase('daily report SQL integration', () => {
         sales: [
           {
             ...initial.sales[0],
-            products: [{ customName: 'Only this one now' }],
+            products: [{ customName: 'Only this one now', unitsSold: 1, lineValue: '10.00', valueOverridden: false }],
           },
         ],
         lockVersion: 1,

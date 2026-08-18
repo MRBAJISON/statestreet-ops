@@ -68,7 +68,9 @@ export async function GET(req: NextRequest) {
     }
     let storeId = storeIdParam ? requestedStoreId : undefined;
     if (session.user.role === 'store-manager') {
-      storeId = await resolveDailyReportStore(session.user);
+      // Pass the requested store through so a manager covering two shops can list
+      // either. resolveDailyReportStore rejects anything not assigned to them.
+      storeId = await resolveDailyReportStore(session.user, storeIdParam ? requestedStoreId : undefined);
     }
     const status = sp.get('status');
     if (status && !['draft', 'submitted', 'approved'].includes(status)) {

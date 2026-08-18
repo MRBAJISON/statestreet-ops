@@ -65,6 +65,19 @@ describe('product contract', () => {
     expect(update.unitCost).toBe('850.00');
   });
 
+  it('accepts a quantity held in a named store', () => {
+    const product = createProductSchema.parse({
+      sku: 'WP-TEE-01',
+      name: 'Woodpeckers tee',
+      brandId: 1,
+      categoryId: 2,
+      storeId: 7,
+      quantity: 25,
+    });
+    expect(product.storeId).toBe(7);
+    expect(product.quantity).toBe(25);
+  });
+
   it('requires a product change and concurrency timestamp', () => {
     expect(updateProductSchema.safeParse({ active: false }).success).toBe(false);
     expect(updateProductSchema.safeParse({ expectedUpdatedAt: '2026-07-11T17:00:00.123Z' }).success).toBe(false);

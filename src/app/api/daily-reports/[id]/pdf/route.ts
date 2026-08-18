@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pdf } from '@react-pdf/renderer';
 import { DailyStoreReportDocument } from '@/components/pdf/DailyStoreReportDocument';
+import { canUseStore } from '@/lib/store-access';
 import { getSession } from '@/lib/auth';
 import { getDailyReportById, getDailyReportReferenceData } from '@/lib/daily-reports';
 import { getOrgSettings } from '@/lib/org-server';
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const report = await getDailyReportById(reportId);
     if (!report) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    if (session.user.role === 'store-manager' && report.storeCode !== session.user.store) {
+    if (session.user.role === 'store-manager' && !(await canUseStore(session.user, report.storeId))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     // A draft is still being worked on, so it is not a report anyone should be circulating.

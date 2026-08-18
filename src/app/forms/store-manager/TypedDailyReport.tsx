@@ -25,15 +25,19 @@ import {
   createDailyReportDraft,
   createSavedDailyReportRecord,
   mergeDailyReportsResponses,
+  sumProductUnits,
+  sumProductValue,
+  type DailyProductDraftRow,
   type DailyReportDraft,
   type DailySalesDraftRow,
   upsertDailyReport,
 } from '@/lib/daily-report-form';
+import { CategoryProductLines } from './CategoryProductLines';
 import { downloadFile } from '@/lib/download-file';
 import { cn } from '@/lib/utils';
 
-type SalesField = Exclude<keyof DailySalesDraftRow, 'categoryId' | 'products'>;
-type HeaderField = Exclude<keyof DailyReportDraft, 'businessDate' | 'sales' | 'payments'>;
+type SalesField = Exclude<keyof DailySalesDraftRow, 'categoryId' | 'products' | 'totalsOverridden'>;
+type HeaderField = Exclude<keyof DailyReportDraft, 'businessDate' | 'sales' | 'payments' | 'noSales'>;
 
 const SALES_FIELDS: Array<{ key: SalesField; label: string; step: number }> = [
   { key: 'unitsSold', label: 'Units sold', step: 1 },
@@ -75,9 +79,18 @@ function StatusBadge({ status }: { status: DailyReportStatus }) {
   return <Badge variant="outline" className={cn('capitalize', STATUS_VARIANTS[status])}>{status}</Badge>;
 }
 
-export default function TypedDailyReport({ assignedStore }: { assignedStore: string }) {
+export default function TypedDailyReport({
+  assignedStore,
+  stores = [],
+}: {
+  assignedStore: string;
+  stores?: Array<{ id: number; code: string; name: string }>;
+}) {
   const { org } = useOrg();
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  // Only meaningful for a manager covering more than one shop; with one store the
+  // server ignores it and uses the single assignment.
+  const [selectedStoreId, setSelectedStoreId] = useState<number | null>(() => stores[0]?.id ?? null);
   const [data, setData] = useState<DailyReportsResponse | null>(null);
   const [draft, setDraft] = useState<DailyReportDraft | null>(null);
   const [visibleCategoryIds, setVisibleCategoryIds] = useState<Set<number>>(() => new Set());
@@ -93,8 +106,13 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
     setLoading(true);
     try {
       const query = new URLSearchParams({ from: businessDate, to: businessDate });
+      const recentQuery = new URLSearchParams();
+      if (selectedStoreId) {
+        query.set('storeId', String(selectedStoreId));
+        recentQuery.set('storeId', String(selectedStoreId));
+      }
       const [recentResponse, selectedResponse] = await Promise.all([
-        fetch('/api/daily-reports', { cache: 'no-store' }),
+        fetch(`/api/daily-reports?${recentQuery}`, { cache: 'no-store' }),
         fetch(`/api/daily-reports?${query}`, { cache: 'no-store' }),
       ]);
       if (!recentResponse.ok) throw new Error(await responseError(recentResponse));
@@ -109,7 +127,7 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
     } finally {
       if (requestId === loadSequence.current) setLoading(false);
     }
-  }, []);
+  }, [selectedStoreId]);
 
   useEffect(() => {
     void loadReports(selectedDate).catch((loadError) => setError((loadError as Error).message));
@@ -147,9 +165,14 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
   }
 
   function updateSales(categoryId: number, field: SalesField, value: string) {
+    // Editing units or gross by hand is the manager overriding the computed total,
+    // and is recorded as such so it survives further product edits.
+    const overridesTotals = field === 'unitsSold' || field === 'grossRevenue';
     setDraft((current) => current ? {
       ...current,
-      sales: current.sales.map((line) => line.categoryId === categoryId ? { ...line, [field]: value } : line),
+      sales: current.sales.map((line) => line.categoryId === categoryId
+        ? { ...line, [field]: value, ...(overridesTotals ? { totalsOverridden: true } : {}) }
+        : line),
     } : current);
   }
 
@@ -160,10 +183,21 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
     } : current);
   }
 
-  function updateProductNames(categoryId: number, productNames: string) {
+  function updateProducts(categoryId: number, products: DailyProductDraftRow[]) {
     setDraft((current) => current ? {
       ...current,
-      sales: current.sales.map((line) => line.categoryId === categoryId ? { ...line, productNames } : line),
+      sales: current.sales.map((line) => {
+        if (line.categoryId !== categoryId) return line;
+        // Category totals track the product lines until someone corrects a total by
+        // hand, after which adding a product must not overwrite their figure.
+        if (line.totalsOverridden) return { ...line, products };
+        return {
+          ...line,
+          products,
+          unitsSold: products.length ? String(sumProductUnits(products)) : line.unitsSold,
+          grossRevenue: products.length ? sumProductValue(products) : line.grossRevenue,
+        };
+      }),
     } : current);
   }
 
@@ -185,7 +219,8 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
         discounts: '',
         returns: '',
         creditSales: '',
-        productNames: '',
+        products: [],
+        totalsOverridden: false,
       } : line),
     } : current);
     setVisibleCategoryIds((current) => {
@@ -220,7 +255,9 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
       const response = await fetch(currentReport ? `/api/daily-reports/${currentReport.id}` : '/api/daily-reports', {
         method: currentReport ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
+        // Name the store on create so a manager covering two shops files against
+        // the one they picked. The server still checks it is assigned to them.
+        body: JSON.stringify(selectedStoreId && !currentReport ? { ...input, storeId: selectedStoreId } : input),
       });
       if (!response.ok) throw new Error(await responseError(response));
       const result = (await response.json()) as DailyReportMutationResponse;
@@ -274,7 +311,26 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
               <StatusBadge status={status} />
               {locked ? <LockKeyhole className="text-muted-foreground" aria-label="Locked" /> : null}
             </div>
-            <p className="text-sm text-muted-foreground">{storeName}</p>
+            {stores.length > 1 ? (
+              <Select
+                value={selectedStoreId ? String(selectedStoreId) : ''}
+                onValueChange={(value) => setSelectedStoreId(Number(value))}
+                disabled={busy !== null}
+              >
+                <SelectTrigger className="mt-1 h-8 w-56" aria-label="Store">
+                  <SelectValue placeholder="Choose a store" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {stores.map((store) => (
+                      <SelectItem key={store.id} value={String(store.id)}>{store.name}</SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            ) : (
+              <p className="text-sm text-muted-foreground">{storeName}</p>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -348,8 +404,29 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
         </TabsList>
 
         <TabsContent value="sales">
+          <label className="mb-3 flex items-start gap-3 rounded-md border bg-muted/35 px-4 py-3">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4"
+              checked={draft.noSales}
+              disabled={disabled}
+              onChange={(event) => setDraft((current) => (current ? { ...current, noSales: event.target.checked } : current))}
+            />
+            <span className="text-sm">
+              <span className="font-medium">Nothing sold today</span>
+              <span className="mt-0.5 block text-muted-foreground">
+                Records the day as traded with no sales, so it still counts as filed. Tick this instead of adding a
+                category and typing zeros.
+              </span>
+            </span>
+          </label>
+
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">{visibleSales.length} {visibleSales.length === 1 ? 'category' : 'categories'} in this report</p>
+            <p className="text-sm text-muted-foreground">
+              {draft.noSales
+                ? 'No sales recorded for this day'
+                : `${visibleSales.length} ${visibleSales.length === 1 ? 'category' : 'categories'} in this report`}
+            </p>
             <Select
               value={categoryToAdd}
               onValueChange={(value) => {
@@ -357,13 +434,14 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
                 setVisibleCategoryIds((current) => new Set([...current, categoryId]));
                 setCategoryToAdd('');
               }}
-              disabled={disabled || !availableCategories.length}
+              disabled={disabled || draft.noSales || !availableCategories.length}
             >
               <SelectTrigger className="w-52"><SelectValue placeholder="Add category" /></SelectTrigger>
               <SelectContent><SelectGroup>{availableCategories.map((category) => <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>)}</SelectGroup></SelectContent>
             </Select>
           </div>
 
+          {draft.noSales ? null : (
           <div className="overflow-x-auto rounded-md border bg-card shadow-sm hidden md:block">
             <Table>
               <TableHeader>
@@ -379,16 +457,15 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
                   const category = categoryNames.get(line.categoryId) ?? `Category ${line.categoryId}`;
                   return (
                     <TableRow key={line.categoryId}>
-                      <TableCell className="font-medium">{category}</TableCell>
-                      <TableCell>
-                        <Textarea
-                          aria-label={`${category}: Product name`}
-                          placeholder="Product name, one per line"
-                          rows={1}
-                          className="min-h-9 min-w-40 resize-none py-1.5"
-                          value={line.productNames}
+                      <TableCell className="font-medium align-top">{category}</TableCell>
+                      <TableCell className="min-w-80">
+                        <CategoryProductLines
+                          categoryId={line.categoryId}
+                          categoryName={category}
+                          products={line.products}
+                          storeId={data?.references.store?.id ?? null}
                           disabled={disabled}
-                          onChange={(event) => updateProductNames(line.categoryId, event.target.value)}
+                          onChange={(products) => updateProducts(line.categoryId, products)}
                         />
                       </TableCell>
                       {SALES_FIELDS.map((field) => (
@@ -415,6 +492,8 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
               </TableBody>
             </Table>
           </div>
+          )}
+          {draft.noSales ? null : (
 
           <div className="flex flex-col gap-5 md:hidden">
             {visibleSales.map((line) => {
@@ -424,8 +503,15 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
                   <div className="mb-3 flex items-center justify-between gap-3"><h2 className="text-sm font-semibold">{category}</h2><Button type="button" variant="ghost" size="icon" aria-label={`Remove ${category}`} disabled={disabled} onClick={() => removeCategory(line.categoryId)}><Trash2 /></Button></div>
                   <FieldGroup className="grid grid-cols-2 gap-4">
                     <Field className="col-span-2">
-                      <FieldLabel>Product name</FieldLabel>
-                      <Textarea placeholder="Product name, one per line" rows={1} className="min-h-9 resize-none py-1.5" value={line.productNames} disabled={disabled} onChange={(event) => updateProductNames(line.categoryId, event.target.value)} />
+                      <FieldLabel>Products sold</FieldLabel>
+                      <CategoryProductLines
+                        categoryId={line.categoryId}
+                        categoryName={category}
+                        products={line.products}
+                        storeId={data?.references.store?.id ?? null}
+                        disabled={disabled}
+                        onChange={(products) => updateProducts(line.categoryId, products)}
+                      />
                     </Field>
                     {SALES_FIELDS.map((field) => (
                       <Field key={field.key}>
@@ -439,6 +525,7 @@ export default function TypedDailyReport({ assignedStore }: { assignedStore: str
             })}
             {!visibleSales.length ? <p className="py-12 text-center text-sm text-muted-foreground">Add the first category sold today.</p> : null}
           </div>
+          )}
         </TabsContent>
 
         <TabsContent value="store">

@@ -24,6 +24,8 @@ import {
 } from './db/foundation-schema';
 import { users } from './db/schema';
 import { HttpError, sessionUserId } from './server-errors';
+import { applySalesToStockQuery, fillOpeningStockQuery } from './reporting/stock-levels';
+import { accessibleStores } from './store-access';
 import {
   buildCreateDailyReportQuery,
   buildDecideDailyReportQuery,
@@ -110,14 +112,23 @@ export async function getDailyReportReferenceData(storeId?: number): Promise<Dai
 export async function resolveDailyReportStore(user: AppUser, requestedStoreId?: number): Promise<number> {
   if (!DAILY_REPORT_WRITERS.has(user.role)) throw new HttpError(403, 'Forbidden');
   if (user.role === 'store-manager') {
-    if (!user.store) throw new HttpError(403, 'No store is assigned to this account');
-    const [store] = await db
-      .select({ id: stores.id })
-      .from(stores)
-      .where(and(eq(stores.code, user.store), eq(stores.type, 'store'), eq(stores.active, true)))
-      .limit(1);
-    if (!store) throw new HttpError(409, 'Assigned store is not available in the new store catalog');
-    return store.id;
+    // A manager covering more than one shop picks which one they are filing for.
+    // With a single store the request is ignored and the one store is used, so
+    // nothing changes for the accounts that have always had exactly one.
+    const allowed = await accessibleStores(user);
+    if (!allowed.length) {
+      // These need different fixes, so they keep different errors: an account with
+      // nothing assigned needs a store setting, whereas one pointed at a warehouse
+      // or a store missing from the catalogue needs that assignment corrected.
+      if (user.store) throw new HttpError(409, 'Assigned store is not available in the new store catalog');
+      throw new HttpError(403, 'No store is assigned to this account');
+    }
+    if (requestedStoreId) {
+      const match = allowed.find((store) => store.id === requestedStoreId);
+      if (!match) throw new HttpError(403, 'That store is not assigned to this account');
+      return match.id;
+    }
+    return allowed[0].id;
   }
   if (!requestedStoreId) throw new HttpError(400, 'storeId is required');
   const [store] = await db
@@ -180,7 +191,27 @@ export async function createDailyReport(
   const result = await db.execute(buildCreateDailyReportQuery(userId, storeId, input));
   const row = (result.rows as DailyReportMutationResult[])[0];
   if (!row) throw new Error('Daily report was not created');
+  await settleStockForReport(Number(row.id), input.status);
   return dailyReportMutationRecord(row, input.status);
+}
+
+/**
+ * Moves stock once a report is submitted, and fills in the opening figures.
+ *
+ * Deliberately only on submit: a draft is still being edited, and taking stock on
+ * every keystroke-triggered save would double-count. Stock work is kept out of the
+ * save statement itself so a stock problem can never roll back a report a manager
+ * has already filed — the sale is the record that matters, and a balance can be
+ * corrected by the next count.
+ */
+async function settleStockForReport(reportId: number, status: SaveDailyReportInput['status']): Promise<void> {
+  if (status !== 'submitted') return;
+  try {
+    await db.execute(fillOpeningStockQuery(reportId));
+    await db.execute(applySalesToStockQuery(reportId));
+  } catch (error) {
+    console.error('Stock levels could not be settled for daily report', reportId, error);
+  }
 }
 
 export async function replaceDailyReport(
@@ -192,6 +223,7 @@ export async function replaceDailyReport(
   const result = await db.execute(buildReplaceDailyReportQuery(userId, reportId, input));
   const row = (result.rows as DailyReportMutationResult[])[0];
   if (!row) throw new HttpError(409, 'Report changed, is locked, or cannot move to the requested status');
+  await settleStockForReport(reportId, input.status);
   return dailyReportMutationRecord(row, input.status);
 }
 
@@ -272,6 +304,9 @@ export async function attachDailyReportDetails(baseReports: DailyReportBaseRow[]
         productName: products.name,
         sku: products.sku,
         brandName: brands.name,
+        unitsSold: dailyReportProducts.unitsSold,
+        lineValue: dailyReportProducts.lineValue,
+        valueOverridden: dailyReportProducts.valueOverridden,
       })
       .from(dailyReportProducts)
       .leftJoin(products, eq(dailyReportProducts.productId, products.id))
@@ -318,6 +353,9 @@ export async function attachDailyReportDetails(baseReports: DailyReportBaseRow[]
         productName: item.productName ?? item.customName ?? '',
         sku: item.sku,
         brandName: item.brandName,
+        unitsSold: item.unitsSold,
+        lineValue: item.lineValue,
+        valueOverridden: item.valueOverridden,
       })),
     })),
     payments: paymentsByReport.get(report.id) ?? [],
@@ -347,6 +385,7 @@ const dailyReportBaseColumns = {
   notes: dailyReports.notes,
   staffPerformanceNote: dailyReports.staffPerformanceNote,
   closingFacilityStatus: dailyReports.closingFacilityStatus,
+  noSales: dailyReports.noSales,
   lockVersion: dailyReports.lockVersion,
   submittedAt: dailyReports.submittedAt,
   approvedAt: dailyReports.approvedAt,

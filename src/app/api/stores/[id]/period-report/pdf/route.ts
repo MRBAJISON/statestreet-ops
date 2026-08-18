@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { pdf } from '@react-pdf/renderer';
 import { eq } from 'drizzle-orm';
 import { StorePeriodReportDocument } from '@/components/pdf/StorePeriodReportDocument';
+import { canUseStore } from '@/lib/store-access';
 import { getSession } from '@/lib/auth';
 import { getDailyReportReferenceData } from '@/lib/daily-reports';
 import { db } from '@/lib/db';
@@ -59,8 +60,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .where(eq(stores.id, storeId))
       .limit(1);
     if (!store) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    // Store managers only ever see their own store, same rule as the daily report.
-    if (session.user.role === 'store-manager' && store.code !== session.user.store) {
+    // Store managers only ever see stores assigned to them, same rule as the daily
+    // report. A manager covering two shops may open either.
+    if (session.user.role === 'store-manager' && !(await canUseStore(session.user, storeId))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

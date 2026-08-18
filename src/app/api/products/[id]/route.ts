@@ -54,6 +54,8 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       ), updated as (
         update products product
         set sku = case when ${input.sku !== undefined} then ${input.sku ?? existing.sku} else before.sku end,
+            -- The SKU is the barcode, so they move together and can never drift.
+            barcode = case when ${input.sku !== undefined} then ${input.sku ?? existing.sku} else before.sku end,
             name = case when ${input.name !== undefined} then ${input.name ?? existing.name} else before.name end,
             description = case when ${input.description !== undefined} then ${input.description ?? null} else before.description end,
             brand_id = case when ${input.brandId !== undefined} then ${input.brandId ?? existing.brandId} else before.brand_id end,

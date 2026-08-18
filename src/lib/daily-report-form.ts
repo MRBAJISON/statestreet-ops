@@ -8,6 +8,20 @@ import {
 } from './contracts/daily-report';
 import { formatContractError } from './contracts/shared';
 
+export interface DailyProductDraftRow {
+  // Stable across re-renders so React keeps focus while a row is being typed into.
+  key: string;
+  productId: number | null;
+  name: string;
+  sku: string | null;
+  unitsSold: string;
+  lineValue: string;
+  valueOverridden: boolean;
+  // Catalogue selling price, held so the line value can be recalculated when the
+  // units change. Null for a free-typed line, which has no price to work from.
+  unitPrice: string | null;
+}
+
 export interface DailySalesDraftRow {
   categoryId: number;
   openingStock: string;
@@ -17,7 +31,11 @@ export interface DailySalesDraftRow {
   discounts: string;
   returns: string;
   creditSales: string;
-  productNames: string;
+  products: DailyProductDraftRow[];
+  // Category units and gross normally track the sum of the product lines. Once the
+  // manager corrects a total by hand they stop tracking, so adding another product
+  // cannot silently overwrite a figure someone entered deliberately.
+  totalsOverridden: boolean;
 }
 
 export interface DailyPaymentDraftRow {
@@ -35,6 +53,7 @@ export interface DailyReportDraft {
   notes: string;
   staffPerformanceNote: string;
   closingFacilityStatus: string;
+  noSales: boolean;
   sales: DailySalesDraftRow[];
   payments: DailyPaymentDraftRow[];
 }
@@ -48,8 +67,29 @@ const emptySalesRow = (categoryId: number): DailySalesDraftRow => ({
   discounts: '',
   returns: '',
   creditSales: '',
-  productNames: '',
+  products: [],
+  totalsOverridden: false,
 });
+
+let productKeySeed = 0;
+export const nextProductKey = () => `product-${(productKeySeed += 1)}`;
+
+const toCents = (value: string) => Math.round((Number(value) || 0) * 100);
+const fromCents = (cents: number) => (cents / 100).toFixed(2);
+
+/** Units x the catalogue price. Returns null when the line has no price to work from. */
+export function derivedLineValue(units: string, unitPrice: string | null): string | null {
+  if (unitPrice === null || unitPrice.trim() === '') return null;
+  return fromCents(toCents(unitPrice) * (Number(units) || 0));
+}
+
+export function sumProductUnits(products: DailyProductDraftRow[]): number {
+  return products.reduce((total, product) => total + (Number(product.unitsSold) || 0), 0);
+}
+
+export function sumProductValue(products: DailyProductDraftRow[]): string {
+  return fromCents(products.reduce((total, product) => total + toCents(product.lineValue), 0));
+}
 
 const countValue = (value: number | undefined) => (value === undefined ? '' : String(value));
 
@@ -79,21 +119,39 @@ export function createDailyReportDraft(
     notes: report?.notes ?? '',
     staffPerformanceNote: report?.staffPerformanceNote ?? '',
     closingFacilityStatus: report?.closingFacilityStatus ?? '',
+    noSales: report?.noSales ?? false,
     sales: categoryIds.map((categoryId) => {
       const line = existingSales.get(categoryId);
-      return line
-        ? {
-            categoryId,
-            openingStock: String(line.openingStock),
-            unitsSold: String(line.unitsSold),
-            grossRevenue: line.grossRevenue,
-            cogs: line.cogs,
-            discounts: line.discounts,
-            returns: line.returns,
-            creditSales: line.creditSales,
-            productNames: line.products.map((item) => item.productName).join('\n'),
-          }
-        : emptySalesRow(categoryId);
+      if (!line) return emptySalesRow(categoryId);
+      const products: DailyProductDraftRow[] = line.products.map((item) => ({
+        key: nextProductKey(),
+        productId: item.productId,
+        name: item.productName,
+        sku: item.sku,
+        unitsSold: String(item.unitsSold),
+        lineValue: item.lineValue,
+        valueOverridden: item.valueOverridden,
+        // The catalogue price is not stored on the saved line. Recovering it from
+        // the saved value keeps recalculation working after a reload without
+        // re-fetching every product.
+        unitPrice: item.unitsSold > 0 ? fromCents(Math.round(toCents(item.lineValue) / item.unitsSold)) : null,
+      }));
+      // A saved report carries no override flag for the category totals, so infer
+      // it: totals that already disagree with the lines were set deliberately.
+      const totalsOverridden =
+        line.unitsSold !== sumProductUnits(products) || toCents(line.grossRevenue) !== toCents(sumProductValue(products));
+      return {
+        categoryId,
+        openingStock: String(line.openingStock),
+        unitsSold: String(line.unitsSold),
+        grossRevenue: line.grossRevenue,
+        cogs: line.cogs,
+        discounts: line.discounts,
+        returns: line.returns,
+        creditSales: line.creditSales,
+        products,
+        totalsOverridden,
+      };
     }),
     payments: paymentMethodIds.map((paymentMethodId) => ({
       paymentMethodId,
@@ -102,14 +160,10 @@ export function createDailyReportDraft(
   };
 }
 
-const parseProductNames = (value: string) =>
-  value
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '');
+const productRowHasValue = (row: DailyProductDraftRow) => row.productId !== null || row.name.trim() !== '';
 
 const salesRowHasValue = (row: DailySalesDraftRow) =>
-  parseProductNames(row.productNames).length > 0 ||
+  row.products.some(productRowHasValue) ||
   [row.openingStock, row.unitsSold, row.grossRevenue, row.cogs, row.discounts, row.returns, row.creditSales].some(
     (value) => value.trim() !== ''
   );
@@ -130,8 +184,12 @@ export function buildDailyReportInput(
     notes: draft.notes.trim() || null,
     staffPerformanceNote: draft.staffPerformanceNote.trim() || null,
     closingFacilityStatus: draft.closingFacilityStatus.trim() || null,
+    noSales: draft.noSales,
     lockVersion,
-    sales: draft.sales.filter(salesRowHasValue).map((row) => ({
+    // A no-sales day sends no lines at all. Anything half-typed before the toggle
+    // was flipped is dropped rather than saved as a zero row, which is the phantom
+    // category the flag exists to avoid.
+    sales: (draft.noSales ? [] : draft.sales.filter(salesRowHasValue)).map((row) => ({
       categoryId: row.categoryId,
       openingStock: Number(row.openingStock || 0),
       unitsSold: Number(row.unitsSold || 0),
@@ -140,7 +198,12 @@ export function buildDailyReportInput(
       discounts: row.discounts.trim() || '0',
       returns: row.returns.trim() || '0',
       creditSales: row.creditSales.trim() || '0',
-      products: parseProductNames(row.productNames).map((customName) => ({ customName })),
+      products: row.products.filter(productRowHasValue).map((product) => ({
+        ...(product.productId ? { productId: product.productId } : { customName: product.name.trim() }),
+        unitsSold: Number(product.unitsSold || 0),
+        lineValue: product.lineValue.trim() || '0',
+        valueOverridden: product.valueOverridden,
+      })),
     })),
     payments: draft.payments
       .filter((row) => row.amount.trim() !== '')
@@ -179,6 +242,7 @@ export function createSavedDailyReportRecord(
     notes: input.notes ?? null,
     staffPerformanceNote: input.staffPerformanceNote ?? null,
     closingFacilityStatus: input.closingFacilityStatus ?? null,
+    noSales: input.noSales,
     lockVersion: mutation.lockVersion,
     submittedAt:
       mutation.status === 'submitted' ? existing?.submittedAt ?? savedAt : null,
@@ -191,6 +255,9 @@ export function createSavedDailyReportRecord(
         productName: item.customName ?? '',
         sku: null,
         brandName: null,
+        unitsSold: item.unitsSold,
+        lineValue: item.lineValue,
+        valueOverridden: item.valueOverridden,
       })),
     })),
     payments: input.payments.map((line) => ({ ...line })),

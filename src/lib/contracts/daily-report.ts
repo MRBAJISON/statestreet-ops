@@ -9,6 +9,11 @@ export const dailyReportProductSchema = z
   .object({
     productId: positiveIdSchema.optional(),
     customName: z.string().trim().max(160).optional(),
+    unitsSold: countSchema.default(0),
+    lineValue: moneySchema.default('0.00'),
+    // Set when the manager corrected the value away from units x catalogue price,
+    // so a deliberate markdown can be told apart from a derived figure.
+    valueOverridden: z.boolean().default(false),
   })
   .refine((value) => Boolean(value.productId || value.customName), {
     path: ['customName'],
@@ -25,13 +30,34 @@ export const dailySalesLineSchema = z
     discounts: moneySchema.default('0.00'),
     returns: moneySchema.default('0.00'),
     creditSales: moneySchema.default('0.00'),
-    products: z.array(dailyReportProductSchema).max(20).default([]),
+    products: z.array(dailyReportProductSchema).max(100).default([]),
   })
   .superRefine((line, ctx) => {
     const gross = moneyToCents(line.grossRevenue);
     const discounts = moneyToCents(line.discounts);
     const returns = moneyToCents(line.returns);
     const credit = moneyToCents(line.creditSales);
+
+    // Product lines are an attributed subset of the category, so they may add up to
+    // less than the category total — a manager who forgets one item should not be
+    // blocked from closing the day. They must never add up to more, which would
+    // mean the category understates what was actually sold.
+    const productUnits = line.products.reduce((total, product) => total + product.unitsSold, 0);
+    const productValue = line.products.reduce((total, product) => total + moneyToCents(product.lineValue), BigInt(0));
+    if (productUnits > line.unitsSold) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['unitsSold'],
+        message: 'Product lines add up to more units than the category total',
+      });
+    }
+    if (productValue > gross) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['grossRevenue'],
+        message: 'Product lines add up to more than the category gross revenue',
+      });
+    }
     if (discounts + returns > gross) {
       ctx.addIssue({
         code: 'custom',
@@ -63,10 +89,30 @@ export const saveDailyReportSchema = z
     staffPerformanceNote: z.string().trim().max(2000).optional().nullable(),
     closingFacilityStatus: z.string().trim().max(2000).optional().nullable(),
     lockVersion: z.number().int().positive().optional(),
-    sales: z.array(dailySalesLineSchema).min(1).max(200),
+    // The store opened and sold nothing. Declared rather than implied so a day
+    // with no sales can be filed without inventing a zero category line.
+    noSales: z.boolean().default(false),
+    sales: z.array(dailySalesLineSchema).max(200),
     payments: z.array(dailyPaymentLineSchema).max(30).default([]),
   })
   .superRefine((report, ctx) => {
+    // Sales lines are still required on an ordinary day: an empty list is almost
+    // always an unfinished report, and silently accepting it would lose a day's
+    // trading. Saying "no sales" is the deliberate way through.
+    if (!report.noSales && !report.sales.length) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['sales'],
+        message: 'Add what sold, or mark the day as having no sales',
+      });
+    }
+    if (report.noSales && report.sales.some((line) => line.unitsSold > 0 || moneyToCents(line.grossRevenue) > BigInt(0))) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['noSales'],
+        message: 'This day is marked as no sales but has sales recorded',
+      });
+    }
     if (report.newCustomers + report.returningCustomers > report.totalCustomers) {
       ctx.addIssue({
         code: 'custom',
@@ -147,6 +193,9 @@ export interface DailyReportProductRecord {
   productName: string;
   sku: string | null;
   brandName: string | null;
+  unitsSold: number;
+  lineValue: string;
+  valueOverridden: boolean;
 }
 
 export interface DailyReportSalesRecord {
@@ -190,6 +239,7 @@ export interface DailyReportRecord {
   notes: string | null;
   staffPerformanceNote: string | null;
   closingFacilityStatus: string | null;
+  noSales: boolean;
   lockVersion: number;
   submittedAt: string | null;
   approvedAt: string | null;

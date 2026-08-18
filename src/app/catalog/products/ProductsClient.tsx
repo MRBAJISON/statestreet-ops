@@ -43,6 +43,8 @@ interface ProductRow {
   color: string | null;
   unitCost?: string | number | null;
   sellingPrice: string | number | null;
+  // Total held across every store; the form sets it for one store at a time.
+  quantity?: number | null;
   active: boolean;
   updatedAt: string;
 }
@@ -58,6 +60,8 @@ interface ProductDraft {
   color: string;
   unitCost: string;
   sellingPrice: string;
+  storeId: string;
+  quantity: string;
   active: boolean;
 }
 
@@ -77,6 +81,8 @@ const EMPTY_DRAFT: ProductDraft = {
   color: '',
   unitCost: '',
   sellingPrice: '',
+  storeId: '',
+  quantity: '',
   active: true,
 };
 
@@ -160,6 +166,10 @@ export default function ProductsClient({ currency, canReadCost }: { currency: st
     () => reference?.subcategories.filter((item) => item.categoryId === Number(draft.categoryId)) ?? [],
     [draft.categoryId, reference]
   );
+  const availableStores = useMemo(
+    () => reference?.stores.filter((store) => store.type === 'store') ?? [],
+    [reference]
+  );
 
   function openNew() {
     if (!reference) return;
@@ -188,6 +198,10 @@ export default function ProductsClient({ currency, canReadCost }: { currency: st
       color: product.color ?? '',
       unitCost: product.unitCost == null ? '' : String(product.unitCost),
       sellingPrice: product.sellingPrice == null ? '' : String(product.sellingPrice),
+      // Quantity is per store, so editing an existing product starts blank rather
+      // than showing a group total someone might overwrite one store with.
+      storeId: '',
+      quantity: '',
       active: product.active,
     });
     setSaveError('');
@@ -219,6 +233,9 @@ export default function ProductsClient({ currency, canReadCost }: { currency: st
       color: draft.color.trim() || null,
       ...(canReadCost ? { unitCost: moneyValue(draft.unitCost) } : {}),
       sellingPrice: moneyValue(draft.sellingPrice),
+      ...(draft.storeId && draft.quantity.trim() !== ''
+        ? { storeId: Number(draft.storeId), quantity: Number(draft.quantity) }
+        : {}),
     };
     try {
       const response = await fetch(editing ? `/api/products/${editing.id}` : '/api/products', {
@@ -293,6 +310,7 @@ export default function ProductsClient({ currency, canReadCost }: { currency: st
                   <TableHead className="hidden lg:table-cell">Category</TableHead>
                   <TableHead className="hidden text-right sm:table-cell">Retail price</TableHead>
                   {canReadCost ? <TableHead className="hidden text-right xl:table-cell">Unit cost</TableHead> : null}
+                  <TableHead className="hidden text-right xl:table-cell">Quantity</TableHead>
                   <TableHead className="hidden sm:table-cell">Status</TableHead>
                   <TableHead className="w-12"><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
@@ -312,6 +330,7 @@ export default function ProductsClient({ currency, canReadCost }: { currency: st
                     <TableCell className="hidden lg:table-cell"><span className="block">{product.categoryName}</span>{product.subcategoryName ? <span className="block text-xs text-muted-foreground">{product.subcategoryName}</span> : null}</TableCell>
                     <TableCell className="hidden text-right tabular-nums sm:table-cell">{formatMoney(product.sellingPrice)}</TableCell>
                     {canReadCost ? <TableCell className="hidden text-right tabular-nums text-muted-foreground xl:table-cell">{formatMoney(product.unitCost)}</TableCell> : null}
+                    <TableCell className="hidden text-right tabular-nums text-muted-foreground xl:table-cell">{product.quantity ?? 0}</TableCell>
                     <TableCell className="hidden sm:table-cell"><Badge variant={product.active ? 'secondary' : 'outline'} className={product.active ? 'bg-primary/10 text-primary' : ''}>{product.active ? 'Active' : 'Inactive'}</Badge></TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon-sm" onClick={() => openEdit(product)} aria-label={`Edit ${product.name}`}><Pencil /></Button>
@@ -411,6 +430,23 @@ export default function ProductsClient({ currency, canReadCost }: { currency: st
                     <Input id="selling-price" type="number" min="0" step="0.01" value={draft.sellingPrice} onChange={(event) => setDraft((current) => ({ ...current, sellingPrice: event.target.value }))} className="h-10" />
                   </Field>
                 </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field>
+                    <FieldLabel>Store</FieldLabel>
+                    <Select value={draft.storeId || 'none'} onValueChange={(value) => setDraft((current) => ({ ...current, storeId: value === 'none' ? '' : value }))}>
+                      <SelectTrigger className="h-10 w-full"><SelectValue placeholder="Select store" /></SelectTrigger>
+                      <SelectContent><SelectGroup><SelectItem value="none">None</SelectItem>{availableStores.map((store) => <SelectItem key={store.id} value={String(store.id)}>{store.name}</SelectItem>)}</SelectGroup></SelectContent>
+                    </Select>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="product-quantity">Quantity</FieldLabel>
+                    <Input id="product-quantity" type="number" min="0" step="1" value={draft.quantity} disabled={!draft.storeId} onChange={(event) => setDraft((current) => ({ ...current, quantity: event.target.value }))} className="h-10" />
+                  </Field>
+                </div>
+                <p className="-mt-2 text-xs text-muted-foreground">
+                  Stock is held per store, so choose the store this quantity sits in. Leave both blank to change only
+                  the product details.
+                </p>
                 {editing ? (
                   <Field orientation="horizontal" className="rounded-md border bg-muted/35 px-3 py-3">
                     <div className="flex-1">
