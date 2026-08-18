@@ -11,10 +11,9 @@ import {
   categories,
   products,
   storeStockLevels,
-  subcategories,
+  stores,
 } from '@/lib/db/foundation-schema';
 import { databaseErrorCode, sessionUserId } from '@/lib/server-errors';
-import { canReadUnitCost } from '@/lib/access';
 
 const PRODUCT_EDITORS = new Set(['owner', 'commercial', 'operations', 'inventory']);
 
@@ -95,32 +94,31 @@ export async function GET(req: NextRequest) {
         brandName: brands.name,
         categoryId: products.categoryId,
         categoryName: categories.name,
-        subcategoryId: products.subcategoryId,
-        subcategoryName: subcategories.name,
-        size: products.size,
-        color: products.color,
         barcode: products.barcode,
-        unitCost: products.unitCost,
         sellingPrice: products.sellingPrice,
         active: products.active,
         updatedAt: products.updatedAt,
+        // Stock held across every store, so the catalogue list shows what exists
+        // without needing a second request per row.
+        quantity: sql<number>`(
+          select coalesce(sum(level.quantity), 0)::integer
+          from ${storeStockLevels} level
+          where level.product_id = ${products.id}
+        )`,
       })
       .from(products)
       .innerJoin(brands, eq(products.brandId, brands.id))
       .innerJoin(categories, eq(products.categoryId, categories.id))
-      .leftJoin(subcategories, eq(products.subcategoryId, subcategories.id))
       .where(where)
       .orderBy(storeRank, matchRank, desc(products.updatedAt), products.sku)
       .limit(pageSize)
       .offset((page - 1) * pageSize),
     db.select({ value: sql<number>`count(*)::integer` }).from(products).where(where),
   ]);
-  const mayReadCost = canReadUnitCost(session.user.role);
   return NextResponse.json({
-    products: rows.map((product) => {
-      if (mayReadCost) return product;
-      return Object.fromEntries(Object.entries(product).filter(([key]) => key !== 'unitCost'));
-    }),
+    // Unit cost is no longer part of the catalogue, so there is nothing left here
+    // to redact by role.
+    products: rows,
     pagination: {
       page,
       pageSize,
@@ -143,18 +141,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: formatContractError(parsed.error) }, { status: 400 });
     }
     const input = parsed.data;
-    const [brandRows, categoryRows, subcategoryRows, brandCategoryRows] = await Promise.all([
+    const [brandRows, categoryRows, storeRows, brandCategoryRows] = await Promise.all([
       db.select({ id: brands.id }).from(brands).where(and(eq(brands.id, input.brandId), eq(brands.active, true))).limit(1),
       db
         .select({ id: categories.id })
         .from(categories)
         .where(and(eq(categories.id, input.categoryId), eq(categories.active, true)))
         .limit(1),
-      input.subcategoryId
+      input.storeId
         ? db
-            .select({ id: subcategories.id, categoryId: subcategories.categoryId })
-            .from(subcategories)
-            .where(and(eq(subcategories.id, input.subcategoryId), eq(subcategories.active, true)))
+            .select({ id: stores.id })
+            .from(stores)
+            .where(and(eq(stores.id, input.storeId), eq(stores.active, true), eq(stores.type, 'store')))
             .limit(1)
         : Promise.resolve([]),
       db
@@ -167,21 +165,32 @@ export async function POST(req: NextRequest) {
     if (brandCategoryRows.length && !brandCategoryRows.some((row) => row.categoryId === input.categoryId)) {
       return NextResponse.json({ error: 'Category is not configured for the selected brand' }, { status: 400 });
     }
-    if (input.subcategoryId && subcategoryRows[0]?.categoryId !== input.categoryId) {
-      return NextResponse.json({ error: 'Subcategory does not belong to the selected category' }, { status: 400 });
+    if (input.storeId && !storeRows.length) {
+      return NextResponse.json({ error: 'Store was not found or is inactive' }, { status: 400 });
+    }
+    if (input.quantity != null && !input.storeId) {
+      return NextResponse.json({ error: 'Choose the store this quantity is held in' }, { status: 400 });
     }
     const userId = sessionUserId(session.user.id);
+    const stocked = input.storeId != null && input.quantity != null;
     const result = await db.execute(sql`
       with new_product as (
         insert into products (
-          sku, name, description, brand_id, category_id, subcategory_id, size, color,
-          unit_cost, selling_price, created_by_user_id, updated_by_user_id
+          sku, barcode, name, description, brand_id, category_id, selling_price,
+          created_by_user_id, updated_by_user_id
         ) values (
-          ${input.sku}, ${input.name}, ${input.description ?? null}, ${input.brandId}, ${input.categoryId},
-          ${input.subcategoryId ?? null}, ${input.size ?? null}, ${input.color ?? null}, ${input.unitCost ?? null},
-          ${input.sellingPrice ?? null}, ${userId}, ${userId}
+          ${input.sku}, ${input.sku}, ${input.name}, ${input.description ?? null}, ${input.brandId},
+          ${input.categoryId}, ${input.sellingPrice ?? null}, ${userId}, ${userId}
         )
         returning *
+      ), new_stock as (
+        insert into store_stock_levels (store_id, product_id, quantity, as_of_date)
+        select ${input.storeId ?? null}, product.id, ${input.quantity ?? 0}, current_date
+        from new_product product
+        where ${stocked}
+        on conflict (store_id, product_id) do update set
+          quantity = excluded.quantity, as_of_date = excluded.as_of_date, updated_at = now()
+        returning id
       ), new_audit as (
         insert into ${auditEvents} (entity_type, entity_id, action, actor_user_id, after)
         select 'product', product.id, 'create', ${userId}, to_jsonb(product)

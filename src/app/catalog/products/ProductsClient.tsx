@@ -37,12 +37,9 @@ interface ProductRow {
   brandName: string;
   categoryId: number;
   categoryName: string;
-  subcategoryId: number | null;
-  subcategoryName: string | null;
-  size: string | null;
-  color: string | null;
-  unitCost?: string | number | null;
   sellingPrice: string | number | null;
+  // Total held across every store; the form sets it for one store at a time.
+  quantity?: number | null;
   active: boolean;
   updatedAt: string;
 }
@@ -53,11 +50,9 @@ interface ProductDraft {
   description: string;
   brandId: string;
   categoryId: string;
-  subcategoryId: string;
-  size: string;
-  color: string;
-  unitCost: string;
   sellingPrice: string;
+  storeId: string;
+  quantity: string;
   active: boolean;
 }
 
@@ -72,11 +67,9 @@ const EMPTY_DRAFT: ProductDraft = {
   description: '',
   brandId: '',
   categoryId: '',
-  subcategoryId: '',
-  size: '',
-  color: '',
-  unitCost: '',
   sellingPrice: '',
+  storeId: '',
+  quantity: '',
   active: true,
 };
 
@@ -156,9 +149,9 @@ export default function ProductsClient({ currency, canReadCost }: { currency: st
     () => categoriesForBrand(reference, Number(draft.brandId)),
     [draft.brandId, reference]
   );
-  const availableSubcategories = useMemo(
-    () => reference?.subcategories.filter((item) => item.categoryId === Number(draft.categoryId)) ?? [],
-    [draft.categoryId, reference]
+  const availableStores = useMemo(
+    () => reference?.stores.filter((store) => store.type === 'store') ?? [],
+    [reference]
   );
 
   function openNew() {
@@ -183,11 +176,11 @@ export default function ProductsClient({ currency, canReadCost }: { currency: st
       description: product.description ?? '',
       brandId: String(product.brandId),
       categoryId: String(product.categoryId),
-      subcategoryId: product.subcategoryId ? String(product.subcategoryId) : '',
-      size: product.size ?? '',
-      color: product.color ?? '',
-      unitCost: product.unitCost == null ? '' : String(product.unitCost),
       sellingPrice: product.sellingPrice == null ? '' : String(product.sellingPrice),
+      // Quantity is per store, so editing an existing product starts blank rather
+      // than showing a group total someone might overwrite one store with.
+      storeId: '',
+      quantity: '',
       active: product.active,
     });
     setSaveError('');
@@ -200,7 +193,6 @@ export default function ProductsClient({ currency, canReadCost }: { currency: st
       ...current,
       brandId: value,
       categoryId: categories[0] ? String(categories[0].id) : '',
-      subcategoryId: '',
     }));
   }
 
@@ -214,11 +206,10 @@ export default function ProductsClient({ currency, canReadCost }: { currency: st
       description: draft.description.trim() || null,
       brandId: Number(draft.brandId),
       categoryId: Number(draft.categoryId),
-      subcategoryId: draft.subcategoryId ? Number(draft.subcategoryId) : null,
-      size: draft.size.trim() || null,
-      color: draft.color.trim() || null,
-      ...(canReadCost ? { unitCost: moneyValue(draft.unitCost) } : {}),
       sellingPrice: moneyValue(draft.sellingPrice),
+      ...(draft.storeId && draft.quantity.trim() !== ''
+        ? { storeId: Number(draft.storeId), quantity: Number(draft.quantity) }
+        : {}),
     };
     try {
       const response = await fetch(editing ? `/api/products/${editing.id}` : '/api/products', {
@@ -292,7 +283,7 @@ export default function ProductsClient({ currency, canReadCost }: { currency: st
                   <TableHead className="hidden md:table-cell">Brand</TableHead>
                   <TableHead className="hidden lg:table-cell">Category</TableHead>
                   <TableHead className="hidden text-right sm:table-cell">Retail price</TableHead>
-                  {canReadCost ? <TableHead className="hidden text-right xl:table-cell">Unit cost</TableHead> : null}
+                  <TableHead className="hidden text-right xl:table-cell">Quantity</TableHead>
                   <TableHead className="hidden sm:table-cell">Status</TableHead>
                   <TableHead className="w-12"><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
@@ -303,15 +294,15 @@ export default function ProductsClient({ currency, canReadCost }: { currency: st
                     <TableCell className="max-w-[320px] pl-4">
                       <button type="button" className="block max-w-full text-left" onClick={() => openEdit(product)}>
                         <span className="block truncate font-medium">{product.name}</span>
-                        <span className="block truncate text-xs text-muted-foreground">{product.sku}{product.size ? ` · ${product.size}` : ''}{product.color ? ` · ${product.color}` : ''}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{product.sku}</span>
                         <span className="mt-1 block truncate text-xs text-muted-foreground sm:hidden">{product.brandName} · {product.categoryName}</span>
                         <span className="mt-1 block text-xs font-medium sm:hidden">{formatMoney(product.sellingPrice)} · {product.active ? 'Active' : 'Inactive'}</span>
                       </button>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{product.brandName}</TableCell>
-                    <TableCell className="hidden lg:table-cell"><span className="block">{product.categoryName}</span>{product.subcategoryName ? <span className="block text-xs text-muted-foreground">{product.subcategoryName}</span> : null}</TableCell>
+                    <TableCell className="hidden lg:table-cell">{product.categoryName}</TableCell>
                     <TableCell className="hidden text-right tabular-nums sm:table-cell">{formatMoney(product.sellingPrice)}</TableCell>
-                    {canReadCost ? <TableCell className="hidden text-right tabular-nums text-muted-foreground xl:table-cell">{formatMoney(product.unitCost)}</TableCell> : null}
+                    <TableCell className="hidden text-right tabular-nums text-muted-foreground xl:table-cell">{product.quantity ?? 0}</TableCell>
                     <TableCell className="hidden sm:table-cell"><Badge variant={product.active ? 'secondary' : 'outline'} className={product.active ? 'bg-primary/10 text-primary' : ''}>{product.active ? 'Active' : 'Inactive'}</Badge></TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon-sm" onClick={() => openEdit(product)} aria-label={`Edit ${product.name}`}><Pencil /></Button>
@@ -374,43 +365,33 @@ export default function ProductsClient({ currency, canReadCost }: { currency: st
                   </Field>
                   <Field>
                     <FieldLabel>Category</FieldLabel>
-                    <Select value={draft.categoryId} onValueChange={(value) => setDraft((current) => ({ ...current, categoryId: value, subcategoryId: '' }))} required>
+                    <Select value={draft.categoryId} onValueChange={(value) => setDraft((current) => ({ ...current, categoryId: value }))} required>
                       <SelectTrigger className="h-10 w-full"><SelectValue placeholder="Select category" /></SelectTrigger>
                       <SelectContent><SelectGroup>{availableCategories.map((category: ReferenceOption) => <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>)}</SelectGroup></SelectContent>
                     </Select>
                   </Field>
                 </div>
-                {availableSubcategories.length ? (
-                  <Field>
-                    <FieldLabel>Subcategory</FieldLabel>
-                    <Select value={draft.subcategoryId || 'none'} onValueChange={(value) => setDraft((current) => ({ ...current, subcategoryId: value === 'none' ? '' : value }))}>
-                      <SelectTrigger className="h-10 w-full"><SelectValue /></SelectTrigger>
-                      <SelectContent><SelectGroup><SelectItem value="none">None</SelectItem>{availableSubcategories.map((subcategory) => <SelectItem key={subcategory.id} value={String(subcategory.id)}>{subcategory.name}</SelectItem>)}</SelectGroup></SelectContent>
-                    </Select>
-                  </Field>
-                ) : null}
+                <Field>
+                  <FieldLabel htmlFor="selling-price">Selling price ({currency})</FieldLabel>
+                  <Input id="selling-price" type="number" min="0" step="0.01" value={draft.sellingPrice} onChange={(event) => setDraft((current) => ({ ...current, sellingPrice: event.target.value }))} className="h-10" />
+                </Field>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field>
-                    <FieldLabel htmlFor="product-size">Size</FieldLabel>
-                    <Input id="product-size" value={draft.size} onChange={(event) => setDraft((current) => ({ ...current, size: event.target.value }))} className="h-10" />
+                    <FieldLabel>Store</FieldLabel>
+                    <Select value={draft.storeId || 'none'} onValueChange={(value) => setDraft((current) => ({ ...current, storeId: value === 'none' ? '' : value }))}>
+                      <SelectTrigger className="h-10 w-full"><SelectValue placeholder="Select store" /></SelectTrigger>
+                      <SelectContent><SelectGroup><SelectItem value="none">None</SelectItem>{availableStores.map((store) => <SelectItem key={store.id} value={String(store.id)}>{store.name}</SelectItem>)}</SelectGroup></SelectContent>
+                    </Select>
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="product-color">Color</FieldLabel>
-                    <Input id="product-color" value={draft.color} onChange={(event) => setDraft((current) => ({ ...current, color: event.target.value }))} className="h-10" />
+                    <FieldLabel htmlFor="product-quantity">Quantity</FieldLabel>
+                    <Input id="product-quantity" type="number" min="0" step="1" value={draft.quantity} disabled={!draft.storeId} onChange={(event) => setDraft((current) => ({ ...current, quantity: event.target.value }))} className="h-10" />
                   </Field>
                 </div>
-                <div className={canReadCost ? 'grid gap-4 sm:grid-cols-2' : ''}>
-                  {canReadCost ? (
-                    <Field>
-                      <FieldLabel htmlFor="unit-cost">Unit cost ({currency})</FieldLabel>
-                      <Input id="unit-cost" type="number" min="0" step="0.01" value={draft.unitCost} onChange={(event) => setDraft((current) => ({ ...current, unitCost: event.target.value }))} className="h-10" />
-                    </Field>
-                  ) : null}
-                  <Field>
-                    <FieldLabel htmlFor="selling-price">Selling price ({currency})</FieldLabel>
-                    <Input id="selling-price" type="number" min="0" step="0.01" value={draft.sellingPrice} onChange={(event) => setDraft((current) => ({ ...current, sellingPrice: event.target.value }))} className="h-10" />
-                  </Field>
-                </div>
+                <p className="-mt-2 text-xs text-muted-foreground">
+                  Stock is held per store, so choose the store this quantity sits in. Leave both blank to change only
+                  the product details.
+                </p>
                 {editing ? (
                   <Field orientation="horizontal" className="rounded-md border bg-muted/35 px-3 py-3">
                     <div className="flex-1">

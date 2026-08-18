@@ -13,14 +13,14 @@ interface SearchResult {
   sku: string;
   name: string;
   barcode: string | null;
-  size: string | null;
-  color: string | null;
   sellingPrice: string | null;
   brandName: string;
+  quantity?: number | null;
 }
 
 function describe(product: SearchResult) {
-  return [product.sku, product.size, product.color].filter(Boolean).join(' · ');
+  const stock = product.quantity == null ? null : `${product.quantity} in stock`;
+  return [product.sku, product.brandName, stock].filter(Boolean).join(' · ');
 }
 
 /**

@@ -18,7 +18,6 @@ export interface CatalogReference {
 export interface CatalogImportReferences {
   brands: CatalogReference[];
   categories: CatalogReference[];
-  subcategories: Array<CatalogReference & { categoryId: number }>;
   stores: CatalogReference[];
 }
 
@@ -36,15 +35,11 @@ export interface CatalogRowError {
 }
 
 export interface ParsedCatalogProduct {
+  // One number: the SKU is also the barcode.
   sku: string;
   name: string;
-  barcode: string | null;
   brandId: number;
   categoryId: number;
-  subcategoryId: number | null;
-  size: string | null;
-  color: string | null;
-  unitCost: string | null;
   sellingPrice: string | null;
 }
 
@@ -65,8 +60,8 @@ const MAX_ROWS = 20_000;
 
 export async function loadCatalogImportReferences(): Promise<CatalogImportReferences> {
   const [{ db }, schema] = await Promise.all([import('./db'), import('./db/foundation-schema')]);
-  const { asc, eq } = await import('drizzle-orm');
-  const [brandRows, categoryRows, subcategoryRows, storeRows] = await Promise.all([
+  const { and, asc, eq } = await import('drizzle-orm');
+  const [brandRows, categoryRows, storeRows] = await Promise.all([
     db
       .select({ id: schema.brands.id, code: schema.brands.code, name: schema.brands.name })
       .from(schema.brands)
@@ -78,22 +73,12 @@ export async function loadCatalogImportReferences(): Promise<CatalogImportRefere
       .where(eq(schema.categories.active, true))
       .orderBy(asc(schema.categories.name)),
     db
-      .select({
-        id: schema.subcategories.id,
-        code: schema.subcategories.code,
-        name: schema.subcategories.name,
-        categoryId: schema.subcategories.categoryId,
-      })
-      .from(schema.subcategories)
-      .where(eq(schema.subcategories.active, true))
-      .orderBy(asc(schema.subcategories.name)),
-    db
       .select({ id: schema.stores.id, code: schema.stores.code, name: schema.stores.name })
       .from(schema.stores)
-      .where(eq(schema.stores.active, true))
+      .where(and(eq(schema.stores.active, true), eq(schema.stores.type, 'store')))
       .orderBy(asc(schema.stores.name)),
   ]);
-  return { brands: brandRows, categories: categoryRows, subcategories: subcategoryRows, stores: storeRows };
+  return { brands: brandRows, categories: categoryRows, stores: storeRows };
 }
 
 function cellStr(value: unknown): string {
@@ -165,41 +150,19 @@ export async function parseCatalogFile(
     if (!name) rowErrors.push('Product name is required');
     if (sku && seenSkus.has(sku.toLowerCase())) rowErrors.push(`SKU ${sku} appears more than once in the file`);
 
-    const brand = matchReference(references.brands, cellStr(row.getCell(4).value));
+    const brand = matchReference(references.brands, cellStr(row.getCell(3).value));
     if (!brand) rowErrors.push('Brand was not recognised');
-    const category = matchReference(references.categories, cellStr(row.getCell(5).value));
+    const category = matchReference(references.categories, cellStr(row.getCell(4).value));
     if (!category) rowErrors.push('Category was not recognised');
 
-    const subcategoryValue = cellStr(row.getCell(6).value);
-    let subcategoryId: number | null = null;
-    if (subcategoryValue) {
-      const subcategory = matchReference(references.subcategories, subcategoryValue);
-      if (!subcategory) rowErrors.push('Subcategory was not recognised');
-      else if (category && subcategory.categoryId !== category.id) {
-        rowErrors.push('Subcategory does not belong to that category');
-      } else subcategoryId = subcategory.id;
-    }
-
-    const unitCost = money(cellStr(row.getCell(9).value), 'Unit cost', rowErrors);
-    const sellingPrice = money(cellStr(row.getCell(10).value), 'Selling price', rowErrors);
+    const sellingPrice = money(cellStr(row.getCell(5).value), 'Selling price', rowErrors);
 
     if (rowErrors.length) {
       errors.push({ sheet: 'Products', row: rowNumber, message: rowErrors.join('; ') });
       return;
     }
     seenSkus.add(sku.toLowerCase());
-    products.push({
-      sku,
-      name,
-      barcode: cellStr(row.getCell(3).value) || null,
-      brandId: brand!.id,
-      categoryId: category!.id,
-      subcategoryId,
-      size: cellStr(row.getCell(7).value) || null,
-      color: cellStr(row.getCell(8).value) || null,
-      unitCost,
-      sellingPrice,
-    });
+    products.push({ sku, name, brandId: brand!.id, categoryId: category!.id, sellingPrice });
   });
 
   if (stockSheet) {
@@ -266,27 +229,21 @@ export function buildCommitCatalogImportQuery(input: CatalogCommitInput): SQL {
       returning id
     ), upserted_products as (
       insert into products (
-        sku, name, barcode, brand_id, category_id, subcategory_id, size, color,
-        unit_cost, selling_price, active, created_by_user_id, updated_by_user_id
+        sku, barcode, name, brand_id, category_id, selling_price, active,
+        created_by_user_id, updated_by_user_id
       )
       select
-        row."sku", row."name", nullif(row."barcode", ''), row."brandId", row."categoryId",
-        row."subcategoryId", nullif(row."size", ''), nullif(row."color", ''),
-        row."unitCost", row."sellingPrice", true, ${input.actorUserId}, ${input.actorUserId}
+        row."sku", row."sku", row."name", row."brandId", row."categoryId",
+        row."sellingPrice", true, ${input.actorUserId}, ${input.actorUserId}
       from jsonb_to_recordset(${products}::jsonb) as row(
-        "sku" text, "name" text, "barcode" text, "brandId" bigint, "categoryId" bigint,
-        "subcategoryId" bigint, "size" text, "color" text, "unitCost" numeric(14, 2),
+        "sku" text, "name" text, "brandId" bigint, "categoryId" bigint,
         "sellingPrice" numeric(14, 2)
       )
       on conflict (lower(sku)) do update set
-        name = excluded.name,
         barcode = excluded.barcode,
+        name = excluded.name,
         brand_id = excluded.brand_id,
         category_id = excluded.category_id,
-        subcategory_id = excluded.subcategory_id,
-        size = excluded.size,
-        color = excluded.color,
-        unit_cost = excluded.unit_cost,
         selling_price = excluded.selling_price,
         active = true,
         updated_by_user_id = ${input.actorUserId},
@@ -322,22 +279,17 @@ export function buildCommitCatalogImportQuery(input: CatalogCommitInput): SQL {
 }
 
 const PRODUCT_COLUMNS = [
-  { header: 'SKU', width: 18 },
+  { header: 'SKU / Barcode', width: 20 },
   { header: 'Product Name', width: 32 },
-  { header: 'Barcode', width: 18 },
   { header: 'Brand', width: 20 },
   { header: 'Category', width: 22 },
-  { header: 'Subcategory', width: 22 },
-  { header: 'Size', width: 10 },
-  { header: 'Colour', width: 14 },
-  { header: 'Unit Cost', width: 14 },
   { header: 'Selling Price', width: 14 },
 ];
 
 const STOCK_COLUMNS = [
   { header: 'Store', width: 24 },
-  { header: 'SKU', width: 18 },
-  { header: 'Opening Quantity', width: 18 },
+  { header: 'SKU / Barcode', width: 20 },
+  { header: 'Quantity', width: 14 },
 ];
 
 export async function buildCatalogTemplate(references: CatalogImportReferences): Promise<Buffer> {
@@ -362,9 +314,6 @@ export async function buildCatalogTemplate(references: CatalogImportReferences):
   reference.getRow(1).font = { bold: true };
   for (const brand of references.brands) reference.addRow(['Brand', brand.code, brand.name]);
   for (const category of references.categories) reference.addRow(['Category', category.code, category.name]);
-  for (const subcategory of references.subcategories) {
-    reference.addRow(['Subcategory', subcategory.code, subcategory.name]);
-  }
   for (const store of references.stores) reference.addRow(['Store', store.code, store.name]);
 
   const output = await workbook.xlsx.writeBuffer();
