@@ -81,6 +81,11 @@ did not happen. It stays worth building whatever else changes.
 
 ## 2. Sales are tracked by category, not by product
 
+> **Superseded 18 August 2026.** Store managers confirmed they will enter units
+> per product, and category totals are to sum from the product lines. That makes
+> this the full product-level model rather than the lighter one described below.
+> See [next-phase-plan.md](next-phase-plan.md) for what is actually being built.
+
 **Today.** `daily_sales_lines` records units and revenue per **category**, one
 row per report per category. `daily_report_products` holds the product names
 typed under each category but carries no quantity and no value.
