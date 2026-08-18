@@ -258,9 +258,14 @@ monthly combined reports have no stable subject.
   table, so a manager can hold one store, several, or a group. This migration is
   the bulk of the work — those eight comparison sites, the user admin UI, export
   and metrics scoping all move from "equals one code" to "is in this set".
-- **Sales are still filed per store.** One form, two tabs — or a store selector
-  on each line. This matters: if the two are entered as a single blended figure,
-  per-store revenue is gone forever and per-store targets stop meaning anything.
+- **Sales are filed per store, via a store selector (decided).** The manager
+  picks which shop, then records that shop's sales — the same daily report form
+  as everyone else, with the store chosen instead of fixed. Two reports get
+  filed on a trading day, one per shop.
+
+  This keeps `daily_reports` exactly as it is, still unique on store and date,
+  so **no change to how a day is stored** — the only change is that the manager
+  is allowed to pick between their two stores instead of being pinned to one.
 - **Reports are produced for the group.** See below.
 - The readiness rule carries over unchanged: a group weekly report unlocks when
   **every trading day of every member store** has been submitted.
@@ -292,11 +297,16 @@ Commercial still see the two stores separately everywhere else in the system.
 rather than being replaced, and `store-period-report.ts` gains a group-scoped
 query beside the store-scoped one.
 
-## Targets
+## Targets (decided)
 
-Targets are set per store today. A group target is the sum of its members, so no
-new target machinery is needed — but Commercial should be told that setting a
-group-level figure is not currently possible, only the sum of two store figures.
+**Each store keeps its own target.** The group figure on the cluster report is
+the sum of the two, and the achievement percentage is measured against that sum.
+No new target machinery is needed, and Commercial carries on setting targets
+exactly as it does today.
+
+The per-store split section of the cluster report shows each shop against its
+own target, which is what makes the combined achievement figure explicable
+rather than a black box.
 
 ---
 
@@ -326,33 +336,63 @@ likely maps to the same category row. Renaming it there may be perfectly fine,
 or may not be what Carbon wants to see on its own reports. That is a decision
 per category, not a blanket one, which is why the mapping report comes first.
 
-Two routes, chosen per category:
+## The rule (decided)
 
-- A category used **only by Woodpeckers** → rename in place. Ids are unchanged,
-  so all history follows the new name automatically. This is the good case.
-- A category **shared with another brand** → create a new category, map it to
-  Woodpeckers only, and leave the shared one alone. Existing Woodpeckers history
-  then needs remapping onto the new id, or it stays under the old label.
+**If the category already exists in the group, point Woodpeckers at it. If it
+does not, rename what Woodpeckers already has.**
 
-**Which case each of the eleven falls into cannot be determined from the code.**
-It depends on live data. So step one is a read-only mapping report: for each
-existing category, its current name, which brands map to it, and how many
-`daily_sales_lines` rows reference it. The rename plan gets written from that
-report, reviewed, then applied as a migration.
+This is better than renaming everything, because shared names converge on one
+category row for the whole group — footwear sold by Carbon and by Woodpeckers
+then rolls up into a single group figure instead of two rows that mean the same
+thing.
+
+Applied per category, that gives four cases:
+
+| Name exists in the group? | Woodpeckers has an equivalent? | Action |
+|---|---|---|
+| Yes | Yes | **Replace** — map Woodpeckers to the group category, move its history across, retire the old one |
+| Yes | No | **Map** — simply add the mapping, nothing else to do |
+| No | Yes | **Rename** — change the display name in place, history follows automatically |
+| No | No | **Create** — new category, mapped to Woodpeckers only |
+
+**Which of the eleven falls into which case cannot be determined from the code.**
+It depends on live data, so step one is a read-only mapping report: for each
+existing category, its name, which brands map to it, and how many
+`daily_sales_lines` rows reference it. The migration is written from that report,
+reviewed, then applied.
+
+## The replace case needs care
+
+Rename and map are trivial. **Replace moves history**, and there is one trap.
+
+Woodpeckers sales rows currently point at the old category id. They have to be
+repointed at the group category, or the change puts a permanent break in every
+Woodpeckers trend. But `daily_sales_lines` is unique on
+(daily_report_id, category_id) — so **if any single report already has a row
+under both the old and the new category, repointing collides** and the migration
+fails. Those pairs have to be merged: units, revenue, cost, discounts, returns
+and credit sales added together into one row.
+
+The mapping report must therefore also count how many reports hold both
+categories, so the merge is understood before anything is written.
+
+Retire the old category with `active = false` rather than deleting it —
+`categories` is referenced with `on delete restrict`, and keeping the row keeps
+the audit trail intact.
 
 **Rename `name`, keep `code`.** Codes appear in exports and the legacy entries
 payloads. Changing display names is safe; changing codes is a data migration
 with a much wider blast radius, and there is no reason to take it on.
 
-## Two things to confirm
+## Confirmed
 
-- **Jersey / Tops & Tees / Premium T-Shirts / Shirts** are four separate
-  categories with real overlap. Store staff will have to pick correctly every
-  time, and a wrong pick misfiles revenue. Worth confirming these are genuinely
-  distinct in how the business buys and reports.
-- Eleven categories on a daily form is a long list. The form only shows
-  categories a store actually sold that day, so this is manageable — but it is
-  worth checking Woodpeckers managers agree the list matches how they think.
+**Jersey, Tops & Tees, Premium T-Shirts and Shirts are genuinely distinct** and
+all four stay. Staff have to pick correctly every time, so the daily form should
+keep them in a stable order and never reorder them between days — a moving list
+is how the wrong one gets picked.
+
+Eleven categories is a long list, but the form only shows categories a store
+actually sold that day, so it stays manageable.
 
 ---
 
@@ -370,24 +410,39 @@ Categories go first because renaming is cheapest before the catalogue is loaded
 against them. Store groups are independent of the catalogue work and could run
 in parallel or first if the Carbon / D Angelo situation is urgent.
 
-# Open questions
+# Answered
 
-1. Is `selling_price` the shelf price including any tax, and is it the same in
-   every store?
-2. For Carbon and D Angelo — should the manager file **one form with two store
-   tabs**, or **two separate reports**? Recommendation is one form, two tabs,
-   with sales still stored per store either way.
-3. Should the group get its own revenue target, or remain the sum of the two
-   store targets?
-4. Confirm the eleven category names, casing, and that the overlapping apparel
-   ones (Jersey / Tops & Tees / Premium T-Shirts / Shirts) are genuinely
-   distinct.
-5. If Footwear turns out to be shared with Carbon Shoe Store, does Carbon mind
-   the shared name, or does Woodpeckers need its own separate category?
+- Barcodes are searched by **partial digits with live suggestions**, always
+  presenting a list rather than auto-selecting.
+- Woodpeckers carries **its own category set**; where a name already exists in
+  the group, Woodpeckers is pointed at the existing category rather than a
+  duplicate being made.
+- Cluster reports are **one combined PDF per group**, with a per-store split.
+- `selling_price` is the **shelf price including tax, identical in every store**.
+  So one price column on the product is correct — no per-store pricing table,
+  and the line value on a sale needs no tax calculation.
+- The cluster manager **selects the store, then records that store's sales**.
+- **Each store keeps its own target**; the group figure is their sum.
 
-Answered: barcodes are searched by partial digits with live suggestions;
-Woodpeckers carries its own category set; cluster reports are one combined PDF
-per group.
+# Still open
+
+None of these block starting. They are sequencing and operational questions
+rather than design ones.
+
+1. **Cutover.** When does product-level entry begin, and does one store pilot it
+   first or does everyone switch on the same day? This date is the seam in the
+   history, so it wants deciding deliberately rather than by accident.
+2. **Day-to-day catalogue ownership.** Inventory does the bulk upload, but who
+   adds a new arrival mid-week before the next upload? Without an answer,
+   everything new lands in the "Other" line and the catalogue quietly decays.
+3. **Stock reseeding and the first count.** How often the opening balances are
+   reloaded, and how soon after go-live a physical count happens. Sell-through
+   cannot be switched on until that count exists.
+4. **Training.** The daily form changes shape for every store manager, not only
+   the two in the cluster.
+5. **Priority.** The order below is a recommendation, not a decision. Workstream
+   5 is independent and can go first if the Carbon / D Angelo situation is
+   urgent.
 
 # Risks
 
