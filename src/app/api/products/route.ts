@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
         select 1 from ${storeStockLevels} level
         where level.product_id = ${products.id} and level.store_id = ${storeId}
       ) then 0 else 1 end`
-    : sql<number>`0`;
+    : null;
   // Exact barcode beats a partial one, and any barcode hit beats a name hit.
   const matchRank = q
     ? sql<number>`case
@@ -82,7 +82,12 @@ export async function GET(req: NextRequest) {
         when lower(${products.sku}) like lower(${`%${q}%`}) then 3
         else 4
       end`
-    : sql<number>`0`;
+    : null;
+  // Left out entirely rather than ordered by a constant: Postgres reads a bare
+  // integer in ORDER BY as a column position, and there is no position zero.
+  const orderBy = [storeRank, matchRank, desc(products.updatedAt), products.sku].filter(
+    (term) => term !== null
+  );
   const [rows, totals] = await Promise.all([
     db
       .select({
@@ -110,7 +115,7 @@ export async function GET(req: NextRequest) {
       .innerJoin(brands, eq(products.brandId, brands.id))
       .innerJoin(categories, eq(products.categoryId, categories.id))
       .where(where)
-      .orderBy(storeRank, matchRank, desc(products.updatedAt), products.sku)
+      .orderBy(...orderBy)
       .limit(pageSize)
       .offset((page - 1) * pageSize),
     db.select({ value: sql<number>`count(*)::integer` }).from(products).where(where),
