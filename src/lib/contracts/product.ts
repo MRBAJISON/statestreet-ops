@@ -16,6 +16,10 @@ export const createProductSchema = z.object({
   description: optionalText(2000),
   brandId: positiveIdSchema,
   categoryId: positiveIdSchema,
+  subcategoryId: positiveIdSchema.optional().nullable(),
+  size: optionalText(100),
+  color: optionalText(100),
+  unitCost: optionalProductMoney,
   sellingPrice: optionalProductMoney,
   // Opening quantity for one store. Products are stocked per store, so a quantity
   // is meaningless without saying which store holds it.

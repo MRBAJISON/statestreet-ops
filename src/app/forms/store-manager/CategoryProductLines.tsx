@@ -13,6 +13,8 @@ interface SearchResult {
   sku: string;
   name: string;
   barcode: string | null;
+  size: string | null;
+  color: string | null;
   sellingPrice: string | null;
   brandName: string;
   quantity?: number | null;
@@ -20,7 +22,7 @@ interface SearchResult {
 
 function describe(product: SearchResult) {
   const stock = product.quantity == null ? null : `${product.quantity} in stock`;
-  return [product.sku, product.brandName, stock].filter(Boolean).join(' · ');
+  return [product.sku, product.size, product.color, stock].filter(Boolean).join(' · ');
 }
 
 /**

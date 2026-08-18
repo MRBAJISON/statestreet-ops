@@ -49,18 +49,20 @@ describe('product contract', () => {
       name: 'Carbon sneaker',
       brandId: 1,
       categoryId: 2,
-      sellingPrice: '350',
+      unitCost: '350',
     });
     expect(product.sku).toBe('ARB-101-BLK-42');
-    expect(product.sellingPrice).toBe('350.00');
+    expect(product.unitCost).toBe('350.00');
   });
 
   it('keeps product money exact and supports explicitly clearing a price', () => {
     const update = updateProductSchema.parse({
       sellingPrice: null,
+      unitCost: '850',
       expectedUpdatedAt: '2026-07-11T17:00:00.123Z',
     });
     expect(update.sellingPrice).toBeNull();
+    expect(update.unitCost).toBe('850.00');
   });
 
   it('accepts a quantity held in a named store', () => {

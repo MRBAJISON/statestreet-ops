@@ -4,7 +4,7 @@ import { getSession } from '@/lib/auth';
 import { updateProductSchema } from '@/lib/contracts/product';
 import { formatContractError } from '@/lib/contracts/shared';
 import { db } from '@/lib/db';
-import { auditEvents, brandCategories, brands, categories, products } from '@/lib/db/foundation-schema';
+import { auditEvents, brandCategories, brands, categories, products, subcategories } from '@/lib/db/foundation-schema';
 import { databaseErrorCode, sessionUserId } from '@/lib/server-errors';
 
 const PRODUCT_EDITORS = new Set(['owner', 'commercial', 'operations', 'inventory']);
@@ -28,15 +28,23 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     const input = parsed.data;
     const brandId = input.brandId ?? existing.brandId;
     const categoryId = input.categoryId ?? existing.categoryId;
-    const [brandRows, categoryRows, brandCategoryRows] = await Promise.all([
+    const subcategoryId = input.subcategoryId === undefined ? existing.subcategoryId : input.subcategoryId;
+    const [brandRows, categoryRows, subcategoryRows, brandCategoryRows] = await Promise.all([
       db.select({ id: brands.id }).from(brands).where(and(eq(brands.id, brandId), eq(brands.active, true))).limit(1),
       db.select({ id: categories.id }).from(categories).where(and(eq(categories.id, categoryId), eq(categories.active, true))).limit(1),
+      subcategoryId
+        ? db.select({ id: subcategories.id, categoryId: subcategories.categoryId }).from(subcategories)
+            .where(and(eq(subcategories.id, subcategoryId), eq(subcategories.active, true))).limit(1)
+        : Promise.resolve([]),
       db.select({ categoryId: brandCategories.categoryId }).from(brandCategories).where(eq(brandCategories.brandId, brandId)),
     ]);
     if (!brandRows.length) return NextResponse.json({ error: 'Brand was not found or is inactive' }, { status: 400 });
     if (!categoryRows.length) return NextResponse.json({ error: 'Category was not found or is inactive' }, { status: 400 });
     if (brandCategoryRows.length && !brandCategoryRows.some((row) => row.categoryId === categoryId)) {
       return NextResponse.json({ error: 'Category is not configured for the selected brand' }, { status: 400 });
+    }
+    if (subcategoryId && subcategoryRows[0]?.categoryId !== categoryId) {
+      return NextResponse.json({ error: 'Subcategory does not belong to the selected category' }, { status: 400 });
     }
 
     const userId = sessionUserId(session.user.id);
@@ -52,6 +60,10 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
             description = case when ${input.description !== undefined} then ${input.description ?? null} else before.description end,
             brand_id = case when ${input.brandId !== undefined} then ${input.brandId ?? existing.brandId} else before.brand_id end,
             category_id = case when ${input.categoryId !== undefined} then ${input.categoryId ?? existing.categoryId} else before.category_id end,
+            subcategory_id = case when ${input.subcategoryId !== undefined} then ${input.subcategoryId ?? null} else before.subcategory_id end,
+            size = case when ${input.size !== undefined} then ${input.size ?? null} else before.size end,
+            color = case when ${input.color !== undefined} then ${input.color ?? null} else before.color end,
+            unit_cost = case when ${input.unitCost !== undefined} then ${input.unitCost ?? null} else before.unit_cost end,
             selling_price = case when ${input.sellingPrice !== undefined} then ${input.sellingPrice ?? null} else before.selling_price end,
             active = case when ${input.active !== undefined} then ${input.active ?? true} else before.active end,
             updated_by_user_id = ${userId},
