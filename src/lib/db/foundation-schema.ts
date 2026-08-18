@@ -178,6 +178,9 @@ export const products = pgTable(
     }),
     size: text('size'),
     color: text('color'),
+    // Scanned or typed at the till. Unique when present so a barcode identifies one
+    // product, but nullable because plenty of stock is not barcoded.
+    barcode: text('barcode'),
     unitCost: money('unit_cost'),
     sellingPrice: money('selling_price'),
     active: boolean('active').notNull().default(true),
@@ -187,6 +190,9 @@ export const products = pgTable(
   },
   (t) => [
     uniqueIndex('products_sku_lower_uidx').on(sql`lower(${t.sku})`),
+    uniqueIndex('products_barcode_lower_uidx')
+      .on(sql`lower(${t.barcode})`)
+      .where(sql`${t.barcode} is not null`),
     index('products_brand_idx').on(t.brandId),
     index('products_category_idx').on(t.categoryId),
     index('products_subcategory_idx').on(t.subcategoryId),
@@ -311,6 +317,11 @@ export const dailyReportProducts = pgTable(
       .references(() => categories.id, { onDelete: 'restrict' }),
     productId: bigint('product_id', { mode: 'number' }).references(() => products.id, { onDelete: 'set null' }),
     customName: text('custom_name'),
+    unitsSold: integer('units').notNull().default(0),
+    // Units x the catalogue selling price, unless the manager corrected it — in which
+    // case valueOverridden records that the figure is deliberate rather than derived.
+    lineValue: money('line_value').notNull().default('0'),
+    valueOverridden: boolean('value_overridden').notNull().default(false),
     ...timestamps(),
   },
   (t) => [
@@ -318,6 +329,81 @@ export const dailyReportProducts = pgTable(
     index('daily_report_products_category_idx').on(t.categoryId),
     index('daily_report_products_product_idx').on(t.productId),
     check('daily_report_products_name_check', sql`${t.productId} is not null or ${t.customName} is not null`),
+    check('daily_report_products_amounts_check', sql`${t.unitsSold} >= 0 and ${t.lineValue} >= 0`),
+  ]
+);
+
+// A store's running on-hand quantity per product. Seeded by the catalogue import,
+// then moved by sales, goods receipts, transfers and corrected by stock counts.
+// This is what makes opening stock — and therefore sell-through — a real figure
+// rather than a typed one.
+export const storeStockLevels = pgTable(
+  'store_stock_levels',
+  {
+    id: id(),
+    storeId: bigint('store_id', { mode: 'number' })
+      .notNull()
+      .references(() => stores.id, { onDelete: 'cascade' }),
+    productId: bigint('product_id', { mode: 'number' })
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    quantity: integer('quantity').notNull().default(0),
+    asOfDate: date('as_of_date').notNull(),
+    ...timestamps(),
+  },
+  (t) => [
+    uniqueIndex('store_stock_levels_store_product_uidx').on(t.storeId, t.productId),
+    index('store_stock_levels_product_idx').on(t.productId),
+    check('store_stock_levels_quantity_check', sql`${t.quantity} >= 0`),
+  ]
+);
+
+// Stores that trade as one reporting unit — Carbon and D Angelo share a building
+// and a manager. Members keep their own identity, history and targets; the group
+// only decides what a combined report is produced for.
+export const storeGroups = pgTable(
+  'store_groups',
+  {
+    id: id(),
+    code: text('code').notNull(),
+    name: text('name').notNull(),
+    active: boolean('active').notNull().default(true),
+    ...timestamps(),
+  },
+  (t) => [uniqueIndex('store_groups_code_lower_uidx').on(sql`lower(${t.code})`)]
+);
+
+export const storeGroupMembers = pgTable(
+  'store_group_members',
+  {
+    storeGroupId: bigint('store_group_id', { mode: 'number' })
+      .notNull()
+      .references(() => storeGroups.id, { onDelete: 'cascade' }),
+    storeId: bigint('store_id', { mode: 'number' })
+      .notNull()
+      .references(() => stores.id, { onDelete: 'cascade' }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.storeGroupId, t.storeId], name: 'store_group_members_pk' }),
+    index('store_group_members_store_idx').on(t.storeId),
+  ]
+);
+
+// Which stores a user may act on. Replaces the single users.store code so one
+// manager can cover more than one shop.
+export const userStores = pgTable(
+  'user_stores',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    storeId: bigint('store_id', { mode: 'number' })
+      .notNull()
+      .references(() => stores.id, { onDelete: 'cascade' }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.storeId], name: 'user_stores_pk' }),
+    index('user_stores_store_idx').on(t.storeId),
   ]
 );
 

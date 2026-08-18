@@ -92,6 +92,13 @@
       "when": 1783970200000,
       "tag": "0012_daily_report_products_fulfillment",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1787040000000,
+      "tag": "0013_catalog_stock_groups",
+      "breakpoints": true
     }
   ]
 }
