@@ -99,6 +99,13 @@
       "when": 1787040000000,
       "tag": "0013_catalog_stock_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1787040060000,
+      "tag": "0014_woodpeckers_categories",
+      "breakpoints": true
     }
   ]
 }
