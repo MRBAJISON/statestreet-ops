@@ -88,9 +88,10 @@ the difference between a usable page and one people avoid.
 
 - **No new permissions.** Commercial can already read these. Nothing about who
   may see what changes, which keeps this out of the risky category.
-- **No combined-across-all-stores report.** The cluster report exists for stores
-  that trade as one unit. A group total across unrelated stores is a different
-  thing and nobody has asked for it.
+- ~~No combined-across-all-stores report.~~ **Now wanted.** Commercial gets a
+  group report covering every store, in the cluster format: combined totals with
+  a per-store split. That split is the point — it answers "how did the group do"
+  and "which store carried it" in one document.
 - **No changes to the store manager's own screens.** They already download from
   the daily report and keep doing so.
 

@@ -68,11 +68,17 @@ function netOf(report: DailyReportRecord): number {
   );
 }
 
+/**
+ * @param storeIds  The stores to combine, defaulting to the group's members. The
+ *   group-wide report Commercial takes passes every active store, so it does not
+ *   need a store_groups row for a set that is not a real trading unit.
+ */
 export async function getStoreGroupDailyReport(
   group: { id: number; code: string; name: string },
-  businessDate: string
+  businessDate: string,
+  storeIds?: number[]
 ): Promise<StoreGroupDailyReport | null> {
-  const memberIds = await storesInGroup(group.id);
+  const memberIds = storeIds ?? (await storesInGroup(group.id));
   if (!memberIds.length) return null;
 
   const names = await storeNames(memberIds);

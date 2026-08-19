@@ -135,6 +135,20 @@ export async function storesInGroup(groupId: number): Promise<number[]> {
   return rows.map((row) => row.storeId);
 }
 
+/**
+ * Every active trading store, for the roles that read across the business.
+ *
+ * Warehouses and offices are excluded: they file no daily report, so including
+ * them would put permanent empty rows in the group-wide split.
+ */
+export async function allTradingStores(): Promise<AccessibleStore[]> {
+  return db
+    .select({ id: stores.id, code: stores.code, name: stores.name })
+    .from(stores)
+    .where(and(eq(stores.type, 'store'), eq(stores.active, true)))
+    .orderBy(stores.name);
+}
+
 /** Names for a set of store ids, for report headers and per-store splits. */
 export async function storeNames(storeIds: number[]): Promise<Map<number, string>> {
   if (!storeIds.length) return new Map();

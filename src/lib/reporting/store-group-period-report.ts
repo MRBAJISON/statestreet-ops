@@ -59,12 +59,21 @@ function statusTextFor(achievementPercent: number): string {
     : `Below Target (${difference.toFixed(1)}%)`;
 }
 
+/**
+ * @param group  What the combined document is titled after — a store group, or
+ *               the whole business for the group-wide report Commercial takes.
+ * @param storeIds  The stores to combine. Defaults to the group's members, so a
+ *               cluster caller passes nothing; the group-wide caller passes every
+ *               active store rather than needing a store_groups row to exist for
+ *               a set that is not a real trading unit.
+ */
 export async function getStoreGroupPeriodReport(
   group: { id: number; code: string; name: string },
   periodType: StorePeriodType,
-  anchorIso: string
+  anchorIso: string,
+  storeIds?: number[]
 ): Promise<StoreGroupPeriodReport | null> {
-  const memberIds = await storesInGroup(group.id);
+  const memberIds = storeIds ?? (await storesInGroup(group.id));
   if (!memberIds.length) return null;
 
   const names = await storeNames(memberIds);
