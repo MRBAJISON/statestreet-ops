@@ -81,19 +81,19 @@ function StatusBadge({ status }: { status: DailyReportStatus }) {
 
 export default function TypedDailyReport({
   assignedStore,
-  stores = [],
+  activeStoreId = null,
   storeGroup = null,
 }: {
   assignedStore: string;
-  stores?: Array<{ id: number; code: string; name: string }>;
+  // The store chosen on the tab strip above. The form follows it rather than
+  // carrying its own picker — two places to choose the store is how the form
+  // ended up requesting one store while the tab showed another.
+  activeStoreId?: number | null;
   // Present only when this manager can open every store in the group.
   storeGroup?: DownloadableStoreGroup | null;
 }) {
   const { org } = useOrg();
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
-  // Only meaningful for a manager covering more than one shop; with one store the
-  // server ignores it and uses the single assignment.
-  const [selectedStoreId, setSelectedStoreId] = useState<number | null>(() => stores[0]?.id ?? null);
   const [data, setData] = useState<DailyReportsResponse | null>(null);
   const [draft, setDraft] = useState<DailyReportDraft | null>(null);
   const [visibleCategoryIds, setVisibleCategoryIds] = useState<Set<number>>(() => new Set());
@@ -110,9 +110,9 @@ export default function TypedDailyReport({
     try {
       const query = new URLSearchParams({ from: businessDate, to: businessDate });
       const recentQuery = new URLSearchParams();
-      if (selectedStoreId) {
-        query.set('storeId', String(selectedStoreId));
-        recentQuery.set('storeId', String(selectedStoreId));
+      if (activeStoreId) {
+        query.set('storeId', String(activeStoreId));
+        recentQuery.set('storeId', String(activeStoreId));
       }
       const [recentResponse, selectedResponse] = await Promise.all([
         fetch(`/api/daily-reports?${recentQuery}`, { cache: 'no-store' }),
@@ -130,7 +130,7 @@ export default function TypedDailyReport({
     } finally {
       if (requestId === loadSequence.current) setLoading(false);
     }
-  }, [selectedStoreId]);
+  }, [activeStoreId]);
 
   useEffect(() => {
     void loadReports(selectedDate).catch((loadError) => setError((loadError as Error).message));
@@ -260,7 +260,7 @@ export default function TypedDailyReport({
         headers: { 'Content-Type': 'application/json' },
         // Name the store on create so a manager covering two shops files against
         // the one they picked. The server still checks it is assigned to them.
-        body: JSON.stringify(selectedStoreId && !currentReport ? { ...input, storeId: selectedStoreId } : input),
+        body: JSON.stringify(activeStoreId && !currentReport ? { ...input, storeId: activeStoreId } : input),
       });
       if (!response.ok) throw new Error(await responseError(response));
       const result = (await response.json()) as DailyReportMutationResponse;
@@ -314,26 +314,9 @@ export default function TypedDailyReport({
               <StatusBadge status={status} />
               {locked ? <LockKeyhole className="text-muted-foreground" aria-label="Locked" /> : null}
             </div>
-            {stores.length > 1 ? (
-              <Select
-                value={selectedStoreId ? String(selectedStoreId) : ''}
-                onValueChange={(value) => setSelectedStoreId(Number(value))}
-                disabled={busy !== null}
-              >
-                <SelectTrigger className="mt-1 h-8 w-56" aria-label="Store">
-                  <SelectValue placeholder="Choose a store" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {stores.map((store) => (
-                      <SelectItem key={store.id} value={String(store.id)}>{store.name}</SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            ) : (
-              <p className="text-sm text-muted-foreground">{storeName}</p>
-            )}
+            {/* The store comes from the tab strip above, so this states it rather
+                than offering a second way to change it. */}
+            <p className="text-sm text-muted-foreground">{storeName}</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
