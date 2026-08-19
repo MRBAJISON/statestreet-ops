@@ -122,7 +122,8 @@ export function StoreReportPanel() {
   }
 
   return (
-    <section className="surface p-5">
+    <div className="p-4 sm:p-5">
+      <section className="surface p-5">
       <div className="mb-4">
         <h2 className="text-lg font-semibold">Store reports</h2>
         <p className="text-sm text-muted-foreground">
@@ -179,6 +180,7 @@ export function StoreReportPanel() {
       </p>
 
       {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
-    </section>
+      </section>
+    </div>
   );
 }
