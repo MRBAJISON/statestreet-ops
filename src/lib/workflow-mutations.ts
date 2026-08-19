@@ -36,6 +36,7 @@ import {
 import { db } from './db';
 import { stores } from './db/foundation-schema';
 import { HttpError, sessionUserId } from './server-errors';
+import { resolveActingStore } from './store-access';
 import type { UserRole } from './types';
 
 interface WorkflowHandler {
@@ -83,15 +84,9 @@ async function assignedStore(user: AppUser, requestedStoreId?: number) {
     if (!requestedStoreId) throw new HttpError(400, 'storeId is required');
     return activeStoreById(requestedStoreId);
   }
-  if (!user.store) throw new HttpError(403, 'No store is assigned to this account');
-  const [store] = await db
-    .select({ id: stores.id, code: stores.code, name: stores.name })
-    .from(stores)
-    .where(and(eq(stores.code, user.store), eq(stores.active, true), eq(stores.type, 'store')))
-    .limit(1);
-  if (!store) throw new HttpError(409, 'The assigned store is not active');
-  if (requestedStoreId && requestedStoreId !== store.id) throw new HttpError(403, 'Store does not match this account');
-  return store;
+  // The store selected on the tab strip. A requested store is still honoured and
+  // still checked, so a form that names its store explicitly keeps working.
+  return resolveActingStore(user, requestedStoreId);
 }
 
 function normalizePhone(value: string): string {

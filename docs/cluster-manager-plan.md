@@ -132,8 +132,16 @@ the real thing, not by typechecking it.
 Phase 2's daily cluster report is independent of the acting-store work and could
 land first if the report matters more than the workflows.
 
-# Open question
+# Decided
 
-**Should the cluster manager also see a combined view on screen**, or only in the
-downloaded PDF? Today the My Store dashboard is per store. A combined dashboard
-is a larger piece of work and is not in this plan — say if it is wanted.
+- **A store tab.** The manager picks the store from a tab strip and records the
+  workflows under it. One choice, remembered across screens, shown on every form
+  that writes.
+- **Dashboards stay per store.** Each record sits on its own store's dashboard.
+  There is no combined dashboard and none is planned.
+- **Only the report is combined.** Daily, weekly and monthly cluster PDFs are the
+  single place the two shops are added together.
+
+That split is worth keeping deliberately: the dashboards answer "how is this shop
+doing", which a blended number would destroy, while the report answers "how did
+the building do", which is what the combined document is for.

@@ -64,6 +64,23 @@ export function PeriodReportDownload({
     }
   }
 
+  /** The combined day for both stores, alongside the store's own daily PDF. */
+  async function downloadGroupDay() {
+    if (busy || !group) return;
+    setBusy('group-day');
+    try {
+      const query = new URLSearchParams({ date: anchorDate });
+      await downloadFile(
+        `/api/store-groups/${group.id}/daily-report/pdf?${query}`,
+        `daily-cluster-report-${group.code}-${anchorDate}.pdf`
+      );
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const week = resolveStorePeriod('week', anchorDate).range;
   const month = resolveStorePeriod('month', anchorDate).range;
 
@@ -91,6 +108,9 @@ export function PeriodReportDownload({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuLabel>{group.name} combined</DropdownMenuLabel>
+            <DropdownMenuItem onSelect={() => void downloadGroupDay()}>
+              Day — {anchorDate}
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => void download('week', 'group')}>
               Week — {week.label}
             </DropdownMenuItem>
