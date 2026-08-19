@@ -19,6 +19,18 @@ export function formatPercent(value: number, digits = 1) {
   return `${Number.isFinite(value) ? value.toFixed(digits) : '0.0'}%`;
 }
 
+/**
+ * Sell-through, shown only where there is an opening stock figure to divide by.
+ *
+ * Without stock loaded for a store, units sold over nothing is not zero percent —
+ * it is unknown, and printing 0.0% invites someone to act on a number nobody
+ * measured. A dash says so plainly.
+ */
+export function formatSellThrough(value: number, openingStock: number) {
+  if (!openingStock || !Number.isFinite(value)) return '—';
+  return formatPercent(value);
+}
+
 export function percentageChange(current: number, previous: number) {
   if (!previous) return null;
   return ((current - previous) / Math.abs(previous)) * 100;

@@ -21,6 +21,7 @@ import {
   suppliers,
 } from './db/foundation-schema';
 import { HttpError } from './server-errors';
+import { resolveActingStore } from './store-access';
 
 const RECENT_DOCUMENT_LIMIT = 20;
 const fromStores = alias(stores, 'inventory_document_from_stores');
@@ -41,6 +42,9 @@ export function getInventoryDocumentReadScope(
   if (user.role !== 'store-manager' || !['stock-transfer', 'replenishment'].includes(document)) {
     throw new HttpError(403, 'Forbidden');
   }
+  // Deliberately still the user's own store code rather than the acting store:
+  // this is a synchronous scope used for filtering, and the acting store needs an
+  // async lookup. resolveScopedStoreId below does the acting-store resolution.
   if (!user.store) throw new HttpError(403, 'No store is assigned to this account');
   return { allStores: false, storeCode: user.store };
 }
@@ -48,13 +52,10 @@ export function getInventoryDocumentReadScope(
 async function resolveScopedStoreId(document: InventoryDocumentName, user: AppUser) {
   const scope = getInventoryDocumentReadScope(document, user);
   if (scope.allStores) return undefined;
-  const [store] = await db
-    .select({ id: stores.id })
-    .from(stores)
-    .where(and(eq(stores.code, scope.storeCode!), eq(stores.type, 'store'), eq(stores.active, true)))
-    .limit(1);
-  if (!store) throw new HttpError(409, 'The assigned store was not found or is inactive');
-  return store.id;
+  // A manager sees the documents of the store they are recording against, so the
+  // list matches the tab they are on rather than always their first store.
+  const acting = await resolveActingStore(user);
+  return acting.id;
 }
 
 function transferHeaders(storeId?: number, id?: number) {

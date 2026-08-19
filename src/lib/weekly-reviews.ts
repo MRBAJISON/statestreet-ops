@@ -3,21 +3,18 @@ import type { z } from 'zod';
 import type { AppUser } from './auth';
 import type { weeklyReviewSchema } from './contracts/documents';
 import { db } from './db';
-import { stores, weeklyReviewActions, weeklyReviews } from './db/foundation-schema';
+import { weeklyReviewActions, weeklyReviews } from './db/foundation-schema';
 import { weeklyReviewCategoryNotes } from './db/operational-schema';
 import { HttpError, sessionUserId } from './server-errors';
+import { resolveActingStore } from './store-access';
 
 type WeeklyReviewInput = z.infer<typeof weeklyReviewSchema>;
 
 async function assignedStore(user: AppUser) {
-  if (user.role !== 'store-manager' || !user.store) throw new HttpError(403, 'A store manager account is required');
-  const [store] = await db
-    .select({ id: stores.id, name: stores.name })
-    .from(stores)
-    .where(and(eq(stores.code, user.store), eq(stores.active, true), eq(stores.type, 'store')))
-    .limit(1);
-  if (!store) throw new HttpError(409, 'The assigned store is not active');
-  return store;
+  if (user.role !== 'store-manager') throw new HttpError(403, 'A store manager account is required');
+  // The store selected on the tab strip, so a manager covering two shops files the
+  // review against the one they are working on.
+  return resolveActingStore(user);
 }
 
 export async function getWeeklyReview(user: AppUser, weekEnd?: string) {

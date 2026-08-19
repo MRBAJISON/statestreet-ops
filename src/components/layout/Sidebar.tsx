@@ -14,6 +14,7 @@ import {
   LogOut,
   Megaphone,
   FileSpreadsheet,
+  FileText,
   PackageSearch,
   Settings,
   ShoppingBag,
@@ -61,6 +62,10 @@ const DEPARTMENT_NAV: Record<Department, { label: string; icon: typeof Gauge; hr
   inventory: { label: 'Inventory', icon: Boxes, href: '/dashboard/inventory', tone: 'text-chart-3' },
   brand: { label: 'Brand health', icon: HeartPulse, href: '/dashboard/brand-health', tone: 'text-destructive' },
 };
+// Roles that may pull a store's formatted daily, weekly or monthly PDF. Kept
+// beside the export rather than inside it: the export is a spreadsheet of raw
+// data, these are the documents a store actually files.
+const STORE_REPORT_READERS = ['owner', 'finance', 'commercial', 'operations', 'store-manager'];
 
 const ROLE_FORM: Record<string, { label: string; href: string; icon: typeof ClipboardCheck } | undefined> = {
   finance: { label: 'Finance workflows', href: '/forms/finance', icon: WalletCards },
@@ -222,6 +227,16 @@ export default function AppSidebar({ userName, userRole, departments }: SidebarP
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {STORE_REPORT_READERS.includes(userRole) ? (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname.startsWith('/store-reports')} tooltip="Store reports">
+                    <Link href="/store-reports">
+                      <FileText className="text-chart-2" />
+                      <span>Store reports</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ) : null}
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname.startsWith('/settings')} tooltip="Settings">
                   <Link href="/settings">

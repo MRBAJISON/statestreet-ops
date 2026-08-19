@@ -12,6 +12,7 @@ import type {
 import { db } from './db';
 import { brandStores, stores } from './db/foundation-schema';
 import { HttpError, sessionUserId } from './server-errors';
+import { resolveActingStore } from './store-access';
 import type { z } from 'zod';
 
 type StockTransferInput = z.infer<typeof stockTransferSchema>;
@@ -44,14 +45,10 @@ async function activeStore(id: number) {
 }
 
 async function managerStore(user: AppUser) {
-  if (!user.store) throw new HttpError(403, 'No store is assigned to this account');
-  const [store] = await db
-    .select({ id: stores.id, code: stores.code, name: stores.name, type: stores.type })
-    .from(stores)
-    .where(and(eq(stores.code, user.store), eq(stores.active, true), eq(stores.type, 'store')))
-    .limit(1);
-  if (!store) throw new HttpError(409, 'The assigned store is not active');
-  return store;
+  // The store selected on the tab strip, so a stock document belongs to the shop
+  // the manager is working on rather than always their first one.
+  const acting = await resolveActingStore(user);
+  return { ...acting, type: 'store' as const };
 }
 
 async function sourceStore(user: AppUser, requestedId?: number) {

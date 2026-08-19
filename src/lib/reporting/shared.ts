@@ -6,6 +6,7 @@ import { db } from '../db';
 import { stores } from '../db/foundation-schema';
 import { organizationSettings } from '../db/operational-schema';
 import { HttpError } from '../server-errors';
+import { resolveActingStore } from '../store-access';
 import type { Department } from '../types';
 import { resolveAnalyticsRange } from './range';
 
@@ -49,15 +50,6 @@ async function storeById(id: number): Promise<AnalyticsStoreScope | null> {
   return store ?? null;
 }
 
-async function storeByCode(code: string): Promise<AnalyticsStoreScope | null> {
-  const [store] = await db
-    .select({ id: stores.id, code: stores.code, name: stores.name })
-    .from(stores)
-    .where(and(eq(stores.code, code), eq(stores.type, 'store'), eq(stores.active, true)))
-    .limit(1);
-  return store ?? null;
-}
-
 export async function resolveAnalyticsScope(
   user: AppUser,
   view: AnalyticsView,
@@ -66,8 +58,11 @@ export async function resolveAnalyticsScope(
   if (!canAccessView(user, view)) throw new HttpError(403, 'Forbidden');
   let store: AnalyticsStoreScope | null = null;
   if (user.role === 'store-manager') {
-    if (!user.store) throw new HttpError(403, 'No store is assigned to this account');
-    store = await storeByCode(user.store);
+    // Dashboards stay per store by design: each store's records sit on its own
+    // dashboard, and only the downloaded report combines the two. So this follows
+    // the tab rather than blending them.
+    const acting = await resolveActingStore(user);
+    store = await storeById(acting.id);
     if (!store) throw new HttpError(409, 'The assigned store is not active');
   } else if (query.storeId) {
     store = await storeById(query.storeId);

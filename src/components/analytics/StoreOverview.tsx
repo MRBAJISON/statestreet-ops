@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useExpandable } from '@/hooks/use-expandable';
 import type { AnalyticsMeta, StoreDomain, TradingOverview } from '@/lib/contracts/analytics';
 import { EmptyPanel, EmptyTableRow, MetricRail, SectionHeading, StatusBadge } from './DashboardPrimitives';
-import { NamedBarChart } from './Charts';
+import { HorizontalBarChart, NamedBarChart } from './Charts';
 import { formatCurrency, formatNumber, formatPercent } from './format';
 import { TradingSnapshot } from './TradingSnapshot';
 
@@ -25,6 +25,7 @@ export function StoreOverview({ meta, trading, domain }: { meta: AnalyticsMeta; 
       ]} className="xl:grid-cols-4 2xl:grid-cols-4" />
 
       <section className="surface min-w-0 p-5"><SectionHeading title="Sales by Category" description="Approved category revenue for this store" /><NamedBarChart data={trading.categories.map((item) => ({ name: item.name, value: item.revenue }))} valueFormatter={(value) => formatCurrency(value, meta.currency)} /></section>
+      <section className="surface min-w-0 p-5"><SectionHeading title="Sell-Through by Category" description="Units sold against opening stock" /><HorizontalBarChart data={trading.categories.filter((item) => item.openingStock > 0).map((item) => ({ name: item.name, value: item.sellThrough }))} valueFormatter={formatPercent} /></section>
 
       <div className="grid gap-5 xl:grid-cols-12">
         <section className="surface p-5 xl:col-span-7">

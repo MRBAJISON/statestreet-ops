@@ -27,7 +27,7 @@ import {
   RevenueTrendChart,
   StoreRankingChart,
 } from './Charts';
-import { formatCurrency, formatNumber, formatPercent, percentageChange } from './format';
+import { formatCurrency, formatNumber, formatPercent, formatSellThrough, percentageChange } from './format';
 
 const departmentLinks = [
   { label: 'Finance', href: '/dashboard/finance', icon: WalletCards, tone: 'text-chart-1 bg-chart-1/10' },
@@ -172,9 +172,9 @@ export function ExecutiveOverview({
       </div>
 
       <section className="surface min-w-0 overflow-hidden">
-        <div className="p-5 pb-3"><SectionHeading title="Sales by Category" description="Revenue, units, and period movement" /></div>
+        <div className="p-5 pb-3"><SectionHeading title="Sales by Category" description="Revenue, units, sell-through, and period movement" /></div>
         <Table>
-          <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Revenue</TableHead><TableHead className="text-right">Share</TableHead><TableHead className="text-right">Units</TableHead><TableHead className="text-right">Change</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Revenue</TableHead><TableHead className="text-right">Share</TableHead><TableHead className="text-right">Units</TableHead><TableHead className="text-right">Sell-through</TableHead><TableHead className="text-right">Change</TableHead></TableRow></TableHeader>
           <TableBody>
             {trading.categories.length ? categoryRows.visible.map((category) => (
               <TableRow key={category.id}>
@@ -182,9 +182,10 @@ export function ExecutiveOverview({
                 <TableCell className="text-right">{formatCurrency(category.revenue, meta.currency)}</TableCell>
                 <TableCell className="text-right">{formatPercent(category.share)}</TableCell>
                 <TableCell className="text-right">{formatNumber(category.units)}</TableCell>
+                <TableCell className="text-right">{formatSellThrough(category.sellThrough, category.openingStock)}</TableCell>
                 <TableCell className="text-right font-medium">{percentageChange(category.revenue, category.previousRevenue)?.toFixed(1) ?? '0.0'}%</TableCell>
               </TableRow>
-            )) : <EmptyTableRow colSpan={5} message="No approved category sales for this period" />}
+            )) : <EmptyTableRow colSpan={6} message="No approved category sales for this period" />}
           </TableBody>
         </Table>
         <ShowMoreButton expanded={categoryRows.expanded} hiddenCount={categoryRows.hiddenCount} canExpand={categoryRows.canExpand} onClick={categoryRows.toggle} />
