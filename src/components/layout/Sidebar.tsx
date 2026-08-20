@@ -62,10 +62,11 @@ const DEPARTMENT_NAV: Record<Department, { label: string; icon: typeof Gauge; hr
   inventory: { label: 'Inventory', icon: Boxes, href: '/dashboard/inventory', tone: 'text-chart-3' },
   brand: { label: 'Brand health', icon: HeartPulse, href: '/dashboard/brand-health', tone: 'text-destructive' },
 };
-// Roles that may pull a store's formatted daily, weekly or monthly PDF. Kept
-// beside the export rather than inside it: the export is a spreadsheet of raw
-// data, these are the documents a store actually files.
-const STORE_REPORT_READERS = ['owner', 'finance', 'commercial', 'operations', 'store-manager'];
+// Commercial reads across every store, so this is where the page earns its place.
+// Store managers are deliberately excluded: they already download their own store's
+// reports from the daily report screen, and a second route to the same documents is
+// clutter, not access. The owner is included because the owner sees everything.
+const STORE_REPORT_READERS = ['owner', 'commercial'];
 
 const ROLE_FORM: Record<string, { label: string; href: string; icon: typeof ClipboardCheck } | undefined> = {
   finance: { label: 'Finance workflows', href: '/forms/finance', icon: WalletCards },

@@ -2,8 +2,11 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { StoreReportPanel } from './StoreReportPanel';
 
-// Roles that may pull a store's formatted PDF, as opposed to the Excel export.
-const STORE_REPORT_READERS = new Set(['owner', 'finance', 'commercial', 'operations', 'store-manager']);
+// Commercial, who reads across every store, plus the owner. Store managers are not
+// here: they download their own store's reports from the daily report screen. The
+// underlying endpoints still permit the other roles, so nothing is taken away —
+// this is about who gets the page in their sidebar.
+const STORE_REPORT_READERS = new Set(['owner', 'commercial']);
 
 export default async function StoreReportsPage() {
   const session = await getSession();
