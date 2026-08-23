@@ -127,6 +127,13 @@
       "when": 1787126400000,
       "tag": "0017_carbon_accessories",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1787385600000,
+      "tag": "0018_dangelo_palace_cluster_manager",
+      "breakpoints": true
     }
   ]
 }
