@@ -1,11 +1,18 @@
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import type { AppUser } from './auth';
-import type { weeklyReviewSchema } from './contracts/documents';
+import type { WeeklyReviewCategorySummary, weeklyReviewSchema } from './contracts/documents';
 import { db } from './db';
-import { weeklyReviewActions, weeklyReviews } from './db/foundation-schema';
+import {
+  categories,
+  products,
+  storeStockLevels,
+  weeklyReviewActions,
+  weeklyReviews,
+} from './db/foundation-schema';
 import { weeklyReviewCategoryNotes } from './db/operational-schema';
 import { HttpError, sessionUserId } from './server-errors';
+import { configuredCategoryIdsForStore } from './daily-reports';
 import { resolveActingStore } from './store-access';
 
 type WeeklyReviewInput = z.infer<typeof weeklyReviewSchema>;
@@ -15,6 +22,45 @@ async function assignedStore(user: AppUser) {
   // The store selected on the tab strip, so a manager covering two shops files the
   // review against the one they are working on.
   return resolveActingStore(user);
+}
+
+async function getCategorySummariesForStore(storeId: number): Promise<WeeklyReviewCategorySummary[]> {
+  const configuredCategoryIds = await configuredCategoryIdsForStore(storeId);
+  if (configuredCategoryIds && configuredCategoryIds.size === 0) return [];
+
+  const conditions = [eq(categories.active, true)];
+  if (configuredCategoryIds) conditions.push(inArray(categories.id, [...configuredCategoryIds]));
+
+  const rows = await db
+    .select({
+      id: categories.id,
+      name: categories.name,
+      stockQuantity: sql<number>`coalesce(sum(${storeStockLevels.quantity}), 0)::integer`,
+      stockValue: sql<string>`coalesce(sum(${storeStockLevels.quantity}::numeric * ${products.sellingPrice}), 0)::numeric`,
+      missingSellingPriceCount: sql<number>`count(*) filter (where ${storeStockLevels.quantity} > 0 and ${products.sellingPrice} is null)::integer`,
+    })
+    .from(categories)
+    .leftJoin(products, and(eq(products.categoryId, categories.id), eq(products.active, true)))
+    .leftJoin(
+      storeStockLevels,
+      and(eq(storeStockLevels.productId, products.id), eq(storeStockLevels.storeId, storeId))
+    )
+    .where(and(...conditions))
+    .groupBy(categories.id, categories.name, categories.sortOrder)
+    .orderBy(asc(categories.sortOrder), asc(categories.name));
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    stockQuantity: Number(row.stockQuantity ?? 0),
+    stockValue: String(row.stockValue ?? '0'),
+    missingSellingPriceCount: Number(row.missingSellingPriceCount ?? 0),
+  }));
+}
+
+export async function getWeeklyReviewCategories(user: AppUser) {
+  const store = await assignedStore(user);
+  return getCategorySummariesForStore(store.id);
 }
 
 export async function getWeeklyReview(user: AppUser, weekEnd?: string) {
@@ -90,7 +136,57 @@ export async function getWeeklyReview(user: AppUser, weekEnd?: string) {
 export async function saveWeeklyReview(user: AppUser, input: WeeklyReviewInput) {
   const store = await assignedStore(user);
   const actorUserId = sessionUserId(user.id);
-  const categoryNotes = JSON.stringify(input.categoryNotes);
+  const categorySummaries = await getCategorySummariesForStore(store.id);
+  const categoriesById = new Map(categorySummaries.map((category) => [category.id, category]));
+  const unknownCategoryNames = input.categoryNotes
+    .filter((note) => !categoriesById.has(note.categoryId))
+    .map((note) => String(note.categoryId));
+  if (unknownCategoryNames.length) {
+    throw new HttpError(400, `These categories are not assigned to this store: ${unknownCategoryNames.join(', ')}`);
+  }
+
+  if (input.status === 'submitted') {
+    if (!categorySummaries.length) {
+      throw new HttpError(400, 'No active categories are configured for this store');
+    }
+
+    const submittedCategoryIds = new Set(input.categoryNotes.map((note) => note.categoryId));
+    const missingCategories = categorySummaries.filter((category) => !submittedCategoryIds.has(category.id));
+    if (missingCategories.length) {
+      throw new HttpError(400, `Review every category before submitting: ${missingCategories.map((category) => category.name).join(', ')}`);
+    }
+
+    const incompleteCategories = input.categoryNotes
+      .filter((note) => !note.performanceComment)
+      .map((note) => categoriesById.get(note.categoryId)?.name ?? String(note.categoryId));
+    if (incompleteCategories.length) {
+      throw new HttpError(400, `Add a performance comment for: ${incompleteCategories.join(', ')}`);
+    }
+
+    const missingCorrectiveActions = input.categoryNotes
+      .filter((note) => (note.overstocked || note.slowMoving) && !note.correctiveAction)
+      .map((note) => categoriesById.get(note.categoryId)?.name ?? String(note.categoryId));
+    if (missingCorrectiveActions.length) {
+      throw new HttpError(400, `Add a corrective action for: ${missingCorrectiveActions.join(', ')}`);
+    }
+
+    const missingSellingPrices = input.categoryNotes
+      .filter((note) => note.overstocked || note.slowMoving)
+      .filter((note) => (categoriesById.get(note.categoryId)?.missingSellingPriceCount ?? 0) > 0)
+      .map((note) => categoriesById.get(note.categoryId)?.name ?? String(note.categoryId));
+    if (missingSellingPrices.length) {
+      throw new HttpError(400, `Add selling prices to the catalogue before flagging stock risk for: ${missingSellingPrices.join(', ')}`);
+    }
+  }
+
+  const categoryNotes = JSON.stringify(input.categoryNotes.map((note) => ({
+    ...note,
+    // Stock at Risk is always derived from on-hand quantity and selling price;
+    // a client-supplied value is deliberately ignored.
+    valueAtRisk: note.overstocked || note.slowMoving
+      ? categoriesById.get(note.categoryId)?.stockValue ?? '0'
+      : undefined,
+  })));
   const actions = JSON.stringify(input.actions);
   const result = await db.execute(sql`
     with before_review as materialized (

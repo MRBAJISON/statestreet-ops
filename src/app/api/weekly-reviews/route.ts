@@ -4,7 +4,7 @@ import { weeklyReviewSchema } from '@/lib/contracts/documents';
 import { dateSchema } from '@/lib/contracts/shared';
 import { formatContractError } from '@/lib/contracts/shared';
 import { databaseErrorCode, HttpError } from '@/lib/server-errors';
-import { getWeeklyReview, saveWeeklyReview } from '@/lib/weekly-reviews';
+import { getWeeklyReview, getWeeklyReviewCategories, saveWeeklyReview } from '@/lib/weekly-reviews';
 
 export const runtime = 'nodejs';
 
@@ -17,8 +17,11 @@ export async function GET(req: NextRequest) {
     if (parsedWeekEnd && !parsedWeekEnd.success) {
       return NextResponse.json({ error: formatContractError(parsedWeekEnd.error) }, { status: 400 });
     }
-    const review = await getWeeklyReview(session.user, parsedWeekEnd?.data);
-    return NextResponse.json({ review }, { headers: { 'Cache-Control': 'private, no-store' } });
+    const [review, categories] = await Promise.all([
+      getWeeklyReview(session.user, parsedWeekEnd?.data),
+      getWeeklyReviewCategories(session.user),
+    ]);
+    return NextResponse.json({ review, categories }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     if (error instanceof HttpError) return NextResponse.json({ error: error.message }, { status: error.status });
     return NextResponse.json({ error: 'The weekly review could not be loaded' }, { status: 500 });

@@ -98,7 +98,10 @@ Manual fields:
 - which category Marketing should amplify
 - what the manager will do differently
 - the manager's first three actions
-- category-level comments or risk flags where judgement is required
+- a performance comment for every active category assigned to the store; category
+  cards are generated automatically and the existing card fields open on demand
+- category-level risk flags where judgement is required; Stock at Risk is derived
+  from current store quantity multiplied by the product catalogue's selling price
 - action, owner, due date, unit/revenue target, and status
 
 ## Finance

@@ -58,7 +58,7 @@ function dailyReportMutationRecord(
   };
 }
 
-async function configuredCategoryIdsForStore(storeId: number): Promise<Set<number> | null> {
+export async function configuredCategoryIdsForStore(storeId: number): Promise<Set<number> | null> {
   const storeBrandRows = await db
     .select({ brandId: brandStores.brandId })
     .from(brandStores)

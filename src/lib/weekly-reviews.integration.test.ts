@@ -94,5 +94,80 @@ describeWithDatabase('weekly review SQL integration', () => {
         )
       ).rows[0].count
     ).toBe(1);
+  }, 15000);
+
+  it('requires every store category and derives Stock at Risk from selling price', async () => {
+    const { saveWeeklyReview } = await import('./weekly-reviews');
+    const suffix = Date.now().toString();
+    const storeId = (await client.query(`select id from stores where code = 'weekly-review-store'`)).rows[0].id;
+    const brand = await client.query(
+      `insert into brands (code, name) values ($1, $2) returning id`,
+      [`weekly-review-brand-${suffix}`, `Weekly Review Brand ${suffix}`]
+    );
+    const categoryOne = await client.query(
+      `insert into categories (code, name, sort_order) values ($1, $2, 1) returning id`,
+      [`weekly-review-category-one-${suffix}`, `Weekly Review Category One ${suffix}`]
+    );
+    const categoryTwo = await client.query(
+      `insert into categories (code, name, sort_order) values ($1, $2, 2) returning id`,
+      [`weekly-review-category-two-${suffix}`, `Weekly Review Category Two ${suffix}`]
+    );
+    const categoryOneId = Number(categoryOne.rows[0].id);
+    const categoryTwoId = Number(categoryTwo.rows[0].id);
+    await client.query(`insert into brand_stores (brand_id, store_id) values ($1, $2)`, [brand.rows[0].id, storeId]);
+    await client.query(`insert into brand_categories (brand_id, category_id) values ($1, $2), ($1, $3)`, [
+      brand.rows[0].id,
+      categoryOne.rows[0].id,
+      categoryTwo.rows[0].id,
+    ]);
+    const product = await client.query(
+      `insert into products (sku, name, brand_id, category_id, selling_price)
+       values ($1, $2, $3, $4, 125.00) returning id`,
+      [`WEEKLY-REVIEW-${suffix}`, `Weekly Review Product ${suffix}`, brand.rows[0].id, categoryOne.rows[0].id]
+    );
+    await client.query(
+      `insert into store_stock_levels (store_id, product_id, quantity, as_of_date)
+       values ($1, $2, 4, '2026-07-19')`,
+      [storeId, product.rows[0].id]
+    );
+
+    const base = {
+      weekEnd: '2026-07-19' as const,
+      actions: [] as [],
+    };
+    await expect(saveWeeklyReview(manager, {
+      ...base,
+      status: 'submitted',
+      categoryNotes: [{ categoryId: categoryOneId, performanceComment: 'Reviewed', overstocked: true, slowMoving: false }],
+    })).rejects.toMatchObject({ status: 400 });
+
+    const record = await saveWeeklyReview(manager, {
+      ...base,
+      status: 'submitted',
+      categoryNotes: [
+        {
+          categoryId: categoryOneId,
+          performanceComment: 'Reviewed stock position',
+          overstocked: true,
+          slowMoving: false,
+          valueAtRisk: '999999.99',
+          correctiveAction: 'Run a focused promotion',
+        },
+        { categoryId: categoryTwoId, performanceComment: 'Reviewed and no issue found', overstocked: false, slowMoving: false },
+      ],
+    });
+
+    expect(record).toMatchObject({ status: 'submitted', categoryNoteCount: 2 });
+    const stored = await client.query(
+      `select category_id::integer as category_id, value_at_risk::text as value_at_risk
+       from weekly_review_category_notes
+       where weekly_review_id = (select id from weekly_reviews where store_id = $1 and week_end = '2026-07-19')
+       order by category_id`,
+      [storeId]
+    );
+    expect(stored.rows).toEqual([
+      { category_id: categoryOneId, value_at_risk: '500.00' },
+      { category_id: categoryTwoId, value_at_risk: null },
+    ]);
   });
 });

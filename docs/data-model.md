@@ -130,7 +130,10 @@ Customer voice and CEO attention use the shared feedback and action tables.
 ### Weekly review detail
 
 - `weekly_review_category_notes`: review/category risk flags, weeks without
-  movement, value at risk, comments, and optional corrective/action link.
+  movement, Stock at Risk, comments, and optional corrective/action link. Stock
+  at Risk is calculated from current store stock multiplied by catalogue selling
+  price when a category is flagged as overstocked or slow moving; it is not a
+  client-supplied amount.
 
 Weekly figures are reporting data, not copied into the review record.
 

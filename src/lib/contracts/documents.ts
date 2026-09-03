@@ -208,6 +208,14 @@ export interface WeeklyReviewCategoryNoteRecord {
   managerComment: string | null;
 }
 
+export interface WeeklyReviewCategorySummary {
+  id: number;
+  name: string;
+  stockQuantity: number;
+  stockValue: string;
+  missingSellingPriceCount: number;
+}
+
 export interface WeeklyReviewActionRecord {
   id: number;
   categoryId: number | null;

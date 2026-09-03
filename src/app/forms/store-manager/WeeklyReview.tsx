@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { AlertCircle, ArrowLeft, LoaderCircle, LockKeyhole, Plus, Save, Send, Trash2 } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, LoaderCircle, LockKeyhole, Plus, Save, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +15,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import type { ReferenceDataResponse } from '@/lib/contracts/reference-data';
-import type { WeeklyReviewRecord } from '@/lib/contracts/documents';
+import type { WeeklyReviewCategorySummary, WeeklyReviewRecord } from '@/lib/contracts/documents';
 import { ProductCombobox } from '@/components/forms/ProductCombobox';
 
 interface ReviewValues {
@@ -75,10 +75,10 @@ function emptyValues(weekEnd = recentSunday()): ReviewValues {
   };
 }
 
-function emptyCategoryNote(): CategoryNoteDraft {
+function emptyCategoryNote(categoryId = ''): CategoryNoteDraft {
   return {
     key: nextKey++,
-    categoryId: '',
+    categoryId,
     performanceComment: '',
     overstocked: false,
     slowMoving: false,
@@ -127,8 +127,10 @@ export default function WeeklyReview() {
   const [references, setReferences] = useState<ReferenceDataResponse | null>(null);
   const [values, setValues] = useState<ReviewValues>(() => emptyValues());
   const [review, setReview] = useState<WeeklyReviewRecord | null>(null);
+  const [storeCategories, setStoreCategories] = useState<WeeklyReviewCategorySummary[]>([]);
   const [categoryNotes, setCategoryNotes] = useState<CategoryNoteDraft[]>([]);
   const [actions, setActions] = useState<ActionDraft[]>([]);
+  const [expandedCategoryKeys, setExpandedCategoryKeys] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<'draft' | 'submitted' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -154,23 +156,28 @@ export default function WeeklyReview() {
     fetch(`/api/weekly-reviews?${new URLSearchParams({ weekEnd })}`, { signal: controller.signal, cache: 'no-store' })
       .then(async (response) => {
         if (!response.ok) throw new Error(await responseError(response));
-        return response.json() as Promise<{ review: WeeklyReviewRecord | null }>;
+        return response.json() as Promise<{ review: WeeklyReviewRecord | null; categories: WeeklyReviewCategorySummary[] }>;
       })
-      .then(({ review: current }) => {
+      .then(({ review: current, categories }) => {
+        setStoreCategories(categories);
         setReview(current);
+        const existingNotes = new Map(current?.categoryNotes.map((note) => [note.categoryId, note]) ?? []);
         if (current) {
           setValues(valuesFromReview(current));
-          setCategoryNotes(current.categoryNotes.map((note) => ({
-            key: nextKey++,
-            categoryId: String(note.categoryId),
-            performanceComment: note.performanceComment ?? '',
-            overstocked: note.overstocked,
-            slowMoving: note.slowMoving,
-            weeksWithoutMovement: note.weeksWithoutMovement === null ? '' : String(note.weeksWithoutMovement),
-            valueAtRisk: note.valueAtRisk ?? '',
-            correctiveAction: note.correctiveAction ?? '',
-            managerComment: note.managerComment ?? '',
-          })));
+          setCategoryNotes(categories.map((category) => {
+            const note = existingNotes.get(category.id);
+            return {
+              key: nextKey++,
+              categoryId: String(category.id),
+              performanceComment: note?.performanceComment ?? '',
+              overstocked: note?.overstocked ?? false,
+              slowMoving: note?.slowMoving ?? false,
+              weeksWithoutMovement: note?.weeksWithoutMovement === null || note?.weeksWithoutMovement === undefined ? '' : String(note.weeksWithoutMovement),
+              valueAtRisk: note?.valueAtRisk ?? '',
+              correctiveAction: note?.correctiveAction ?? '',
+              managerComment: note?.managerComment ?? '',
+            };
+          }));
           setActions(current.actions.map((action) => ({
             key: nextKey++,
             categoryId: action.categoryId ? String(action.categoryId) : '',
@@ -186,9 +193,10 @@ export default function WeeklyReview() {
           })));
         } else {
           setValues(emptyValues(weekEnd));
-          setCategoryNotes([]);
+          setCategoryNotes(categories.map((category) => emptyCategoryNote(String(category.id))));
           setActions([]);
         }
+        setExpandedCategoryKeys(new Set());
         setError(null);
       })
       .catch((loadError: Error) => {
@@ -208,10 +216,26 @@ export default function WeeklyReview() {
     setActions((current) => current.map((action) => action.key === key ? { ...action, [field]: value } : action));
   }
 
-  function validate() {
+  function validate(status: 'draft' | 'submitted') {
     if (!values.weekEnd) return 'Week ending is required';
     if (categoryNotes.some((note) => !note.categoryId)) return 'Choose a category for every category note';
     if (new Set(categoryNotes.map((note) => note.categoryId)).size !== categoryNotes.length) return 'Each category can appear only once';
+    const selectedCategoryIds = new Set(categoryNotes.map((note) => Number(note.categoryId)));
+    const missingCategories = storeCategories.filter((category) => !selectedCategoryIds.has(category.id));
+    if (status === 'submitted' && missingCategories.length) {
+      return `Review every category before submitting: ${missingCategories.map((category) => category.name).join(', ')}`;
+    }
+    if (status === 'submitted') {
+      const incompleteCategories = categoryNotes
+        .filter((note) => !note.performanceComment.trim())
+        .map((note) => storeCategories.find((category) => category.id === Number(note.categoryId))?.name ?? note.categoryId);
+      if (incompleteCategories.length) return `Add a performance comment for: ${incompleteCategories.join(', ')}`;
+
+      const missingCorrectiveActions = categoryNotes
+        .filter((note) => (note.overstocked || note.slowMoving) && !note.correctiveAction.trim())
+        .map((note) => storeCategories.find((category) => category.id === Number(note.categoryId))?.name ?? note.categoryId);
+      if (missingCorrectiveActions.length) return `Add a corrective action for: ${missingCorrectiveActions.join(', ')}`;
+    }
     if (actions.some((action) => !action.action.trim() || (!action.ownerUserId && !action.ownerName.trim()))) {
       return 'Every action needs an action description and owner';
     }
@@ -219,7 +243,7 @@ export default function WeeklyReview() {
   }
 
   async function save(status: 'draft' | 'submitted') {
-    const validationError = validate();
+    const validationError = validate(status);
     if (validationError) {
       setError(validationError);
       return;
@@ -246,7 +270,8 @@ export default function WeeklyReview() {
             overstocked: note.overstocked,
             slowMoving: note.slowMoving,
             weeksWithoutMovement: note.weeksWithoutMovement ? Number(note.weeksWithoutMovement) : undefined,
-            valueAtRisk: note.valueAtRisk || undefined,
+            // The server calculates Stock at Risk from current stock and selling price.
+            valueAtRisk: undefined,
             correctiveAction: note.correctiveAction || undefined,
             managerComment: note.managerComment || undefined,
           })),
@@ -284,6 +309,8 @@ export default function WeeklyReview() {
 
   const locked = review?.status === 'approved';
   const disabled = Boolean(loading || saving || locked);
+  const categoryById = new Map(storeCategories.map((category) => [category.id, category]));
+  const completedCategoryCount = categoryNotes.filter((note) => note.performanceComment.trim()).length;
 
   return (
     <div className="page-shell flex flex-col gap-6">
@@ -347,33 +374,73 @@ export default function WeeklyReview() {
         </TabsContent>
 
         <TabsContent value="categories" className="flex flex-col gap-4">
-          <div className="flex justify-end"><Button variant="outline" size="sm" disabled={disabled} onClick={() => setCategoryNotes((current) => [...current, emptyCategoryNote()])}><Plus data-icon="inline-start" />Add category note</Button></div>
-          {categoryNotes.map((note, index) => (
-            <section key={note.key} className="surface p-4">
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <h2 className="text-sm font-semibold">Category note {index + 1}</h2>
-                <Button variant="ghost" size="icon" aria-label="Remove category note" disabled={disabled} onClick={() => setCategoryNotes((current) => current.filter((item) => item.key !== note.key))}><Trash2 /></Button>
-              </div>
-              <FieldGroup className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                <Field>
-                  <FieldLabel>Category</FieldLabel>
-                  <Select value={note.categoryId} onValueChange={(value) => updateCategoryNote(note.key, 'categoryId', value)} disabled={disabled}>
-                    <SelectTrigger className="w-full"><SelectValue placeholder="Select category" /></SelectTrigger>
-                    <SelectContent><SelectGroup>{references.categories.map((category) => <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>)}</SelectGroup></SelectContent>
-                  </Select>
-                </Field>
-                <Field><FieldLabel>Weeks without movement</FieldLabel><Input type="number" min={0} step={1} value={note.weeksWithoutMovement} disabled={disabled} onChange={(event) => updateCategoryNote(note.key, 'weeksWithoutMovement', event.target.value)} /></Field>
-                <Field><FieldLabel>Value at risk</FieldLabel><Input type="number" min={0} step={0.01} value={note.valueAtRisk} disabled={disabled} onChange={(event) => updateCategoryNote(note.key, 'valueAtRisk', event.target.value)} /></Field>
-                <FieldGroup className="gap-3">
-                  <Field orientation="horizontal"><FieldLabel>Overstocked</FieldLabel><Switch checked={note.overstocked} disabled={disabled} onCheckedChange={(value) => updateCategoryNote(note.key, 'overstocked', value)} /></Field>
-                  <Field orientation="horizontal"><FieldLabel>Slow moving</FieldLabel><Switch checked={note.slowMoving} disabled={disabled} onCheckedChange={(value) => updateCategoryNote(note.key, 'slowMoving', value)} /></Field>
-                </FieldGroup>
-                <Field className="sm:col-span-2"><FieldLabel>Performance comment</FieldLabel><Textarea value={note.performanceComment} disabled={disabled} onChange={(event) => updateCategoryNote(note.key, 'performanceComment', event.target.value)} /></Field>
-                <Field className="sm:col-span-2"><FieldLabel>Corrective action</FieldLabel><Textarea value={note.correctiveAction} disabled={disabled} onChange={(event) => updateCategoryNote(note.key, 'correctiveAction', event.target.value)} /></Field>
-                <Field className="sm:col-span-2 lg:col-span-4"><FieldLabel>Manager comment</FieldLabel><Textarea value={note.managerComment} disabled={disabled} onChange={(event) => updateCategoryNote(note.key, 'managerComment', event.target.value)} /></Field>
-              </FieldGroup>
-            </section>
-          ))}
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-4 py-3 text-sm">
+            <p>Review every category for this store before submitting.</p>
+            <Badge variant={completedCategoryCount === storeCategories.length && storeCategories.length > 0 ? 'default' : 'outline'}>
+              {completedCategoryCount} of {storeCategories.length} complete
+            </Badge>
+          </div>
+          {categoryNotes.map((note, index) => {
+            const category = categoryById.get(Number(note.categoryId));
+            const expanded = expandedCategoryKeys.has(note.key);
+            const complete = Boolean(note.performanceComment.trim());
+            const stockAtRisk = note.overstocked || note.slowMoving ? category?.stockValue ?? note.valueAtRisk ?? '0' : '0';
+            const formattedStockAtRisk = `${references.organization.currency} ${Number(stockAtRisk).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            return (
+              <section key={note.key} className="surface overflow-hidden">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left transition-colors hover:bg-muted/40"
+                  aria-expanded={expanded}
+                  onClick={() => setExpandedCategoryKeys((current) => {
+                    const next = new Set(current);
+                    if (next.has(note.key)) next.delete(note.key);
+                    else next.add(note.key);
+                    return next;
+                  })}
+                >
+                  <span>
+                    <span className="block text-sm font-semibold">Category note {index + 1}: {category?.name ?? 'Category'}</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">{complete ? 'Review complete' : 'Performance comment required'}</span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <Badge variant={complete ? 'default' : 'outline'}>
+                      {complete ? <CheckCircle2 data-icon="inline-start" /> : null}
+                      {complete ? 'Complete' : 'Needs review'}
+                    </Badge>
+                    <ChevronDown className={`size-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                  </span>
+                </button>
+                {expanded ? (
+                  <div className="border-t p-4">
+                    <FieldGroup className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                      <Field>
+                        <FieldLabel>Category</FieldLabel>
+                        <Select value={note.categoryId} disabled>
+                          <SelectTrigger className="w-full"><SelectValue placeholder="Select category" /></SelectTrigger>
+                          <SelectContent><SelectGroup>{storeCategories.map((storeCategory) => <SelectItem key={storeCategory.id} value={String(storeCategory.id)}>{storeCategory.name}</SelectItem>)}</SelectGroup></SelectContent>
+                        </Select>
+                      </Field>
+                      <Field><FieldLabel>Weeks without movement</FieldLabel><Input type="number" min={0} step={1} value={note.weeksWithoutMovement} disabled={disabled} onChange={(event) => updateCategoryNote(note.key, 'weeksWithoutMovement', event.target.value)} /></Field>
+                      <Field>
+                        <FieldLabel>Stock at Risk</FieldLabel>
+                        <Input value={formattedStockAtRisk} readOnly disabled={disabled} aria-readonly="true" />
+                        {category ? <p className="text-xs text-muted-foreground">{category.stockQuantity} unit(s) on hand; risk uses selling price.</p> : null}
+                        {category && category.missingSellingPriceCount > 0 ? <p className="text-xs text-destructive">{category.missingSellingPriceCount} stocked item(s) need a selling price.</p> : null}
+                      </Field>
+                      <FieldGroup className="gap-3">
+                        <Field orientation="horizontal"><FieldLabel>Overstocked</FieldLabel><Switch checked={note.overstocked} disabled={disabled} onCheckedChange={(value) => updateCategoryNote(note.key, 'overstocked', value)} /></Field>
+                        <Field orientation="horizontal"><FieldLabel>Slow moving</FieldLabel><Switch checked={note.slowMoving} disabled={disabled} onCheckedChange={(value) => updateCategoryNote(note.key, 'slowMoving', value)} /></Field>
+                      </FieldGroup>
+                      <Field className="sm:col-span-2"><FieldLabel>Performance comment <span className="text-destructive">*</span></FieldLabel><Textarea value={note.performanceComment} disabled={disabled} onChange={(event) => updateCategoryNote(note.key, 'performanceComment', event.target.value)} /></Field>
+                      <Field className="sm:col-span-2"><FieldLabel>Corrective action</FieldLabel><Textarea value={note.correctiveAction} disabled={disabled} onChange={(event) => updateCategoryNote(note.key, 'correctiveAction', event.target.value)} /></Field>
+                      <Field className="sm:col-span-2 lg:col-span-4"><FieldLabel>Manager comment</FieldLabel><Textarea value={note.managerComment} disabled={disabled} onChange={(event) => updateCategoryNote(note.key, 'managerComment', event.target.value)} /></Field>
+                    </FieldGroup>
+                  </div>
+                ) : null}
+              </section>
+            );
+          })}
         </TabsContent>
 
         <TabsContent value="actions" className="flex flex-col gap-4">
