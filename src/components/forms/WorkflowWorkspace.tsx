@@ -298,7 +298,16 @@ function WorkflowSheet({
                   disabled={saving}
                   error={errors[field.name]}
                   onChange={(value) => {
-                    setValues((current) => ({ ...current, [field.name]: value }));
+                    setValues((current) => {
+                      const next = { ...current, [field.name]: value };
+                      // A recurring target should not silently expire at the
+                      // default month-end date. The target contract replaces a
+                      // blank end date with its open-ended sentinel.
+                      if (field.name === 'recurring' && value === true && current.periodEnd) {
+                        next.periodEnd = '';
+                      }
+                      return next;
+                    });
                     setErrors((current) => {
                       if (!current[field.name]) return current;
                       const next = { ...current };

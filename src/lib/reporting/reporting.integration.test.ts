@@ -219,6 +219,48 @@ describeWithDatabase('reporting SQL integration', () => {
     expect(store.trend.find((point) => point.date === '2026-07-05')?.target).toBe(0);
   });
 
+  it('repeats a weekly target into a new week without another target row', async () => {
+    await client.query(
+      `insert into performance_targets (
+         metric, scope_type, store_id, period_type, period_start, period_end, recurring, value, unit,
+         created_by_user_id, updated_by_user_id
+       ) values ('net-revenue', 'store', $2, 'week', '2026-08-01', '2099-12-31', true, 600, 'money', $1, $1)`,
+      [userId, storeId]
+    );
+    const { getTradingOverview } = await import('./trading');
+    const report = await getTradingOverview({
+      preset: 'custom',
+      from: '2026-08-03',
+      to: '2026-08-08',
+      compareFrom: '2026-07-27',
+      compareTo: '2026-08-02',
+      store: { id: storeId, code: 'multi-brand', name: 'Multi Brand Store' },
+    });
+
+    expect(report.summary.targetRevenue).toBe(600);
+
+    await client.query(
+      `insert into performance_targets (
+         metric, scope_type, store_id, period_type, period_start, period_end, recurring, value, unit,
+         created_by_user_id, updated_by_user_id
+       ) values
+         ('net-revenue', 'store', $2, 'month', '2026-08-02', '2099-12-31', true, 3000, 'money', $1, $1),
+         ('net-revenue', 'store', $2, 'day', '2026-08-03', '2099-12-31', true, 1200, 'money', $1, $1)`,
+      [userId, storeId]
+    );
+    const withHigherCadences = await getTradingOverview({
+      preset: 'custom',
+      from: '2026-08-03',
+      to: '2026-08-08',
+      compareFrom: '2026-07-27',
+      compareTo: '2026-08-02',
+      store: { id: storeId, code: 'multi-brand', name: 'Multi Brand Store' },
+    });
+
+    // Daily takes precedence over weekly and monthly when all are active.
+    expect(withHigherCadences.summary.targetRevenue).toBe(7200);
+  });
+
   it('uses group budgets when present and otherwise sums store budgets for group reporting', async () => {
     const otherStoreId = Number(
       (await client.query(`insert into stores (code, name) values ('budget-store', 'Budget Store') returning id`)).rows[0].id

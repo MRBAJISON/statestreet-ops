@@ -3,9 +3,10 @@ import type { TradingOverview } from '../contracts/analytics';
 import { db } from '../db';
 import type { AnalyticsScope } from './shared';
 import { jsonResult } from './shared';
-import { isTradingDay, targetPerTradingDay, targetWithinWindow } from './trading-days';
+import { isTradingDay, targetIsEffectiveForDate, targetPerTradingDayForDate, targetWithinWindowForRecord } from './trading-days';
 
 export async function getTradingOverview(scope: AnalyticsScope): Promise<TradingOverview> {
+  const trendByMonth = scope.preset === 'ytd';
   const reportStore = scope.store ? sql`and report.store_id = ${scope.store.id}` : sql``;
   const targetStore = scope.store ? sql`and target.store_id = ${scope.store.id}` : sql``;
   const expenseStore = scope.store ? sql`and expense.store_id = ${scope.store.id}` : sql``;
@@ -102,8 +103,10 @@ export async function getTradingOverview(scope: AnalyticsScope): Promise<Trading
       select
         target.store_id,
         sum(
-          ${targetWithinWindow(
+          ${targetWithinWindowForRecord(
             sql`target.value`,
+            sql`target.period_type`,
+            sql`target.recurring`,
             sql`target.period_start`,
             sql`target.period_end`,
             sql`${scope.from}::date`,
@@ -179,10 +182,10 @@ export async function getTradingOverview(scope: AnalyticsScope): Promise<Trading
         date.date,
         coalesce(
           case when ${scope.store === null}::boolean then
-            sum(${targetPerTradingDay(sql`target.value`, sql`target.period_start`, sql`target.period_end`)})
+            sum(${targetPerTradingDayForDate(sql`target.value`, sql`target.period_type`, sql`target.recurring`, sql`date.date`, sql`target.period_start`, sql`target.period_end`)})
               filter (where target.scope_type = 'group')
           end,
-          sum(${targetPerTradingDay(sql`target.value`, sql`target.period_start`, sql`target.period_end`)})
+          sum(${targetPerTradingDayForDate(sql`target.value`, sql`target.period_type`, sql`target.recurring`, sql`date.date`, sql`target.period_start`, sql`target.period_end`)})
             filter (where target.scope_type = 'store'),
           0
         ) as value
@@ -194,6 +197,7 @@ export async function getTradingOverview(scope: AnalyticsScope): Promise<Trading
          or (target.scope_type = 'store' ${targetStore})
        )
        and date.date between target.period_start and target.period_end
+       and ${targetIsEffectiveForDate(sql`date.date`)}
       group by date.date
     ), effective_target as (
       select coalesce(sum(value), 0) as value from effective_daily_target
@@ -313,7 +317,17 @@ export async function getTradingOverview(scope: AnalyticsScope): Promise<Trading
           'target', round(trend.target, 2)::float8,
           'grossProfit', round(trend.gross_profit, 2)::float8
         ) order by trend.date)
-        from trend_rows trend
+        from (${trendByMonth ? sql`
+          select date_trunc('month', trend.date)::date as date,
+            sum(trend.revenue) as revenue,
+            sum(trend.target) as target,
+            sum(trend.gross_profit) as gross_profit
+          from trend_rows trend
+          group by date_trunc('month', trend.date)::date
+        ` : sql`
+          select trend.date, trend.revenue, trend.target, trend.gross_profit
+          from trend_rows trend
+        `}) trend
       ), '[]'::jsonb),
       'stores', coalesce((
         select jsonb_agg(jsonb_build_object(

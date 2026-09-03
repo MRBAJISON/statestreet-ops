@@ -271,6 +271,7 @@ export interface MarketingDomain {
     qualified: number;
     converted: number;
     costPerLead: number;
+    missedSalesValue: number;
     nps: number | null;
   };
   funnel: { reach: number; engagement: number; leads: number; storeVisits: number; revenueInfluenced: number };

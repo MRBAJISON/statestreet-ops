@@ -28,6 +28,7 @@ export function MarketingOverview({ meta, domain }: { meta: AnalyticsMeta; domai
         { label: 'Influenced revenue', value: formatCurrency(domain.summary.influencedRevenue, meta.currency), detail: `${domain.summary.roas.toFixed(1)}x ROAS`, icon: Megaphone, tone: 'blue' },
         { label: 'Leads', value: formatNumber(domain.summary.leads), detail: `${formatNumber(domain.summary.qualified)} qualified`, icon: ContactRound, tone: 'teal' },
         { label: 'Conversions', value: formatNumber(domain.summary.converted), detail: `${formatCurrency(domain.summary.costPerLead, meta.currency)} per lead`, icon: MousePointerClick, tone: 'green' },
+        { label: 'Missed sales value', value: formatCurrency(domain.summary.missedSalesValue, meta.currency), detail: 'Stock-gap requests', icon: BadgeDollarSign, tone: 'amber' },
         { label: 'Customer NPS', value: domain.summary.nps === null ? 'No score' : domain.summary.nps.toFixed(0), detail: 'Captured feedback', icon: UsersRound, tone: 'amber' },
       ]} className="2xl:grid-cols-5" />
 

@@ -3,7 +3,7 @@ import type { DailyReportRecord, DailyReportStatus } from '../contracts/daily-re
 import { db } from '../db';
 import { customerInteractions, products } from '../db/foundation-schema';
 import { getDailyReportsForStorePeriod } from '../daily-reports';
-import { targetWithinWindow } from './trading-days';
+import { targetWithinWindowForRecord } from './trading-days';
 import { resolveStorePeriod, tradingDaysBetween, type StorePeriodRange, type StorePeriodType } from './store-period';
 
 export { resolveStorePeriod, tradingDaysBetween };
@@ -69,7 +69,7 @@ export interface StorePeriodReport {
   categories: StorePeriodCategory[];
   payments: { paymentMethodId: number; amount: number }[];
   productsSold: { name: string; occurrences: number }[];
-  customerRequests: { id: number; interest: string; fulfillmentStatus: 'in_stock' | 'stock_gap' | null }[];
+  customerRequests: { id: number; interest: string; fulfillmentStatus: 'in_stock' | 'stock_gap' | null; stockGapQuantity: number | null; stockGapValue: number; stockGapCause: string | null }[];
   leadsCount: number;
   notes: StorePeriodNote[];
   previous: { netRevenue: number; transactions: number; avgTicketValue: number };
@@ -107,8 +107,10 @@ function netOf(report: DailyReportRecord): number {
 
 async function targetForRange(storeId: number, from: string, to: string): Promise<number> {
   const result = await db.execute(sql`
-    select coalesce(sum(${targetWithinWindow(
+    select coalesce(sum(${targetWithinWindowForRecord(
       sql`target.value`,
+      sql`target.period_type`,
+      sql`target.recurring`,
       sql`target.period_start`,
       sql`target.period_end`,
       sql`${from}::date`,
@@ -148,6 +150,9 @@ export async function getStorePeriodReport(
         productName: products.name,
         interestText: customerInteractions.interestText,
         fulfillmentStatus: customerInteractions.fulfillmentStatus,
+        stockGapQuantity: customerInteractions.stockGapQuantity,
+        stockGapValue: customerInteractions.stockGapValue,
+        stockGapCause: customerInteractions.stockGapCause,
         lifecycle: customerInteractions.lifecycle,
       })
       .from(customerInteractions)
@@ -250,6 +255,9 @@ export async function getStorePeriodReport(
         id: row.id,
         interest: row.productName ?? row.interestText ?? '',
         fulfillmentStatus: row.fulfillmentStatus as 'in_stock' | 'stock_gap' | null,
+        stockGapQuantity: row.stockGapQuantity,
+        stockGapValue: money(row.stockGapValue),
+        stockGapCause: row.stockGapCause,
       })),
     leadsCount: interactionRows.filter((row) => row.lifecycle === 'lead').length,
     notes: counted

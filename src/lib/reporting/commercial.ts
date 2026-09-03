@@ -3,7 +3,7 @@ import type { CommercialDomain } from '../contracts/analytics';
 import { db } from '../db';
 import type { AnalyticsScope } from './shared';
 import { jsonResult } from './shared';
-import { targetWithinWindow, weekEndFor, weekStartFor } from './trading-days';
+import { targetWithinWindowForRecord, weekEndFor, weekStartFor } from './trading-days';
 
 export async function getCommercialDomain(scope: AnalyticsScope): Promise<CommercialDomain> {
   const movementStore = scope.store ? sql`and movement.store_id = ${scope.store.id}` : sql``;
@@ -104,8 +104,10 @@ export async function getCommercialDomain(scope: AnalyticsScope): Promise<Commer
       ) trading on true
       left join lateral (
         select sum(
-          ${targetWithinWindow(
+          ${targetWithinWindowForRecord(
             sql`target.value`,
+            sql`target.period_type`,
+            sql`target.recurring`,
             sql`target.period_start`,
             sql`target.period_end`,
             weekStartFor(sql`review.week_end`),
@@ -144,10 +146,15 @@ export async function getCommercialDomain(scope: AnalyticsScope): Promise<Commer
       select
         category.id,
         category.name,
-        coalesce(sum(target.value *
-          ((least(target.period_end, ${scope.to}::date) - greatest(target.period_start, ${scope.from}::date)) + 1)::numeric /
-          ((target.period_end - target.period_start) + 1)::numeric
-        ), 0) as target_revenue,
+        coalesce(sum(${targetWithinWindowForRecord(
+          sql`target.value`,
+          sql`target.period_type`,
+          sql`target.recurring`,
+          sql`target.period_start`,
+          sql`target.period_end`,
+          sql`${scope.from}::date`,
+          sql`${scope.to}::date`
+        )}), 0) as target_revenue,
         coalesce(actual.revenue, 0) as actual_revenue
       from categories category
       left join performance_targets target

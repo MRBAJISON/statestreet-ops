@@ -171,11 +171,11 @@ async function captureCustomer(user: AppUser, input: z.infer<typeof customerCapt
     ), interaction as (
       insert into customer_interactions (
         customer_id, store_id, business_date, lifecycle, source, source_detail,
-        product_id, interest_text, fulfillment_status, notes, captured_by_user_id
+        product_id, interest_text, fulfillment_status, stock_gap_quantity, stock_gap_value, stock_gap_cause, notes, captured_by_user_id
       )
       select customer.id, ${store.id}, ${input.businessDate}, ${input.lifecycle}, ${input.source},
              ${input.sourceDetail ?? null}, ${input.productId ?? null}, ${input.interestText ?? null},
-             ${input.fulfillmentStatus ?? null}, ${input.notes ?? null}, ${actorUserId}
+             ${input.fulfillmentStatus ?? null}, ${input.stockGapQuantity ?? null}, ${input.stockGapValue ?? null}, ${input.stockGapCause ?? null}, ${input.notes ?? null}, ${actorUserId}
       from customer_record customer
       returning *
     ), interaction_audit as (
@@ -255,18 +255,19 @@ export const WORKFLOW_HANDLERS: Record<WorkflowName, WorkflowHandler> = {
   }),
   target: workflow(performanceTargetSchema, ['owner', 'finance', 'commercial', 'operations'], async (user, input) => {
     const actorUserId = sessionUserId(user.id);
+    const periodEnd = input.periodEnd ?? '2099-12-31';
     return upsertAuditedRecord({
       table: 'performance_targets', entityType: 'performance-target', actorUserId,
       key: {
         metric: input.metric, scope_type: input.scopeType, store_id: input.storeId ?? null,
         brand_id: input.brandId ?? null, category_id: input.categoryId ?? null,
-        period_start: input.periodStart, period_end: input.periodEnd,
+        period_start: input.periodStart, period_end: periodEnd, recurring: input.recurring,
       },
       values: {
         metric: input.metric, scope_type: input.scopeType, store_id: input.storeId ?? null,
         brand_id: input.brandId ?? null, category_id: input.categoryId ?? null,
-        period_type: input.periodType, period_start: input.periodStart, period_end: input.periodEnd,
-        value: input.value, unit: input.unit, ...upsertActors(actorUserId),
+        period_type: input.periodType, period_start: input.periodStart, period_end: periodEnd,
+        recurring: input.recurring, value: input.value, unit: input.unit, ...upsertActors(actorUserId),
       },
       preserveOnUpdate: ['created_by_user_id'],
     });

@@ -93,14 +93,15 @@ export const performanceTargetSchema = z
     storeId: optionalId,
     brandId: optionalId,
     categoryId: optionalId,
-    periodType: z.enum(['week', 'month', 'quarter', 'year']),
+    periodType: z.enum(['day', 'week', 'month', 'quarter', 'year']),
+    recurring: z.boolean().default(false),
     periodStart: dateSchema,
-    periodEnd: dateSchema,
+    periodEnd: z.preprocess((value) => (value === '' || value === null ? undefined : value), dateSchema.optional()),
     value: moneySchema,
     unit: z.enum(['money', 'percent', 'count', 'ratio']),
   })
   .superRefine((target, context) => {
-    if (target.periodEnd < target.periodStart) {
+    if (target.periodEnd && target.periodEnd < target.periodStart) {
       context.addIssue({ code: 'custom', path: ['periodEnd'], message: 'Period end cannot be before period start' });
     }
     const references = [target.storeId, target.brandId, target.categoryId].filter(Boolean).length;
@@ -110,6 +111,15 @@ export const performanceTargetSchema = z
     if (target.scopeType === 'store' && !target.storeId) context.addIssue({ code: 'custom', path: ['storeId'], message: 'Store is required' });
     if (target.scopeType === 'brand' && !target.brandId) context.addIssue({ code: 'custom', path: ['brandId'], message: 'Brand is required' });
     if (target.scopeType === 'category' && !target.categoryId) context.addIssue({ code: 'custom', path: ['categoryId'], message: 'Category is required' });
+    if (!target.recurring && !target.periodEnd) {
+      context.addIssue({ code: 'custom', path: ['periodEnd'], message: 'An end date is required for a one-time target' });
+    }
+    if (target.recurring && !['day', 'week', 'month'].includes(target.periodType)) {
+      context.addIssue({ code: 'custom', path: ['periodType'], message: 'Recurring targets can repeat daily, weekly, or monthly' });
+    }
+    if (!target.recurring && target.periodType === 'day') {
+      context.addIssue({ code: 'custom', path: ['recurring'], message: 'Select Repeat automatically for a daily target' });
+    }
   });
 
 export const actionItemSchema = z
@@ -412,10 +422,17 @@ export const customerCaptureSchema = z.object({
   productId: optionalId,
   interestText: optionalText(500),
   fulfillmentStatus: optionalEnum(['in_stock', 'stock_gap']),
+  stockGapQuantity: z.number().int().min(1).max(10_000).optional(),
+  stockGapValue: optionalMoneySchema,
+  stockGapCause: optionalEnum(['size_unavailable', 'colour_unavailable', 'price', 'authenticity_doubt', 'discount_declined', 'other']),
   notes: optionalText(1000),
-}).refine((value) => Boolean(value.productId || value.interestText), {
-  path: ['productId'],
-  message: 'Choose a product or describe the customer interest',
+}).superRefine((value, ctx) => {
+  if (!value.productId && !value.interestText) {
+    ctx.addIssue({ path: ['productId'], code: 'custom', message: 'Choose a product or describe the customer interest' });
+  }
+  if (value.fulfillmentStatus !== 'stock_gap' && (value.stockGapQuantity || value.stockGapValue || value.stockGapCause)) {
+    ctx.addIssue({ path: ['fulfillmentStatus'], code: 'custom', message: 'Stock-gap details require Stock gap status' });
+  }
 });
 
 export const workflowSchemas = {

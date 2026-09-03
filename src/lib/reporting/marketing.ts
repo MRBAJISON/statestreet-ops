@@ -136,6 +136,11 @@ export async function getMarketingDomain(scope: AnalyticsScope): Promise<Marketi
       from customer_interactions interaction
       where interaction.business_date between ${scope.from}::date and ${scope.to}::date ${interactionStore}
       group by interaction.source
+    ), stock_gap_summary as (
+      select coalesce(sum(interaction.stock_gap_value), 0) as missed_sales_value
+      from customer_interactions interaction
+      where interaction.business_date between ${scope.from}::date and ${scope.to}::date
+        and interaction.fulfillment_status = 'stock_gap' ${interactionStore}
     ), customer_interests as (
       select coalesce(product.name, interaction.interest_text, 'Not specified') as name, count(*)::integer as value
       from customer_interactions interaction
@@ -158,6 +163,7 @@ export async function getMarketingDomain(scope: AnalyticsScope): Promise<Marketi
         'qualified', lead.qualified,
         'converted', lead.converted,
         'costPerLead', coalesce(round(campaign.spend / nullif(lead.leads, 0), 2), 0)::float8,
+        'missedSalesValue', gaps.missed_sales_value::float8,
         'nps', feedback.nps::float8
       ),
       'funnel', jsonb_build_object(
@@ -278,6 +284,7 @@ export async function getMarketingDomain(scope: AnalyticsScope): Promise<Marketi
     cross join lead_summary lead
     cross join feedback_summary feedback
     cross join customer_summary customer
+    cross join stock_gap_summary gaps
   `);
 
   return jsonResult<MarketingDomain>(result);

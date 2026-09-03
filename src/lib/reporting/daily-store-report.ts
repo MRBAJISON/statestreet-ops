@@ -1,12 +1,15 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { customerInteractions, products } from '../db/foundation-schema';
-import { isTradingDay, targetPerTradingDay } from './trading-days';
+import { isTradingDay, targetPerTradingDayForDate } from './trading-days';
 
 export interface DailyStoreReportCustomerRequest {
   id: number;
   interest: string;
   fulfillmentStatus: 'in_stock' | 'stock_gap' | null;
+  stockGapQuantity: number | null;
+  stockGapValue: number;
+  stockGapCause: string | null;
 }
 
 export interface DailyStoreReportSupplement {
@@ -32,7 +35,7 @@ export async function getDailyStoreReportSupplement(
   const [targetResult, interactionRows] = await Promise.all([
     db.execute(sql`
       select coalesce(
-        sum(${targetPerTradingDay(sql`target.value`, sql`target.period_start`, sql`target.period_end`)}),
+        sum(${targetPerTradingDayForDate(sql`target.value`, sql`target.period_type`, sql`target.recurring`, sql`${businessDate}::date`, sql`target.period_start`, sql`target.period_end`)}),
         0
       ) as daily_target
       from performance_targets target
@@ -49,6 +52,9 @@ export async function getDailyStoreReportSupplement(
         productName: products.name,
         interestText: customerInteractions.interestText,
         fulfillmentStatus: customerInteractions.fulfillmentStatus,
+        stockGapQuantity: customerInteractions.stockGapQuantity,
+        stockGapValue: customerInteractions.stockGapValue,
+        stockGapCause: customerInteractions.stockGapCause,
         lifecycle: customerInteractions.lifecycle,
       })
       .from(customerInteractions)
@@ -73,6 +79,9 @@ export async function getDailyStoreReportSupplement(
       id: row.id,
       interest: row.productName ?? row.interestText ?? '',
       fulfillmentStatus: row.fulfillmentStatus as 'in_stock' | 'stock_gap' | null,
+      stockGapQuantity: row.stockGapQuantity,
+      stockGapValue: Number(row.stockGapValue ?? 0),
+      stockGapCause: row.stockGapCause,
     }));
   const leadsCount = interactionRows.filter((row) => row.lifecycle === 'lead').length;
   const followUpText =

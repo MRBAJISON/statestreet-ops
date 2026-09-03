@@ -43,6 +43,23 @@ describe('typed workflow contracts', () => {
     expect(performanceTargetSchema.safeParse({ ...base, scopeType: 'group', brandId: 2 }).success).toBe(false);
   });
 
+  it('allows recurring targets without an end date and restricts their cadence', () => {
+    const base = {
+      metric: 'net-revenue',
+      scopeType: 'store',
+      storeId: 4,
+      periodType: 'month',
+      periodStart: '2026-09-01',
+      value: '320000',
+      unit: 'money',
+      recurring: true,
+    } as const;
+    expect(performanceTargetSchema.parse(base).periodEnd).toBeUndefined();
+    expect(performanceTargetSchema.safeParse({ ...base, periodType: 'year' }).success).toBe(false);
+    expect(performanceTargetSchema.safeParse({ ...base, recurring: false }).success).toBe(false);
+    expect(performanceTargetSchema.safeParse({ ...base, periodType: 'day', recurring: false, periodEnd: '2026-09-01' }).success).toBe(false);
+  });
+
   it('rejects impossible funnel counts and contact storage without consent', () => {
     expect(
       leadMetricSchema.safeParse({

@@ -844,6 +844,9 @@ export const customerInteractions = pgTable(
     productId: bigint('product_id', { mode: 'number' }).references(() => products.id, { onDelete: 'restrict' }),
     interestText: text('interest_text'),
     fulfillmentStatus: text('fulfillment_status'),
+    stockGapQuantity: integer('stock_gap_quantity'),
+    stockGapValue: money('stock_gap_value'),
+    stockGapCause: text('stock_gap_cause'),
     notes: text('notes'),
     capturedByUserId: integer('captured_by_user_id')
       .notNull()
@@ -860,6 +863,8 @@ export const customerInteractions = pgTable(
       'customer_interactions_fulfillment_status_check',
       sql`${t.fulfillmentStatus} is null or ${t.fulfillmentStatus} in ('in_stock', 'stock_gap')`
     ),
+    check('customer_interactions_stock_gap_fields_check', sql`${t.fulfillmentStatus} = 'stock_gap' or (${t.stockGapQuantity} is null and ${t.stockGapValue} is null and ${t.stockGapCause} is null)`),
+    check('customer_interactions_stock_gap_amounts_check', sql`${t.stockGapQuantity} is null or ${t.stockGapQuantity} >= 1`),
   ]
 );
 

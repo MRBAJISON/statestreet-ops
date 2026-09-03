@@ -5,6 +5,7 @@ import type { AnalyticsScope } from './shared';
 import { jsonResult } from './shared';
 
 export async function getFinanceDomain(scope: AnalyticsScope): Promise<FinanceDomain> {
+  const cashTrendByMonth = scope.preset === 'ytd';
   const expenseStore = scope.store ? sql`and expense.store_id = ${scope.store.id}` : sql``;
   const reportStore = scope.store ? sql`and report.store_id = ${scope.store.id}` : sql``;
   const budgetScope = scope.store
@@ -236,7 +237,16 @@ export async function getFinanceDomain(scope: AnalyticsScope): Promise<FinanceDo
           'outflow', round(cash.outflow, 2)::float8,
           'net', round(cash.inflow - cash.outflow, 2)::float8
         ) order by cash.date)
-        from cash_rows cash
+        from (${cashTrendByMonth ? sql`
+          select date_trunc('month', cash.date)::date as date,
+            sum(cash.inflow) as inflow,
+            sum(cash.outflow) as outflow
+          from cash_rows cash
+          group by date_trunc('month', cash.date)::date
+        ` : sql`
+          select cash.date, cash.inflow, cash.outflow
+          from cash_rows cash
+        `}) cash
       ), '[]'::jsonb),
       'cashAccounts', coalesce((
         select jsonb_agg(jsonb_build_object(
