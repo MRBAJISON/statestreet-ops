@@ -145,5 +145,28 @@ export async function getStoreDomain(scope: AnalyticsScope): Promise<StoreDomain
     from customer_health customer
   `);
 
-  return jsonResult<StoreDomain>(result);
+  const domain = jsonResult<StoreDomain>(result);
+  const transactionResult = await db.execute(sql`
+    select
+      (select count(*)::integer from customer_credit_notes note where note.store_id = ${scope.store.id} and note.business_date between ${scope.from}::date and ${scope.to}::date and note.status = 'submitted') as credit_notes_submitted,
+      (select coalesce(sum(note.approved_value), 0) from customer_credit_notes note where note.store_id = ${scope.store.id} and note.business_date between ${scope.from}::date and ${scope.to}::date and note.status in ('approved', 'partially-redeemed', 'redeemed')) as approved_credit_value,
+      (select count(*)::integer from customer_credit_note_items item join customer_credit_notes note on note.id = item.credit_note_id where note.store_id = ${scope.store.id} and item.inventory_status = 'pending-review') as pending_inventory_items,
+      (select coalesce(sum(payment.amount), 0) from customer_deposit_payments payment where payment.store_id = ${scope.store.id} and payment.business_date between ${scope.from}::date and ${scope.to}::date and payment.payment_type in ('deposit', 'balance')) as deposits_received,
+      (select count(*)::integer from customer_deposits deposit where deposit.store_id = ${scope.store.id} and deposit.status in ('active', 'ready')) as active_deposits,
+      (select coalesce(sum(deposit.total_value - coalesce((select sum(case when payment.payment_type = 'refund' then -payment.amount else payment.amount end) from customer_deposit_payments payment where payment.deposit_id = deposit.id), 0)), 0) from customer_deposits deposit where deposit.store_id = ${scope.store.id} and deposit.status in ('active', 'ready')) as outstanding_deposit_balance,
+      (select count(*)::integer from customer_deposits deposit where deposit.store_id = ${scope.store.id} and deposit.status = 'cancel-requested') as cancellation_requests
+  `);
+  const row = transactionResult.rows[0] as Record<string, unknown> | undefined;
+  return {
+    ...domain,
+    customerTransactions: {
+      creditNotesSubmitted: Number(row?.credit_notes_submitted ?? 0),
+      approvedCreditValue: Number(row?.approved_credit_value ?? 0),
+      pendingInventoryItems: Number(row?.pending_inventory_items ?? 0),
+      depositsReceived: Number(row?.deposits_received ?? 0),
+      activeDeposits: Number(row?.active_deposits ?? 0),
+      outstandingDepositBalance: Number(row?.outstanding_deposit_balance ?? 0),
+      cancellationRequests: Number(row?.cancellation_requests ?? 0),
+    },
+  };
 }

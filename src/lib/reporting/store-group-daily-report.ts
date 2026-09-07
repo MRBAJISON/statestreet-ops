@@ -1,6 +1,7 @@
 import type { DailyReportRecord } from '../contracts/daily-report';
 import { getDailyReportsForStorePeriod } from '../daily-reports';
 import { getDailyStoreReportSupplement, type DailyStoreReportCustomerRequest } from './daily-store-report';
+import type { CustomerTransactionSummary } from '../customer-transactions';
 import { storeNames, storesInGroup } from '../store-access';
 
 // The combined report for a single trading day across the stores in a group.
@@ -46,6 +47,7 @@ export interface StoreGroupDailyReport {
     footfall: number;
     creditSales: number;
   };
+  transactionSummary: CustomerTransactionSummary;
   target: number;
   achievementPercent: number;
   surplus: number;
@@ -97,6 +99,10 @@ export async function getStoreGroupDailyReport(
   };
   let target = 0;
   let leadsCount = 0;
+  const transactionSummary: CustomerTransactionSummary = {
+    approvedCredits: 0, creditRedemptions: 0, depositReceived: 0, depositRefunds: 0,
+    additionalPayments: 0, netRevenueAdjustment: 0, cashAdjustment: 0,
+  };
 
   const stores: StoreGroupDailyStoreSplit[] = [];
   const outstanding: StoreGroupDailyReport['outstanding'] = [];
@@ -129,15 +135,19 @@ export async function getStoreGroupDailyReport(
 
     managerName = managerName ?? report.managerName;
     const counted = report.status !== 'draft';
-    const netRevenue = counted ? netOf(report) : 0;
+    const baseNetRevenue = counted ? netOf(report) : 0;
     const transactions = counted ? report.transactions : 0;
 
     const supplement = await getDailyStoreReportSupplement(
       member.storeId,
       businessDate,
-      netRevenue,
+      baseNetRevenue,
       transactions
     );
+    const netRevenue = counted ? baseNetRevenue + supplement.transactionSummary.netRevenueAdjustment : 0;
+    for (const key of Object.keys(transactionSummary) as Array<keyof CustomerTransactionSummary>) {
+      transactionSummary[key] += supplement.transactionSummary[key];
+    }
 
     stores.push({
       storeId: member.storeId,
@@ -199,7 +209,7 @@ export async function getStoreGroupDailyReport(
     }
   }
 
-  totals.netRevenue = totals.grossRevenue - totals.discounts - totals.returns;
+  totals.netRevenue = totals.grossRevenue - totals.discounts - totals.returns + transactionSummary.netRevenueAdjustment;
   const achievementPercent = target > 0 ? (totals.netRevenue / target) * 100 : 0;
   const difference = achievementPercent - 100;
 
@@ -211,6 +221,7 @@ export async function getStoreGroupDailyReport(
     outstanding,
     stores: stores.sort((left, right) => left.storeName.localeCompare(right.storeName)),
     totals,
+    transactionSummary,
     target,
     achievementPercent,
     surplus: totals.netRevenue - target,

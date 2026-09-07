@@ -12,6 +12,8 @@ export interface ProductOption {
   sku: string;
   name: string;
   brandName: string;
+  barcode: string | null;
+  sellingPrice: string | null;
 }
 
 async function responseError(response: Response) {
@@ -25,12 +27,14 @@ export function ProductCombobox({
   onSelect,
   disabled,
   allowedBrandIds,
+  storeId,
 }: {
   value: string;
   onChange: (value: string) => void;
   onSelect?: (product: ProductOption) => void;
   disabled?: boolean;
   allowedBrandIds?: readonly number[];
+  storeId?: number | null;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -53,10 +57,13 @@ export function ProductCombobox({
         const params = new URLSearchParams({ limit: '50' });
         if (query.trim()) params.set('q', query.trim());
         if (brandFilter) params.set('brandIds', brandFilter);
+        if (storeId) params.set('storeId', String(storeId));
         const response = await fetch(`/api/products?${params}`, { signal: controller.signal, cache: 'no-store' });
         if (!response.ok) throw new Error(await responseError(response));
         const payload = (await response.json()) as { products: ProductOption[] };
         setProducts(payload.products);
+      } catch {
+        if (!controller.signal.aborted) setProducts([]);
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -65,7 +72,7 @@ export function ProductCombobox({
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [brandFilter, open, query]);
+  }, [brandFilter, open, query, storeId]);
 
   const selected = products.find((product) => String(product.id) === value);
 
@@ -81,7 +88,7 @@ export function ProductCombobox({
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <Command shouldFilter={false}>
-          <CommandInput placeholder="Search SKU or product" value={query} onValueChange={setQuery} />
+          <CommandInput placeholder="Search barcode, SKU or product" value={query} onValueChange={setQuery} />
           <CommandList>
             <CommandEmpty>{loading ? 'Searching…' : 'No products found.'}</CommandEmpty>
             <CommandGroup heading="Products">

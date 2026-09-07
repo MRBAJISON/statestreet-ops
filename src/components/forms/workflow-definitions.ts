@@ -510,7 +510,12 @@ export const targetWorkflows: WorkflowDefinition[] = [
 
 export const financeShortcuts: WorkflowShortcut[] = [
   { href: '/forms/finance/daily-reports', title: 'Daily report review', group: 'Daily finance', icon: ClipboardCheck, tone: 'amber' },
+  { href: '/forms/finance/customer-transactions', title: 'Credit & deposit approvals', group: 'Daily finance', icon: ClipboardCheck, tone: 'coral' },
   { href: '/forms/finance/import', title: 'Import workbook', group: 'Finance data', icon: FileSpreadsheet, tone: 'teal' },
+];
+
+export const commercialShortcuts: WorkflowShortcut[] = [
+  { href: '/forms/commercial/customer-transactions', title: 'Credit note approvals', group: 'Customer transactions', icon: ClipboardCheck, tone: 'coral' },
 ];
 
 export const inventoryShortcuts: WorkflowShortcut[] = [
@@ -519,6 +524,7 @@ export const inventoryShortcuts: WorkflowShortcut[] = [
   { href: '/forms/inventory/stock-count', title: 'Stock count', group: 'Inventory documents', icon: ScanLine, tone: 'amber' },
   { href: '/forms/inventory/replenishment', title: 'Replenishment request', group: 'Inventory documents', icon: RefreshCcw, tone: 'teal' },
   { href: '/forms/inventory/catalog-import', title: 'Product catalogue import', group: 'Catalogue', icon: FileSpreadsheet, tone: 'blue' },
+  { href: '/forms/inventory/customer-transactions', title: 'Returned item decisions', group: 'Returns', icon: ClipboardCheck, tone: 'coral' },
 ];
 
 export const storeShortcuts: WorkflowShortcut[] = [

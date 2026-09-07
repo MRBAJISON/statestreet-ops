@@ -8,6 +8,7 @@ import { isTradingDay, targetIsEffectiveForDate, targetPerTradingDayForDate, tar
 export async function getTradingOverview(scope: AnalyticsScope): Promise<TradingOverview> {
   const trendByMonth = scope.preset === 'ytd';
   const reportStore = scope.store ? sql`and report.store_id = ${scope.store.id}` : sql``;
+  const transactionStore = scope.store ? sql`and transaction_row.store_id = ${scope.store.id}` : sql``;
   const targetStore = scope.store ? sql`and target.store_id = ${scope.store.id}` : sql``;
   const expenseStore = scope.store ? sql`and expense.store_id = ${scope.store.id}` : sql``;
   const inventoryStore = scope.store ? sql`and movement.store_id = ${scope.store.id}` : sql``;
@@ -24,7 +25,7 @@ export async function getTradingOverview(scope: AnalyticsScope): Promise<Trading
         report.business_date,
         report.transactions,
         report.footfall,
-        sum(line.gross_revenue - line.discounts - line.returns) as revenue,
+        sum(line.gross_revenue - line.discounts - line.returns) as base_revenue,
         sum(line.cogs) as cogs,
         sum(line.units_sold) as units,
         sum(line.opening_stock) as opening_stock
@@ -43,10 +44,34 @@ export async function getTradingOverview(scope: AnalyticsScope): Promise<Trading
         and report.business_date between ${scope.compareFrom}::date and ${scope.to}::date
         ${reportStore}
       group by payment.daily_report_id
+    ), transaction_adjustments as (
+      select transaction_row.store_id, transaction_row.business_date,
+        coalesce(sum(transaction_row.revenue_adjustment), 0) as revenue_adjustment,
+        coalesce(sum(transaction_row.cash_adjustment), 0) as cash_adjustment
+      from (
+        select note.store_id, note.business_date, -note.approved_value as revenue_adjustment, 0::numeric as cash_adjustment
+        from customer_credit_notes note
+        where note.status in ('approved', 'partially-redeemed', 'redeemed')
+          and note.business_date between ${scope.compareFrom}::date and ${scope.to}::date
+        union all
+        select payment.store_id, payment.business_date,
+          case when payment.payment_type = 'refund' then -payment.amount else payment.amount end as revenue_adjustment,
+          case when payment.payment_type = 'refund' then -payment.amount else payment.amount end as cash_adjustment
+        from customer_deposit_payments payment
+        where payment.business_date between ${scope.compareFrom}::date and ${scope.to}::date
+        union all
+        select redemption.store_id, redemption.business_date, redemption.additional_payment, redemption.additional_payment
+        from customer_credit_note_redemptions redemption
+        where redemption.business_date between ${scope.compareFrom}::date and ${scope.to}::date
+      ) transaction_row
+      where true ${transactionStore}
+      group by transaction_row.store_id, transaction_row.business_date
     ), report_facts as (
-      select line.*, coalesce(payment.payments, 0) as payments
+      select line.*, coalesce(payment.payments, 0) + coalesce(adjustment.cash_adjustment, 0) as payments,
+        line.base_revenue + coalesce(adjustment.revenue_adjustment, 0) as revenue
       from report_line_totals line
       left join report_payment_totals payment on payment.daily_report_id = line.id
+      left join transaction_adjustments adjustment on adjustment.store_id = line.store_id and adjustment.business_date = line.business_date
     ), current_trade as (
       select * from report_facts where business_date between ${scope.from}::date and ${scope.to}::date
     ), previous_trade as (

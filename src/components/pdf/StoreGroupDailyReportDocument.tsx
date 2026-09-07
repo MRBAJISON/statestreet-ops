@@ -213,6 +213,18 @@ export function StoreGroupDailyReportDocument({
             {totals.returns > 0 ? (
               <View style={styles.row}><Text style={styles.rowLabel}>Returns</Text><Text style={{ ...styles.rowValue, ...styles.rowValueDiscount }}>- {formatMoney(totals.returns, currency)}</Text></View>
             ) : null}
+            {report.transactionSummary.approvedCredits > 0 ? (
+              <View style={styles.row}><Text style={styles.rowLabel}>Approved credit notes</Text><Text style={{ ...styles.rowValue, ...styles.rowValueDiscount }}>- {formatMoney(report.transactionSummary.approvedCredits, currency)}</Text></View>
+            ) : null}
+            {report.transactionSummary.depositReceived > 0 ? (
+              <View style={styles.row}><Text style={styles.rowLabel}>Customer deposits received</Text><Text style={styles.rowValue}>+ {formatMoney(report.transactionSummary.depositReceived, currency)}</Text></View>
+            ) : null}
+            {report.transactionSummary.additionalPayments > 0 ? (
+              <View style={styles.row}><Text style={styles.rowLabel}>Credit replacement balance</Text><Text style={styles.rowValue}>+ {formatMoney(report.transactionSummary.additionalPayments, currency)}</Text></View>
+            ) : null}
+            {report.transactionSummary.depositRefunds > 0 ? (
+              <View style={styles.row}><Text style={styles.rowLabel}>Deposit refunds</Text><Text style={{ ...styles.rowValue, ...styles.rowValueDiscount }}>- {formatMoney(report.transactionSummary.depositRefunds, currency)}</Text></View>
+            ) : null}
             <View style={styles.rowSubtotal}><Text style={styles.rowLabelBold}>Net Sales</Text><Text style={styles.rowValue}>{formatMoney(totals.netRevenue, currency)}</Text></View>
             {report.payments.map((line, index) => (
               <View key={line.paymentMethodId} style={index === report.payments.length - 1 ? styles.rowLast : styles.row}>

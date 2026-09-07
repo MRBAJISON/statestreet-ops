@@ -3,6 +3,7 @@ import type { DailyReportRecord, DailyReportStatus } from '../contracts/daily-re
 import { db } from '../db';
 import { customerInteractions, products } from '../db/foundation-schema';
 import { getDailyReportsForStorePeriod } from '../daily-reports';
+import { getCustomerTransactionDailyAdjustments, getCustomerTransactionSummary } from '../customer-transactions';
 import { targetWithinWindowForRecord } from './trading-days';
 import { resolveStorePeriod, tradingDaysBetween, type StorePeriodRange, type StorePeriodType } from './store-period';
 
@@ -60,6 +61,7 @@ export interface StorePeriodReport {
     footfall: number;
     creditSales: number;
   };
+  transactionSummary: Awaited<ReturnType<typeof getCustomerTransactionSummary>>;
   target: number;
   achievementPercent: number;
   surplus: number;
@@ -139,7 +141,7 @@ export async function getStorePeriodReport(
   const { range, previousRange } = resolveStorePeriod(periodType, anchorIso);
   const expectedDays = tradingDaysBetween(range.from, range.to);
 
-  const [reports, previousReports, target, interactionRows] = await Promise.all([
+  const [reports, previousReports, target, interactionRows, transactionSummary, transactionDays, previousTransactionSummary] = await Promise.all([
     getDailyReportsForStorePeriod(storeId, range.from, range.to),
     getDailyReportsForStorePeriod(storeId, previousRange.from, previousRange.to),
     targetForRange(storeId, range.from, range.to),
@@ -164,6 +166,9 @@ export async function getStorePeriodReport(
           lte(customerInteractions.businessDate, range.to)
         )
       ),
+    getCustomerTransactionSummary(storeId, range.from, range.to),
+    getCustomerTransactionDailyAdjustments(storeId, range.from, range.to),
+    getCustomerTransactionSummary(storeId, previousRange.from, previousRange.to),
   ]);
 
   const first = reports[0];
@@ -177,6 +182,8 @@ export async function getStorePeriodReport(
     .map((date) => ({ date, reason: byDate.has(date) ? ('draft' as const) : ('missing' as const) }));
 
   const totals = sumReports(counted);
+  totals.netRevenue += transactionSummary.netRevenueAdjustment;
+  const transactionDayMap = new Map(transactionDays.map((day) => [day.businessDate, day.netRevenueAdjustment]));
   const perTradingDayTarget = expectedDays.length ? target / expectedDays.length : 0;
   const achievementPercent = target > 0 ? (totals.netRevenue / target) * 100 : 0;
   const avgTicketValue = totals.transactions > 0 ? totals.netRevenue / totals.transactions : 0;
@@ -187,7 +194,7 @@ export async function getStorePeriodReport(
     return {
       date,
       status: report?.status ?? null,
-      netRevenue: counts ? netOf(report) : 0,
+      netRevenue: counts ? netOf(report) + (transactionDayMap.get(date) ?? 0) : 0,
       transactions: counts ? report.transactions : 0,
       target: perTradingDayTarget,
     };
@@ -220,6 +227,7 @@ export async function getStorePeriodReport(
   }
 
   const previousTotals = sumReports(previousReports.filter((report) => report.status !== 'draft'));
+  previousTotals.netRevenue += previousTransactionSummary.netRevenueAdjustment;
 
   return {
     periodType,
@@ -231,6 +239,7 @@ export async function getStorePeriodReport(
     store: { id: first.storeId, code: first.storeCode, name: first.storeName },
     managerName: first.managerName,
     totals,
+    transactionSummary,
     target,
     achievementPercent,
     surplus: totals.netRevenue - target,

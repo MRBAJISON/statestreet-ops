@@ -420,6 +420,15 @@ export interface StoreDomain {
   customerSources: NamedValue[];
   customerHealth: { total: number; new: number; returning: number; repeatRate: number };
   transfers: Array<{ id: number; date: string; direction: 'incoming' | 'outgoing'; otherStore: string; units: number; status: string }>;
+  customerTransactions: {
+    creditNotesSubmitted: number;
+    approvedCreditValue: number;
+    pendingInventoryItems: number;
+    depositsReceived: number;
+    activeDeposits: number;
+    outstandingDepositBalance: number;
+    cancellationRequests: number;
+  };
 }
 
 export interface ExecutiveDomain {

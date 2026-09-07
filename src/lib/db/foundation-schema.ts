@@ -336,6 +336,184 @@ export const dailyReportProducts = pgTable(
   ]
 );
 
+export const customerCreditNotes = pgTable(
+  'customer_credit_notes',
+  {
+    id: id(),
+    storeId: bigint('store_id', { mode: 'number' }).notNull().references(() => stores.id, { onDelete: 'restrict' }),
+    businessDate: date('business_date').notNull(),
+    customerName: text('customer_name').notNull(),
+    customerPhone: text('customer_phone'),
+    originalReceiptNumber: text('original_receipt_number'),
+    originalPurchaseDate: date('original_purchase_date'),
+    reason: text('reason').notNull(),
+    requestedValue: money('requested_value').notNull(),
+    approvedValue: money('approved_value'),
+    status: text('status').notNull().default('submitted'),
+    decisionReason: text('decision_reason'),
+    submittedByUserId: integer('submitted_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+    approvedByUserId: integer('approved_by_user_id').references(() => users.id, { onDelete: 'restrict' }),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+    ...timestamps(),
+  },
+  (t) => [
+    index('customer_credit_notes_store_date_idx').on(t.storeId, t.businessDate),
+    index('customer_credit_notes_status_idx').on(t.status, t.businessDate),
+    check('customer_credit_notes_values_check', sql`${t.requestedValue} > 0 and (${t.approvedValue} is null or ${t.approvedValue} > 0)`),
+    check('customer_credit_notes_status_check', sql`${t.status} in ('submitted', 'approved', 'rejected', 'partially-redeemed', 'redeemed')`),
+  ]
+);
+
+export const customerCreditNoteItems = pgTable(
+  'customer_credit_note_items',
+  {
+    id: id(),
+    creditNoteId: bigint('credit_note_id', { mode: 'number' }).notNull().references(() => customerCreditNotes.id, { onDelete: 'cascade' }),
+    productId: bigint('product_id', { mode: 'number' }).references(() => products.id, { onDelete: 'restrict' }),
+    productName: text('product_name').notNull(),
+    quantity: integer('quantity').notNull(),
+    originalValue: money('original_value').notNull(),
+    unitPrice: money('unit_price'),
+    unwornUnused: boolean('unworn_unused').notNull(),
+    originalTagsAttached: boolean('original_tags_attached').notNull(),
+    originalPackaging: boolean('original_packaging').notNull(),
+    inspectedApproved: boolean('inspected_approved').notNull(),
+    inventoryStatus: text('inventory_status').notNull().default('pending'),
+    inventoryDecision: text('inventory_decision'),
+    inventoryDecisionReason: text('inventory_decision_reason'),
+    inventoryDecidedByUserId: integer('inventory_decided_by_user_id').references(() => users.id, { onDelete: 'restrict' }),
+    inventoryDecidedAt: timestamp('inventory_decided_at', { withTimezone: true }),
+    ...timestamps(),
+  },
+  (t) => [
+    index('customer_credit_note_items_note_idx').on(t.creditNoteId),
+    index('customer_credit_note_items_product_idx').on(t.productId),
+    check('customer_credit_note_items_quantity_check', sql`${t.quantity} > 0 and ${t.originalValue} > 0`),
+    check('customer_credit_note_items_unit_price_check', sql`${t.unitPrice} is null or ${t.unitPrice} >= 0`),
+    check('customer_credit_note_items_name_check', sql`${t.productId} is not null or length(trim(${t.productName})) > 0`),
+    check('customer_credit_note_items_inventory_status_check', sql`${t.inventoryStatus} in ('pending', 'auto-restocked', 'pending-review', 'restocked', 'rejected')`),
+  ]
+);
+
+export const customerDepositItems = pgTable(
+  'customer_deposit_items',
+  {
+    id: id(),
+    depositId: bigint('deposit_id', { mode: 'number' }).notNull().references(() => customerDeposits.id, { onDelete: 'cascade' }),
+    productId: bigint('product_id', { mode: 'number' }).notNull().references(() => products.id, { onDelete: 'restrict' }),
+    productName: text('product_name').notNull(),
+    sku: text('sku'),
+    barcode: text('barcode'),
+    quantity: integer('quantity').notNull(),
+    unitPrice: money('unit_price').notNull(),
+    lineValue: money('line_value').notNull(),
+    ...timestamps(),
+  },
+  (t) => [
+    index('customer_deposit_items_deposit_idx').on(t.depositId),
+    index('customer_deposit_items_product_idx').on(t.productId),
+    check('customer_deposit_items_quantity_check', sql`${t.quantity} > 0`),
+    check('customer_deposit_items_amounts_check', sql`${t.unitPrice} >= 0 and ${t.lineValue} > 0`),
+  ]
+);
+
+export const customerCreditNoteRedemptions = pgTable(
+  'customer_credit_note_redemptions',
+  {
+    id: id(),
+    creditNoteId: bigint('credit_note_id', { mode: 'number' }).notNull().references(() => customerCreditNotes.id, { onDelete: 'restrict' }),
+    storeId: bigint('store_id', { mode: 'number' }).notNull().references(() => stores.id, { onDelete: 'restrict' }),
+    businessDate: date('business_date').notNull(),
+    replacementProductId: bigint('replacement_product_id', { mode: 'number' }).references(() => products.id, { onDelete: 'restrict' }),
+    replacementDescription: text('replacement_description'),
+    replacementValue: money('replacement_value').notNull(),
+    creditApplied: money('credit_applied').notNull(),
+    additionalPayment: money('additional_payment').notNull(),
+    paymentMethodId: bigint('payment_method_id', { mode: 'number' }).references(() => paymentMethods.id, { onDelete: 'restrict' }),
+    createdByUserId: integer('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+    ...timestamps(),
+  },
+  (t) => [
+    index('customer_credit_note_redemptions_note_idx').on(t.creditNoteId),
+    check('customer_credit_note_redemptions_values_check', sql`${t.replacementValue} > 0 and ${t.creditApplied} >= 0 and ${t.additionalPayment} >= 0`),
+  ]
+);
+
+export const customerDeposits = pgTable(
+  'customer_deposits',
+  {
+    id: id(),
+    storeId: bigint('store_id', { mode: 'number' }).notNull().references(() => stores.id, { onDelete: 'restrict' }),
+    businessDate: date('business_date').notNull(),
+    customerName: text('customer_name').notNull(),
+    customerPhone: text('customer_phone'),
+    productId: bigint('product_id', { mode: 'number' }).notNull().references(() => products.id, { onDelete: 'restrict' }),
+    productName: text('product_name').notNull(),
+    quantity: integer('quantity').notNull(),
+    totalValue: money('total_value').notNull(),
+    expectedCollectionDate: date('expected_collection_date'),
+    status: text('status').notNull().default('active'),
+    cancellationReason: text('cancellation_reason'),
+    cancellationRequestedAt: timestamp('cancellation_requested_at', { withTimezone: true }),
+    cancellationDecision: text('cancellation_decision'),
+    decisionReason: text('decision_reason'),
+    decidedByUserId: integer('decided_by_user_id').references(() => users.id, { onDelete: 'restrict' }),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    collectedAt: timestamp('collected_at', { withTimezone: true }),
+    createdByUserId: integer('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+    ...timestamps(),
+  },
+  (t) => [
+    index('customer_deposits_store_date_idx').on(t.storeId, t.businessDate),
+    index('customer_deposits_status_idx').on(t.status, t.businessDate),
+    check('customer_deposits_values_check', sql`${t.quantity} > 0 and ${t.totalValue} > 0`),
+    check('customer_deposits_status_check', sql`${t.status} in ('active', 'ready', 'collected', 'cancel-requested', 'refunded', 'forfeited', 'store-credit')`),
+    check('customer_deposits_decision_check', sql`${t.cancellationDecision} is null or ${t.cancellationDecision} in ('refund', 'forfeit', 'store-credit')`),
+  ]
+);
+
+export const customerDepositPayments = pgTable(
+  'customer_deposit_payments',
+  {
+    id: id(),
+    depositId: bigint('deposit_id', { mode: 'number' }).notNull().references(() => customerDeposits.id, { onDelete: 'restrict' }),
+    storeId: bigint('store_id', { mode: 'number' }).notNull().references(() => stores.id, { onDelete: 'restrict' }),
+    businessDate: date('business_date').notNull(),
+    paymentType: text('payment_type').notNull(),
+    amount: money('amount').notNull(),
+    paymentMethodId: bigint('payment_method_id', { mode: 'number' }).references(() => paymentMethods.id, { onDelete: 'restrict' }),
+    reference: text('reference'),
+    createdByUserId: integer('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+    ...timestamps(),
+  },
+  (t) => [
+    index('customer_deposit_payments_deposit_idx').on(t.depositId),
+    index('customer_deposit_payments_store_date_idx').on(t.storeId, t.businessDate),
+    check('customer_deposit_payments_type_check', sql`${t.paymentType} in ('deposit', 'balance', 'refund')`),
+    check('customer_deposit_payments_amount_check', sql`${t.amount} > 0`),
+  ]
+);
+
+export const storeStockReservations = pgTable(
+  'store_stock_reservations',
+  {
+    id: id(),
+    depositId: bigint('deposit_id', { mode: 'number' }).notNull().references(() => customerDeposits.id, { onDelete: 'restrict' }),
+    storeId: bigint('store_id', { mode: 'number' }).notNull().references(() => stores.id, { onDelete: 'restrict' }),
+    productId: bigint('product_id', { mode: 'number' }).notNull().references(() => products.id, { onDelete: 'restrict' }),
+    quantity: integer('quantity').notNull(),
+    status: text('status').notNull().default('active'),
+    releasedAt: timestamp('released_at', { withTimezone: true }),
+    fulfilledAt: timestamp('fulfilled_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('store_stock_reservations_store_product_idx').on(t.storeId, t.productId, t.status),
+    check('store_stock_reservations_quantity_check', sql`${t.quantity} > 0`),
+    check('store_stock_reservations_status_check', sql`${t.status} in ('active', 'released', 'fulfilled')`),
+  ]
+);
+
 // A store's running on-hand quantity per product. Seeded by the catalogue import,
 // then moved by sales, goods receipts, transfers and corrected by stock counts.
 // This is what makes opening stock — and therefore sell-through — a real figure
@@ -953,7 +1131,7 @@ export const auditEvents = pgTable(
     index('audit_events_actor_idx').on(t.actorUserId, t.createdAt),
     check(
       'audit_events_action_check',
-      sql`${t.action} in ('create', 'update', 'submit', 'approve', 'reopen', 'cancel', 'complete', 'archive', 'restore', 'import', 'settle', 'authorize', 'receive', 'undo')`
+      sql`${t.action} in ('create', 'update', 'submit', 'approve', 'reject', 'reopen', 'cancel', 'complete', 'archive', 'restore', 'import', 'settle', 'authorize', 'receive', 'undo')`
     ),
   ]
 );

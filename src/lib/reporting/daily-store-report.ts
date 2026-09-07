@@ -21,6 +21,15 @@ export interface DailyStoreReportSupplement {
   leadsCount: number;
   followUpText: string;
   customerRequests: DailyStoreReportCustomerRequest[];
+  transactionSummary: {
+    approvedCredits: number;
+    creditRedemptions: number;
+    depositReceived: number;
+    depositRefunds: number;
+    additionalPayments: number;
+    netRevenueAdjustment: number;
+    cashAdjustment: number;
+  };
 }
 
 // Everything a daily-report PDF needs that isn't already on the fetched DailyReportRecord:
@@ -32,7 +41,7 @@ export async function getDailyStoreReportSupplement(
   netRevenue: number,
   transactions: number
 ): Promise<DailyStoreReportSupplement> {
-  const [targetResult, interactionRows] = await Promise.all([
+  const [targetResult, interactionRows, transactionResult] = await Promise.all([
     db.execute(sql`
       select coalesce(
         sum(${targetPerTradingDayForDate(sql`target.value`, sql`target.period_type`, sql`target.recurring`, sql`${businessDate}::date`, sql`target.period_start`, sql`target.period_end`)}),
@@ -60,18 +69,37 @@ export async function getDailyStoreReportSupplement(
       .from(customerInteractions)
       .leftJoin(products, eq(customerInteractions.productId, products.id))
       .where(and(eq(customerInteractions.storeId, storeId), eq(customerInteractions.businessDate, businessDate))),
+    db.execute(sql`
+      select
+        coalesce((select sum(note.approved_value) from customer_credit_notes note where note.store_id = ${storeId} and note.business_date = ${businessDate}::date and note.status in ('approved', 'partially-redeemed', 'redeemed')), 0) as approved_credits,
+        coalesce((select sum(redemption.credit_applied) from customer_credit_note_redemptions redemption where redemption.store_id = ${storeId} and redemption.business_date = ${businessDate}::date), 0) as credit_redemptions,
+        coalesce((select sum(payment.amount) from customer_deposit_payments payment where payment.store_id = ${storeId} and payment.business_date = ${businessDate}::date and payment.payment_type in ('deposit', 'balance')), 0) as deposit_received,
+        coalesce((select sum(payment.amount) from customer_deposit_payments payment where payment.store_id = ${storeId} and payment.business_date = ${businessDate}::date and payment.payment_type = 'refund'), 0) as deposit_refunds,
+        coalesce((select sum(redemption.additional_payment) from customer_credit_note_redemptions redemption where redemption.store_id = ${storeId} and redemption.business_date = ${businessDate}::date), 0) as additional_payments
+    `),
   ]);
 
   const dailyTarget = Number((targetResult.rows[0] as { daily_target: string } | undefined)?.daily_target ?? 0);
-  const achievementPercent = dailyTarget > 0 ? (netRevenue / dailyTarget) * 100 : 0;
-  const surplus = netRevenue - dailyTarget;
+  const transactionRow = transactionResult.rows[0] as Record<string, unknown> | undefined;
+  const transactionSummary = {
+    approvedCredits: Number(transactionRow?.approved_credits ?? 0),
+    creditRedemptions: Number(transactionRow?.credit_redemptions ?? 0),
+    depositReceived: Number(transactionRow?.deposit_received ?? 0),
+    depositRefunds: Number(transactionRow?.deposit_refunds ?? 0),
+    additionalPayments: Number(transactionRow?.additional_payments ?? 0),
+    netRevenueAdjustment: Number(transactionRow?.deposit_received ?? 0) + Number(transactionRow?.additional_payments ?? 0) - Number(transactionRow?.approved_credits ?? 0) - Number(transactionRow?.deposit_refunds ?? 0),
+    cashAdjustment: Number(transactionRow?.deposit_received ?? 0) + Number(transactionRow?.additional_payments ?? 0) - Number(transactionRow?.deposit_refunds ?? 0),
+  };
+  const adjustedNetRevenue = netRevenue + transactionSummary.netRevenueAdjustment;
+  const achievementPercent = dailyTarget > 0 ? (adjustedNetRevenue / dailyTarget) * 100 : 0;
+  const surplus = adjustedNetRevenue - dailyTarget;
   const statusText =
     dailyTarget <= 0
       ? 'No target set'
       : achievementPercent >= 100
         ? `Target Exceeded (+${(achievementPercent - 100).toFixed(1)}%)`
         : `Below Target (${(achievementPercent - 100).toFixed(1)}%)`;
-  const avgTicketValue = transactions > 0 ? netRevenue / transactions : 0;
+  const avgTicketValue = transactions > 0 ? adjustedNetRevenue / transactions : 0;
 
   const customerRequests = interactionRows
     .filter((row) => row.productId || row.interestText)
@@ -89,5 +117,5 @@ export async function getDailyStoreReportSupplement(
       ? `${leadsCount} new lead${leadsCount === 1 ? '' : 's'} captured — personal outreach and post-purchase follow-up recommended.`
       : 'No new leads captured today.';
 
-  return { dailyTarget, achievementPercent, surplus, statusText, avgTicketValue, leadsCount, followUpText, customerRequests };
+  return { dailyTarget, achievementPercent, surplus, statusText, avgTicketValue, leadsCount, followUpText, customerRequests, transactionSummary };
 }

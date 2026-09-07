@@ -1,4 +1,4 @@
-import { CircleAlert, ClipboardCheck, PackageSearch, Repeat2, Truck, UsersRound } from 'lucide-react';
+import { CircleAlert, ClipboardCheck, PackageSearch, Repeat2, TicketCheck, Truck, UsersRound, WalletCards } from 'lucide-react';
 import { ShowMoreButton } from '@/components/ui/show-more-button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useExpandable } from '@/hooks/use-expandable';
@@ -22,7 +22,11 @@ export function StoreOverview({ meta, trading, domain }: { meta: AnalyticsMeta; 
         { label: 'Returning customers', value: formatNumber(domain.customerHealth.returning), detail: `${formatPercent(domain.customerHealth.repeatRate)} repeat rate`, icon: Repeat2, tone: 'green' },
         { label: 'Low-stock products', value: formatNumber(domain.lowStock.length), detail: 'At or below threshold', icon: PackageSearch, tone: 'coral' },
         { label: 'Stock transfers', value: formatNumber(domain.transfers.length), detail: 'Recent incoming and outgoing', icon: Truck, tone: 'teal' },
+        { label: 'Credit notes', value: formatNumber(domain.customerTransactions.creditNotesSubmitted), detail: `${formatCurrency(domain.customerTransactions.approvedCreditValue, meta.currency)} approved`, icon: TicketCheck, tone: 'coral' },
+        { label: 'Deposits received', value: formatCurrency(domain.customerTransactions.depositsReceived, meta.currency), detail: `${formatNumber(domain.customerTransactions.activeDeposits)} active`, icon: WalletCards, tone: 'blue' },
       ]} className="xl:grid-cols-4 2xl:grid-cols-4" />
+
+      {domain.customerTransactions.pendingInventoryItems || domain.customerTransactions.cancellationRequests ? <section className="surface border-chart-2/30 bg-chart-2/5 p-4"><p className="text-sm font-semibold">Customer transaction attention</p><p className="mt-1 text-sm text-muted-foreground">{domain.customerTransactions.pendingInventoryItems ? `${domain.customerTransactions.pendingInventoryItems} returned item${domain.customerTransactions.pendingInventoryItems === 1 ? '' : 's'} await Inventory.` : ''}{domain.customerTransactions.pendingInventoryItems && domain.customerTransactions.cancellationRequests ? ' ' : ''}{domain.customerTransactions.cancellationRequests ? `${domain.customerTransactions.cancellationRequests} deposit cancellation${domain.customerTransactions.cancellationRequests === 1 ? '' : 's'} await Finance.` : ''}</p></section> : null}
 
       <section className="surface min-w-0 p-5"><SectionHeading title="Sales by Category" description="Approved category revenue for this store" /><NamedBarChart data={trading.categories.map((item) => ({ name: item.name, value: item.revenue }))} valueFormatter={(value) => formatCurrency(value, meta.currency)} /></section>
       <section className="surface min-w-0 p-5"><SectionHeading title="Sell-Through by Category" description="Units sold against opening stock" /><HorizontalBarChart data={trading.categories.filter((item) => item.openingStock > 0).map((item) => ({ name: item.name, value: item.sellThrough }))} valueFormatter={formatPercent} /></section>

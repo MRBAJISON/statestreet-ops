@@ -33,6 +33,7 @@ import {
   upsertDailyReport,
 } from '@/lib/daily-report-form';
 import { CategoryProductLines } from './CategoryProductLines';
+import { CustomerTransactionsTabs } from '@/components/forms/store-manager/CustomerTransactionsTabs';
 import { downloadFile } from '@/lib/download-file';
 import { cn } from '@/lib/utils';
 
@@ -387,6 +388,8 @@ export default function TypedDailyReport({
           <TabsTrigger value="sales">Sales</TabsTrigger>
           <TabsTrigger value="store">Totals</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
+          <TabsTrigger value="credit-notes">Returns &amp; Credit Notes</TabsTrigger>
+          <TabsTrigger value="deposits">Deposits &amp; Redemptions</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
@@ -566,6 +569,28 @@ export default function TypedDailyReport({
               ))}
             </FieldGroup>
           </section>
+        </TabsContent>
+
+        <TabsContent value="credit-notes">
+          <CustomerTransactionsTabs
+            storeId={data?.references.store?.id ?? null}
+            businessDate={selectedDate}
+            disabled={disabled}
+            currency={org.currency}
+            paymentMethods={data?.references.paymentMethods ?? []}
+            section="credits"
+          />
+        </TabsContent>
+
+        <TabsContent value="deposits">
+          <CustomerTransactionsTabs
+            storeId={data?.references.store?.id ?? null}
+            businessDate={selectedDate}
+            disabled={disabled}
+            currency={org.currency}
+            paymentMethods={data?.references.paymentMethods ?? []}
+            section="deposits"
+          />
         </TabsContent>
 
         <TabsContent value="history">

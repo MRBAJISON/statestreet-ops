@@ -105,7 +105,8 @@ export function DailyStoreReportDocument({
   const gross = report.sales.reduce((sum, line) => sum + Number(line.grossRevenue), 0);
   const discounts = report.sales.reduce((sum, line) => sum + Number(line.discounts), 0);
   const returns = report.sales.reduce((sum, line) => sum + Number(line.returns), 0);
-  const net = gross - discounts - returns;
+  const transactionAdjustment = supplement.transactionSummary.netRevenueAdjustment;
+  const net = gross - discounts - returns + transactionAdjustment;
   const statusColor = supplement.achievementPercent >= 100 ? COLORS.achievementBg : COLORS.discount;
   const keyMerchandise = report.sales.flatMap((line) =>
     line.products.map((product) => ({
@@ -165,6 +166,18 @@ export function DailyStoreReportDocument({
             <View style={styles.row}><Text style={styles.rowLabel}>Discount Given</Text><Text style={{ ...styles.rowValue, ...styles.rowValueDiscount }}>- {formatMoney(discounts, currency)}</Text></View>
             {returns > 0 ? (
               <View style={styles.row}><Text style={styles.rowLabel}>Returns</Text><Text style={{ ...styles.rowValue, ...styles.rowValueDiscount }}>- {formatMoney(returns, currency)}</Text></View>
+            ) : null}
+            {supplement.transactionSummary.approvedCredits > 0 ? (
+              <View style={styles.row}><Text style={styles.rowLabel}>Approved credit notes</Text><Text style={{ ...styles.rowValue, ...styles.rowValueDiscount }}>- {formatMoney(supplement.transactionSummary.approvedCredits, currency)}</Text></View>
+            ) : null}
+            {supplement.transactionSummary.depositReceived > 0 ? (
+              <View style={styles.row}><Text style={styles.rowLabel}>Customer deposits received</Text><Text style={styles.rowValue}>+ {formatMoney(supplement.transactionSummary.depositReceived, currency)}</Text></View>
+            ) : null}
+            {supplement.transactionSummary.additionalPayments > 0 ? (
+              <View style={styles.row}><Text style={styles.rowLabel}>Credit replacement balance</Text><Text style={styles.rowValue}>+ {formatMoney(supplement.transactionSummary.additionalPayments, currency)}</Text></View>
+            ) : null}
+            {supplement.transactionSummary.depositRefunds > 0 ? (
+              <View style={styles.row}><Text style={styles.rowLabel}>Deposit refunds</Text><Text style={{ ...styles.rowValue, ...styles.rowValueDiscount }}>- {formatMoney(supplement.transactionSummary.depositRefunds, currency)}</Text></View>
             ) : null}
             <View style={styles.rowSubtotal}><Text style={styles.rowLabelBold}>Net Sales</Text><Text style={styles.rowValue}>{formatMoney(net, currency)}</Text></View>
             {report.payments.map((line, index) => (
