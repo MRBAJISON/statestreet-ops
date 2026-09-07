@@ -124,7 +124,7 @@ export function ExecutiveOverview({
       <MetricRail items={metrics} />
 
       <section className="chart-canvas min-w-0 p-5">
-        <SectionHeading title="Group Revenue & Margin Trend" description="Approved net revenue, target, and gross profit by day" />
+        <SectionHeading title="Group Revenue & Margin Trend" description="Approved net revenue, target, and gross profit by selected period" />
         <div className="mt-3"><RevenueTrendChart data={trading.trend} currency={meta.currency} /></div>
       </section>
 

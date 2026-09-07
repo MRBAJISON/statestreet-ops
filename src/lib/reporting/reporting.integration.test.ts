@@ -85,6 +85,69 @@ describeWithDatabase('reporting SQL integration', () => {
     expect(trading.brands).toEqual([{ name: 'Unassigned', value: 150 }]);
   });
 
+  it('groups QTD revenue and cash flow into Monday-starting weeks', async () => {
+    const paymentMethodId = Number(
+      (await client.query(
+        `insert into payment_methods (code, name) values ('qtd-cash', 'QTD Cash') returning id`
+      )).rows[0].id
+    );
+    const secondReportId = Number(
+      (
+        await client.query(
+          `insert into daily_reports (
+             store_id, business_date, status, transactions, footfall, created_by_user_id, updated_by_user_id
+           ) values ($1, '2026-07-16', 'approved', 3, 5, $2, $2)
+           returning id`,
+          [storeId, userId]
+        )
+      ).rows[0].id
+    );
+    await client.query(
+      `insert into daily_sales_lines (daily_report_id, category_id, opening_stock, units_sold, gross_revenue, cogs)
+       values ($1, $2, 8, 1, 75, 25)`,
+      [secondReportId, (await client.query(`select min(id) as id from categories`)).rows[0].id]
+    );
+    await client.query(
+      `insert into daily_payment_lines (daily_report_id, payment_method_id, amount)
+       values ($1, $2, 60), ($3, $2, 25)`,
+      [reportId, paymentMethodId, secondReportId]
+    );
+
+    try {
+      const [{ getFinanceDomain }, { getTradingOverview }] = await Promise.all([
+        import('./finance'),
+        import('./trading'),
+      ]);
+      const scope = {
+        preset: 'qtd' as const,
+        from: '2026-07-01',
+        to: '2026-07-31',
+        compareFrom: '2026-04-01',
+        compareTo: '2026-06-30',
+        store: null,
+      };
+      const [finance, trading] = await Promise.all([
+        getFinanceDomain(scope),
+        getTradingOverview(scope),
+      ]);
+
+      expect(trading.trend.map((point) => point.date)).toEqual([
+        '2026-06-29',
+        '2026-07-06',
+        '2026-07-13',
+      ]);
+      expect(trading.trend.map((point) => point.revenue)).toEqual([0, 150, 75]);
+      expect(finance.cashTrend).toHaveLength(5);
+      expect(finance.cashTrend.find((point) => point.date === '2026-07-06')).toMatchObject({ inflow: 60, outflow: 0 });
+      expect(finance.cashTrend.find((point) => point.date === '2026-07-13')).toMatchObject({ inflow: 25, outflow: 0 });
+    } finally {
+      await client.query('delete from daily_payment_lines where daily_report_id in ($1, $2)', [reportId, secondReportId]);
+      await client.query('delete from daily_sales_lines where daily_report_id = $1', [secondReportId]);
+      await client.query('delete from daily_reports where id = $1', [secondReportId]);
+      await client.query('delete from payment_methods where id = $1', [paymentMethodId]);
+    }
+  });
+
   it('keeps group revenue trends visible when store reporting is sparse', async () => {
     const sparseStoreRows = await client.query(
       `insert into stores (code, name) values

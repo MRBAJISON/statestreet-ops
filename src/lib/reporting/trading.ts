@@ -7,6 +7,7 @@ import { isTradingDay, targetIsEffectiveForDate, targetPerTradingDayForDate, tar
 
 export async function getTradingOverview(scope: AnalyticsScope): Promise<TradingOverview> {
   const trendByMonth = scope.preset === 'ytd';
+  const trendByWeek = scope.preset === 'qtd';
   const reportStore = scope.store ? sql`and report.store_id = ${scope.store.id}` : sql``;
   const transactionStore = scope.store ? sql`and transaction_row.store_id = ${scope.store.id}` : sql``;
   const targetStore = scope.store ? sql`and target.store_id = ${scope.store.id}` : sql``;
@@ -349,6 +350,13 @@ export async function getTradingOverview(scope: AnalyticsScope): Promise<Trading
             sum(trend.gross_profit) as gross_profit
           from trend_rows trend
           group by date_trunc('month', trend.date)::date
+        ` : trendByWeek ? sql`
+          select date_trunc('week', trend.date)::date as date,
+            sum(trend.revenue) as revenue,
+            sum(trend.target) as target,
+            sum(trend.gross_profit) as gross_profit
+          from trend_rows trend
+          group by date_trunc('week', trend.date)::date
         ` : sql`
           select trend.date, trend.revenue, trend.target, trend.gross_profit
           from trend_rows trend
