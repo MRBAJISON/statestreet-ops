@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import {
+  createCreditSaleSchema,
   createCreditNoteSchema,
   createDepositSchema,
 } from '@/lib/contracts/customer-transactions';
 import { dateSchema, formatContractError } from '@/lib/contracts/shared';
 import {
+  createCreditSale,
   createCreditNote,
   createDeposit,
   listCustomerTransactions,
@@ -28,7 +30,8 @@ export async function GET(req: NextRequest) {
     const dateParam = req.nextUrl.searchParams.get('businessDate') ?? undefined;
     if (dateParam && !dateSchema.safeParse(dateParam).success) return NextResponse.json({ error: 'businessDate must be a valid YYYY-MM-DD date' }, { status: 400 });
     const includeOpenDeposits = req.nextUrl.searchParams.get('openDeposits') === 'true';
-    const transactions = await listCustomerTransactions(session.user, storeId, dateParam, includeOpenDeposits);
+    const includeOpenCreditSales = req.nextUrl.searchParams.get('openCredits') === 'true';
+    const transactions = await listCustomerTransactions(session.user, storeId, dateParam, includeOpenDeposits, includeOpenCreditSales);
     return NextResponse.json(transactions);
   } catch (error) {
     if (error instanceof HttpError) return NextResponse.json({ error: error.message }, { status: error.status });
@@ -41,11 +44,17 @@ export async function POST(req: NextRequest) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const body = await req.json().catch(() => null) as { type?: string } | null;
-    const parsed = body?.type === 'credit-note' ? createCreditNoteSchema.safeParse(body) : createDepositSchema.safeParse(body);
+    const parsed = body?.type === 'credit-sale'
+      ? createCreditSaleSchema.safeParse(body)
+      : body?.type === 'credit-note'
+        ? createCreditNoteSchema.safeParse(body)
+        : createDepositSchema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ error: formatContractError(parsed.error) }, { status: 400 });
-    const id = parsed.data.type === 'credit-note'
-      ? await createCreditNote(session.user, parsed.data)
-      : await createDeposit(session.user, parsed.data);
+    const id = parsed.data.type === 'credit-sale'
+      ? await createCreditSale(session.user, parsed.data)
+      : parsed.data.type === 'credit-note'
+        ? await createCreditNote(session.user, parsed.data)
+        : await createDeposit(session.user, parsed.data);
     return NextResponse.json({ ok: true, id }, { status: 201 });
   } catch (error) {
     if (error instanceof HttpError) return NextResponse.json({ error: error.message }, { status: error.status });

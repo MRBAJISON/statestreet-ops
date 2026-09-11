@@ -20,6 +20,46 @@ const requiredIdSchema = z.preprocess(
   positiveIdSchema
 );
 
+export const creditSaleItemSchema = z.object({
+  categoryId: requiredIdSchema,
+  productId: optionalIdSchema,
+  productName: z.string().trim().min(1).max(200),
+  quantity: z.number().int().positive().max(100_000),
+  unitPrice: optionalMoneySchema,
+}).superRefine((item, ctx) => {
+  if (!item.productId && !item.unitPrice) {
+    ctx.addIssue({ code: 'custom', path: ['unitPrice'], message: 'Enter a unit price for a free-text product' });
+  }
+});
+
+export const createCreditSaleSchema = z.object({
+  type: z.literal('credit-sale'),
+  businessDate: dateSchema,
+  storeId: optionalIdSchema,
+  customerName: z.string().trim().min(1).max(160),
+  customerPhone: optionalText(40),
+  receiptNumber: optionalText(120),
+  dueDate: dateSchema.optional(),
+  items: z.array(creditSaleItemSchema).min(1).max(50),
+}).superRefine((value, ctx) => {
+  if (value.dueDate && value.dueDate < value.businessDate) {
+    ctx.addIssue({ code: 'custom', path: ['dueDate'], message: 'Due date cannot be before the sale date' });
+  }
+  const productIds = value.items.map((item) => item.productId).filter((id): id is number => id != null);
+  if (new Set(productIds).size !== productIds.length) {
+    ctx.addIssue({ code: 'custom', path: ['items'], message: 'Each catalog product can appear only once per credit sale' });
+  }
+});
+
+export const creditSalePaymentSchema = z.object({
+  type: z.literal('credit-sale'),
+  action: z.literal('payment'),
+  businessDate: dateSchema,
+  amount: moneySchema,
+  paymentMethodId: requiredIdSchema,
+  reference: optionalText(120),
+});
+
 export const creditNoteItemSchema = z.object({
   productId: optionalIdSchema,
   productName: z.string().trim().min(1).max(200),
@@ -128,10 +168,13 @@ export const decideDepositCancellationSchema = z.object({
 });
 
 export const customerTransactionInputSchema = z.discriminatedUnion('type', [
+  createCreditSaleSchema,
   createCreditNoteSchema,
   createDepositSchema,
 ]);
 
+export type CreateCreditSaleInput = z.infer<typeof createCreditSaleSchema>;
+export type CreditSalePaymentInput = z.infer<typeof creditSalePaymentSchema>;
 export type CreateCreditNoteInput = z.infer<typeof createCreditNoteSchema>;
 export type DecideCreditNoteInput = z.infer<typeof decideCreditNoteSchema>;
 export type RedeemCreditNoteInput = z.infer<typeof redeemCreditNoteSchema>;

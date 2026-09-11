@@ -45,8 +45,6 @@ const SALES_FIELDS: Array<{ key: SalesField; label: string; step: number }> = [
   { key: 'grossRevenue', label: 'Gross sales', step: 0.01 },
   { key: 'cogs', label: 'COGS', step: 0.01 },
   { key: 'discounts', label: 'Discounts', step: 0.01 },
-  { key: 'returns', label: 'Returns', step: 0.01 },
-  { key: 'creditSales', label: 'Credit sales', step: 0.01 },
 ];
 
 const STATUS_VARIANTS: Record<DailyReportStatus, string> = {
@@ -186,6 +184,17 @@ export default function TypedDailyReport({
       payments: current.payments.map((line) => line.paymentMethodId === paymentMethodId ? { ...line, amount: value } : line),
     } : current);
   }
+
+  const updateCreditSales = useCallback((creditByCategory: Map<number, number>) => {
+    if (!creditByCategory.size) return;
+    setDraft((current) => current ? {
+      ...current,
+      sales: current.sales.map((line) => ({
+        ...line,
+        creditSales: (creditByCategory.get(line.categoryId) ?? 0).toFixed(2),
+      })),
+    } : current);
+  }, []);
 
   function updateProducts(categoryId: number, products: DailyProductDraftRow[]) {
     setDraft((current) => current ? {
@@ -388,6 +397,7 @@ export default function TypedDailyReport({
           <TabsTrigger value="sales">Sales</TabsTrigger>
           <TabsTrigger value="store">Totals</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
+          <TabsTrigger value="credit-sales">Credit sales</TabsTrigger>
           <TabsTrigger value="credit-notes">Returns &amp; Credit Notes</TabsTrigger>
           <TabsTrigger value="deposits">Deposits &amp; Redemptions</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
@@ -578,7 +588,21 @@ export default function TypedDailyReport({
             disabled={disabled}
             currency={org.currency}
             paymentMethods={data?.references.paymentMethods ?? []}
+            categories={data?.references.categories ?? []}
             section="credits"
+          />
+        </TabsContent>
+
+        <TabsContent value="credit-sales">
+          <CustomerTransactionsTabs
+            storeId={data?.references.store?.id ?? null}
+            businessDate={selectedDate}
+            disabled={disabled}
+            currency={org.currency}
+            paymentMethods={data?.references.paymentMethods ?? []}
+            categories={data?.references.categories ?? []}
+            onCreditSalesChange={updateCreditSales}
+            section="credit-sales"
           />
         </TabsContent>
 
@@ -589,6 +613,7 @@ export default function TypedDailyReport({
             disabled={disabled}
             currency={org.currency}
             paymentMethods={data?.references.paymentMethods ?? []}
+            categories={data?.references.categories ?? []}
             section="deposits"
           />
         </TabsContent>

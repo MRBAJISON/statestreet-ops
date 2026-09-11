@@ -182,6 +182,10 @@ export async function getStorePeriodReport(
     .map((date) => ({ date, reason: byDate.has(date) ? ('draft' as const) : ('missing' as const) }));
 
   const totals = sumReports(counted);
+  // New credit sales are maintained in the transaction ledger. Keep the legacy
+  // daily-line value only as a fallback for historical reports created before
+  // the ledger existed.
+  if (transactionSummary.creditSales > 0) totals.creditSales = transactionSummary.creditSales;
   totals.netRevenue += transactionSummary.netRevenueAdjustment;
   const transactionDayMap = new Map(transactionDays.map((day) => [day.businessDate, day.netRevenueAdjustment]));
   const perTradingDayTarget = expectedDays.length ? target / expectedDays.length : 0;

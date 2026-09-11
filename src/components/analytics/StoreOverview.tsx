@@ -1,4 +1,4 @@
-import { CircleAlert, ClipboardCheck, PackageSearch, Repeat2, TicketCheck, Truck, UsersRound, WalletCards } from 'lucide-react';
+import { CircleAlert, ClipboardCheck, CreditCard, PackageSearch, Repeat2, TicketCheck, Truck, UsersRound, WalletCards } from 'lucide-react';
 import { ShowMoreButton } from '@/components/ui/show-more-button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useExpandable } from '@/hooks/use-expandable';
@@ -23,6 +23,7 @@ export function StoreOverview({ meta, trading, domain }: { meta: AnalyticsMeta; 
         { label: 'Low-stock products', value: formatNumber(domain.lowStock.length), detail: 'At or below threshold', icon: PackageSearch, tone: 'coral' },
         { label: 'Stock transfers', value: formatNumber(domain.transfers.length), detail: 'Recent incoming and outgoing', icon: Truck, tone: 'teal' },
         { label: 'Credit notes', value: formatNumber(domain.customerTransactions.creditNotesSubmitted), detail: `${formatCurrency(domain.customerTransactions.approvedCreditValue, meta.currency)} approved`, icon: TicketCheck, tone: 'coral' },
+        { label: 'Open credit sales', value: formatCurrency(domain.customerTransactions.openCreditBalance, meta.currency), detail: `${formatCurrency(domain.customerTransactions.creditCollections, meta.currency)} collected`, icon: CreditCard, tone: 'teal' },
         { label: 'Deposits received', value: formatCurrency(domain.customerTransactions.depositsReceived, meta.currency), detail: `${formatNumber(domain.customerTransactions.activeDeposits)} active`, icon: WalletCards, tone: 'blue' },
       ]} className="xl:grid-cols-4 2xl:grid-cols-4" />
 
