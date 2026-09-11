@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dailyReportDecisionSchema, saveDailyReportSchema } from './daily-report';
+import { createCreditSaleSchema, creditSalePaymentSchema } from './customer-transactions';
 import { createProductSchema, updateProductSchema } from './product';
 import { dateSchema, moneySchema } from './shared';
 import { publicSurveySchema } from './survey';
@@ -154,6 +155,26 @@ describe('daily report contract', () => {
     expect(
       dailyReportDecisionSchema.safeParse({ action: 'reopen', lockVersion: 2, reason: 'Correcting payment split' }).success
     ).toBe(true);
+  });
+});
+
+describe('customer credit-sale contract', () => {
+  const sale = {
+    type: 'credit-sale' as const,
+    businessDate: '2026-09-11',
+    storeId: 2,
+    customerName: 'Ama Customer',
+    items: [{ categoryId: 3, productName: 'Classic tee', quantity: 2, unitPrice: '150' }],
+  };
+
+  it('accepts a category-linked free-text item and optional due date', () => {
+    const parsed = createCreditSaleSchema.parse({ ...sale, dueDate: '2026-09-20' });
+    expect(parsed.items[0].unitPrice).toBe('150.00');
+  });
+
+  it('allows catalog items to omit the unit price and validates payment input', () => {
+    expect(createCreditSaleSchema.safeParse({ ...sale, items: [{ categoryId: 3, productId: 8, productName: 'Catalog tee', quantity: 1 }] }).success).toBe(true);
+    expect(creditSalePaymentSchema.safeParse({ type: 'credit-sale', action: 'payment', businessDate: '2026-09-11', amount: '75', paymentMethodId: '2' }).success).toBe(true);
   });
 });
 

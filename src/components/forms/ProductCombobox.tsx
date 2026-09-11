@@ -12,6 +12,8 @@ export interface ProductOption {
   sku: string;
   name: string;
   brandName: string;
+  categoryId: number;
+  categoryName: string;
   barcode: string | null;
   sellingPrice: string | null;
 }

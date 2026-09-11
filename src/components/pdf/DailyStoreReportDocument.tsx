@@ -167,6 +167,12 @@ export function DailyStoreReportDocument({
             {returns > 0 ? (
               <View style={styles.row}><Text style={styles.rowLabel}>Returns</Text><Text style={{ ...styles.rowValue, ...styles.rowValueDiscount }}>- {formatMoney(returns, currency)}</Text></View>
             ) : null}
+            {supplement.transactionSummary.creditSales > 0 ? (
+              <View style={styles.row}><Text style={styles.rowLabel}>Credit sales</Text><Text style={styles.rowValue}>+ {formatMoney(supplement.transactionSummary.creditSales, currency)}</Text></View>
+            ) : null}
+            {supplement.transactionSummary.creditCollections > 0 ? (
+              <View style={styles.row}><Text style={styles.rowLabel}>Credit payments collected</Text><Text style={styles.rowValue}>+ {formatMoney(supplement.transactionSummary.creditCollections, currency)}</Text></View>
+            ) : null}
             {supplement.transactionSummary.approvedCredits > 0 ? (
               <View style={styles.row}><Text style={styles.rowLabel}>Approved credit notes</Text><Text style={{ ...styles.rowValue, ...styles.rowValueDiscount }}>- {formatMoney(supplement.transactionSummary.approvedCredits, currency)}</Text></View>
             ) : null}
@@ -179,7 +185,7 @@ export function DailyStoreReportDocument({
             {supplement.transactionSummary.depositRefunds > 0 ? (
               <View style={styles.row}><Text style={styles.rowLabel}>Deposit refunds</Text><Text style={{ ...styles.rowValue, ...styles.rowValueDiscount }}>- {formatMoney(supplement.transactionSummary.depositRefunds, currency)}</Text></View>
             ) : null}
-            <View style={styles.rowSubtotal}><Text style={styles.rowLabelBold}>Net Sales</Text><Text style={styles.rowValue}>{formatMoney(net, currency)}</Text></View>
+            <View style={styles.rowSubtotal}><Text style={styles.rowLabelBold}>Net Sales</Text><Text style={{ ...styles.rowValue, ...styles.rowLabelBold }}>{formatMoney(net, currency)}</Text></View>
             {report.payments.map((line, index) => (
               <View key={line.paymentMethodId} style={index === report.payments.length - 1 ? styles.rowLast : styles.row}>
                 <Text style={styles.rowLabel}>{paymentMethodNames.get(line.paymentMethodId) ?? `Method ${line.paymentMethodId}`}</Text>
@@ -193,6 +199,7 @@ export function DailyStoreReportDocument({
           <Text style={styles.sectionTitle}>2. TRANSACTIONS</Text>
           <View style={styles.card}>
             <View style={styles.row}><Text style={styles.rowLabel}>Transactions</Text><Text style={styles.rowValue}>{report.transactions}</Text></View>
+            <View style={styles.row}><Text style={styles.rowLabel}>Open credit balance</Text><Text style={styles.rowValue}>{formatMoney(supplement.transactionSummary.openCreditBalance, currency)}</Text></View>
             <View style={styles.rowLast}><Text style={styles.rowLabel}>Avg Ticket Value</Text><Text style={styles.rowValue}>{formatMoney(supplement.avgTicketValue, currency)}</Text></View>
           </View>
         </View>

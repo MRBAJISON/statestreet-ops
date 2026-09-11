@@ -1,6 +1,7 @@
 import { getStorePeriodReport, type StorePeriodCategory, type StorePeriodDay, type StorePeriodReport } from './store-period-report';
 import { resolveStorePeriod, tradingDaysBetween, type StorePeriodRange, type StorePeriodType } from './store-period';
 import { storeNames, storesInGroup } from '../store-access';
+import type { CustomerTransactionSummary } from '../customer-transactions';
 
 // A combined report for stores that trade as one unit.
 //
@@ -37,6 +38,7 @@ export interface StoreGroupPeriodReport {
   /** Per-store rows. This is what makes it a cluster report rather than a merge. */
   stores: StoreGroupStoreSplit[];
   totals: StorePeriodReport['totals'];
+  transactionSummary: CustomerTransactionSummary;
   target: number;
   achievementPercent: number;
   surplus: number;
@@ -98,6 +100,11 @@ export async function getStoreGroupPeriodReport(
   let target = 0;
   let leadsCount = 0;
   const previous = { netRevenue: 0, transactions: 0, avgTicketValue: 0 };
+  const transactionSummary: CustomerTransactionSummary = {
+    creditSales: 0, creditCollections: 0, openCreditBalance: 0,
+    approvedCredits: 0, creditRedemptions: 0, depositReceived: 0, depositRefunds: 0,
+    additionalPayments: 0, netRevenueAdjustment: 0, cashAdjustment: 0,
+  };
 
   const stores: StoreGroupStoreSplit[] = [];
   const outstanding: StoreGroupOutstandingDay[] = [];
@@ -135,6 +142,7 @@ export async function getStoreGroupPeriodReport(
     const report = member.report;
 
     for (const key of Object.keys(totals) as (keyof typeof totals)[]) totals[key] += report.totals[key];
+    for (const key of Object.keys(transactionSummary) as Array<keyof CustomerTransactionSummary>) transactionSummary[key] += report.transactionSummary[key];
     target += report.target;
     leadsCount += report.leadsCount;
     previous.netRevenue += report.previous.netRevenue;
@@ -220,6 +228,7 @@ export async function getStoreGroupPeriodReport(
     managerName,
     stores: stores.sort((left, right) => left.storeName.localeCompare(right.storeName)),
     totals,
+    transactionSummary,
     target,
     achievementPercent,
     surplus: totals.netRevenue - target,

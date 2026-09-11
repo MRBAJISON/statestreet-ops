@@ -1,8 +1,10 @@
 import { and, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import type { AppUser } from './auth';
 import type {
+  CreateCreditSaleInput,
   CreateCreditNoteInput,
   CreateDepositInput,
+  CreditSalePaymentInput,
   DecideCreditNoteInput,
   DepositPaymentInput,
   InventoryCreditDecisionInput,
@@ -10,12 +12,18 @@ import type {
 } from './contracts/customer-transactions';
 import { db } from './db';
 import {
+  categories,
+  customerCreditSaleItems,
+  customerCreditSalePayments,
+  customerCreditSales,
   customerCreditNoteItems,
   customerCreditNoteRedemptions,
   customerCreditNotes,
   customerDepositItems,
   customerDepositPayments,
   customerDeposits,
+  paymentMethods,
+  products,
   stores,
 } from './db/foundation-schema';
 import { HttpError, sessionUserId } from './server-errors';
@@ -23,6 +31,46 @@ import { resolveActingStore } from './store-access';
 
 const STORE_TRANSACTION_READERS = new Set(['owner', 'finance', 'commercial', 'operations', 'inventory', 'store-manager']);
 const CREDIT_APPROVERS = new Set(['finance', 'commercial']);
+const CREDIT_PAYMENT_ACTORS = new Set(['store-manager', 'finance', 'operations']);
+
+export interface CreditSaleItemView {
+  id: number;
+  categoryId: number;
+  categoryName: string;
+  productId: number | null;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  lineValue: number;
+}
+
+export interface CreditSalePaymentView {
+  id: number;
+  receiptNumber: string;
+  businessDate: string;
+  amount: number;
+  paymentMethodId: number;
+  reference: string | null;
+}
+
+export interface CreditSaleView {
+  id: number;
+  creditNumber: string;
+  storeId: number;
+  storeCode: string;
+  storeName: string;
+  businessDate: string;
+  customerName: string;
+  customerPhone: string | null;
+  receiptNumber: string | null;
+  dueDate: string | null;
+  totalValue: number;
+  paidValue: number;
+  balanceValue: number;
+  status: string;
+  items: CreditSaleItemView[];
+  payments: CreditSalePaymentView[];
+}
 
 export interface CreditNoteItemView {
   id: number;
@@ -108,11 +156,15 @@ export interface DepositView {
 }
 
 export interface CustomerTransactionList {
+  creditSales: CreditSaleView[];
   creditNotes: CreditNoteView[];
   deposits: DepositView[];
 }
 
 export interface CustomerTransactionSummary {
+  creditSales: number;
+  creditCollections: number;
+  openCreditBalance: number;
   approvedCredits: number;
   creditRedemptions: number;
   depositReceived: number;
@@ -149,15 +201,18 @@ export async function listCustomerTransactions(
   user: AppUser,
   requestedStoreId?: number,
   businessDate?: string,
-  includeOpenDeposits = false
+  includeOpenDeposits = false,
+  includeOpenCreditSales = false
 ): Promise<CustomerTransactionList> {
   if (!STORE_TRANSACTION_READERS.has(user.role)) throw new HttpError(403, 'Forbidden');
   const store = await storeFilter(user, requestedStoreId);
   const noteConditions = [];
   const depositConditions = [];
+  const creditSaleConditions = [];
   if (store) {
     noteConditions.push(eq(customerCreditNotes.storeId, store.id));
     depositConditions.push(eq(customerDeposits.storeId, store.id));
+    creditSaleConditions.push(eq(customerCreditSales.storeId, store.id));
   }
   if (businessDate) {
     noteConditions.push(eq(customerCreditNotes.businessDate, businessDate));
@@ -166,9 +221,30 @@ export async function listCustomerTransactions(
         ? or(eq(customerDeposits.businessDate, businessDate), inArray(customerDeposits.status, ['active', 'ready']))!
         : eq(customerDeposits.businessDate, businessDate)
     );
+    creditSaleConditions.push(
+      includeOpenCreditSales
+        ? or(eq(customerCreditSales.businessDate, businessDate), inArray(customerCreditSales.status, ['open', 'partial']))!
+        : eq(customerCreditSales.businessDate, businessDate)
+    );
   }
 
-  const [noteRows, depositRows] = await Promise.all([
+  const [creditSaleRows, noteRows, depositRows] = await Promise.all([
+    db.select({
+      id: customerCreditSales.id,
+      storeId: customerCreditSales.storeId,
+      storeCode: stores.code,
+      storeName: stores.name,
+      businessDate: customerCreditSales.businessDate,
+      customerName: customerCreditSales.customerName,
+      customerPhone: customerCreditSales.customerPhone,
+      receiptNumber: customerCreditSales.receiptNumber,
+      dueDate: customerCreditSales.dueDate,
+      totalValue: customerCreditSales.totalValue,
+      openValue: customerCreditSales.openValue,
+      status: customerCreditSales.status,
+    }).from(customerCreditSales).innerJoin(stores, eq(stores.id, customerCreditSales.storeId))
+      .where(creditSaleConditions.length ? and(...creditSaleConditions) : undefined)
+      .orderBy(desc(customerCreditSales.businessDate), desc(customerCreditSales.id)).limit(200),
     db.select({
       id: customerCreditNotes.id,
       storeId: customerCreditNotes.storeId,
@@ -212,6 +288,7 @@ export async function listCustomerTransactions(
       .orderBy(desc(customerDeposits.businessDate), desc(customerDeposits.id)).limit(200),
   ]);
 
+  const creditSaleIds = creditSaleRows.map((row) => row.id);
   const noteIds = noteRows.map((row) => row.id);
   const depositIds = depositRows.map((row) => row.id);
   const [items, redemptions, payments, depositItems] = await Promise.all([
@@ -220,6 +297,82 @@ export async function listCustomerTransactions(
     depositIds.length ? db.select().from(customerDepositPayments).where(inArray(customerDepositPayments.depositId, depositIds)).orderBy(customerDepositPayments.id) : Promise.resolve([]),
     depositIds.length ? db.select().from(customerDepositItems).where(inArray(customerDepositItems.depositId, depositIds)).orderBy(customerDepositItems.id) : Promise.resolve([]),
   ]);
+  const [creditSaleItemRows, creditSalePaymentRows] = await Promise.all([
+    creditSaleIds.length
+      ? db.select({
+          id: customerCreditSaleItems.id,
+          creditSaleId: customerCreditSaleItems.creditSaleId,
+          categoryId: customerCreditSaleItems.categoryId,
+          categoryName: categories.name,
+          productId: customerCreditSaleItems.productId,
+          productName: customerCreditSaleItems.productName,
+          quantity: customerCreditSaleItems.quantity,
+          unitPrice: customerCreditSaleItems.unitPrice,
+          lineValue: customerCreditSaleItems.lineValue,
+        }).from(customerCreditSaleItems)
+          .innerJoin(categories, eq(categories.id, customerCreditSaleItems.categoryId))
+          .where(inArray(customerCreditSaleItems.creditSaleId, creditSaleIds))
+          .orderBy(customerCreditSaleItems.id)
+      : Promise.resolve([]),
+    creditSaleIds.length
+      ? db.select().from(customerCreditSalePayments)
+          .where(inArray(customerCreditSalePayments.creditSaleId, creditSaleIds))
+          .orderBy(customerCreditSalePayments.id)
+      : Promise.resolve([]),
+  ]);
+  const itemsByCreditSale = new Map<number, CreditSaleItemView[]>();
+  for (const item of creditSaleItemRows) {
+    const list = itemsByCreditSale.get(item.creditSaleId) ?? [];
+    list.push({
+      id: item.id,
+      categoryId: item.categoryId,
+      categoryName: item.categoryName,
+      productId: item.productId,
+      productName: item.productName,
+      quantity: item.quantity,
+      unitPrice: numberValue(item.unitPrice),
+      lineValue: numberValue(item.lineValue),
+    });
+    itemsByCreditSale.set(item.creditSaleId, list);
+  }
+  const paymentsByCreditSale = new Map<number, CreditSalePaymentView[]>();
+  for (const payment of creditSalePaymentRows) {
+    const list = paymentsByCreditSale.get(payment.creditSaleId) ?? [];
+    list.push({
+      id: payment.id,
+      receiptNumber: `RCP-${String(payment.storeId)}-${payment.id}`,
+      businessDate: payment.businessDate,
+      amount: numberValue(payment.amount),
+      paymentMethodId: payment.paymentMethodId,
+      reference: payment.reference,
+    });
+    paymentsByCreditSale.set(payment.creditSaleId, list);
+  }
+  const creditSales = creditSaleRows.map((sale) => {
+    const payments = (paymentsByCreditSale.get(sale.id) ?? []).map((payment) => ({
+      ...payment,
+      receiptNumber: `RCP-${sale.storeCode}-${payment.id}`,
+    }));
+    const paidValue = payments.reduce((sum, payment) => sum + payment.amount, 0);
+    return {
+      id: sale.id,
+      creditNumber: `CR-${sale.storeCode}-${sale.id}`,
+      storeId: sale.storeId,
+      storeCode: sale.storeCode,
+      storeName: sale.storeName,
+      businessDate: sale.businessDate,
+      customerName: sale.customerName,
+      customerPhone: sale.customerPhone,
+      receiptNumber: sale.receiptNumber,
+      dueDate: sale.dueDate,
+      totalValue: numberValue(sale.totalValue),
+      paidValue,
+      balanceValue: numberValue(sale.openValue),
+      status: sale.status,
+      items: itemsByCreditSale.get(sale.id) ?? [],
+      payments,
+    } satisfies CreditSaleView;
+  });
   const itemsByNote = new Map<number, CreditNoteItemView[]>();
   for (const item of items) {
     const list = itemsByNote.get(item.creditNoteId) ?? [];
@@ -323,12 +476,15 @@ export async function listCustomerTransactions(
       payments: depositPayments,
     } satisfies DepositView;
   });
-  return { creditNotes, deposits };
+  return { creditSales, creditNotes, deposits };
 }
 
 export async function getCustomerTransactionSummary(storeId: number, from: string, to: string): Promise<CustomerTransactionSummary> {
   const result = await db.execute(sql`
     select
+      coalesce((select sum(sale.total_value) from customer_credit_sales sale where sale.store_id = ${storeId} and sale.business_date between ${from}::date and ${to}::date), 0) as credit_sales,
+      coalesce((select sum(payment.amount) from customer_credit_sale_payments payment where payment.store_id = ${storeId} and payment.business_date between ${from}::date and ${to}::date), 0) as credit_collections,
+      coalesce((select sum(sale.open_value) from customer_credit_sales sale where sale.store_id = ${storeId} and sale.status in ('open', 'partial')), 0) as open_credit_balance,
       coalesce((select sum(note.approved_value) from customer_credit_notes note where note.store_id = ${storeId} and note.business_date between ${from}::date and ${to}::date and note.status in ('approved', 'partially-redeemed', 'redeemed')), 0) as approved_credits,
       coalesce((select sum(redemption.credit_applied) from customer_credit_note_redemptions redemption join customer_credit_notes note on note.id = redemption.credit_note_id where note.store_id = ${storeId} and redemption.business_date between ${from}::date and ${to}::date), 0) as credit_redemptions,
       coalesce((select sum(payment.amount) from customer_deposit_payments payment where payment.store_id = ${storeId} and payment.business_date between ${from}::date and ${to}::date and payment.payment_type in ('deposit', 'balance')), 0) as deposit_received,
@@ -336,19 +492,27 @@ export async function getCustomerTransactionSummary(storeId: number, from: strin
       coalesce((select sum(redemption.additional_payment) from customer_credit_note_redemptions redemption where redemption.store_id = ${storeId} and redemption.business_date between ${from}::date and ${to}::date), 0) as additional_payments
   `);
   const row = result.rows[0] as Record<string, unknown> | undefined;
+  const creditSales = numberValue(row?.credit_sales);
+  const creditCollections = numberValue(row?.credit_collections);
+  const openCreditBalance = numberValue(row?.open_credit_balance);
   const approvedCredits = numberValue(row?.approved_credits);
   const creditRedemptions = numberValue(row?.credit_redemptions);
   const depositReceived = numberValue(row?.deposit_received);
   const depositRefunds = numberValue(row?.deposit_refunds);
   const additionalPayments = numberValue(row?.additional_payments);
   return {
+    creditSales,
+    creditCollections,
+    openCreditBalance,
     approvedCredits,
     creditRedemptions,
     depositReceived,
     depositRefunds,
     additionalPayments,
-    netRevenueAdjustment: depositReceived + additionalPayments - approvedCredits - depositRefunds,
-    cashAdjustment: depositReceived + additionalPayments - depositRefunds,
+    // Credit sales are revenue at the time the goods leave the store. Collections
+    // are cash movements only and are deliberately excluded from net revenue.
+    netRevenueAdjustment: creditSales + depositReceived + additionalPayments - approvedCredits - depositRefunds,
+    cashAdjustment: depositReceived + additionalPayments + creditCollections - depositRefunds,
   };
 }
 
@@ -368,6 +532,10 @@ export async function getCustomerTransactionDailyAdjustments(storeId: number, fr
       select redemption.business_date, redemption.additional_payment
       from customer_credit_note_redemptions redemption
       where redemption.store_id = ${storeId} and redemption.business_date between ${from}::date and ${to}::date
+      union all
+      select sale.business_date, sale.total_value
+      from customer_credit_sales sale
+      where sale.store_id = ${storeId} and sale.business_date between ${from}::date and ${to}::date
     ) dates
     group by dates.business_date order by dates.business_date
   `);
@@ -377,6 +545,207 @@ export async function getCustomerTransactionDailyAdjustments(storeId: number, fr
 async function requireStoreManager(user: AppUser, requestedStoreId?: number) {
   if (user.role !== 'store-manager') throw new HttpError(403, 'Only a store manager can record this transaction');
   return managerStore(user, requestedStoreId);
+}
+
+function moneyString(value: number) {
+  return (Math.round(value * 100) / 100).toFixed(2);
+}
+
+async function requireCreditPaymentAccess(user: AppUser, storeId: number) {
+  if (!CREDIT_PAYMENT_ACTORS.has(user.role)) throw new HttpError(403, 'You cannot record a credit payment');
+  if (user.role === 'store-manager') {
+    const store = await managerStore(user);
+    if (store.id !== storeId) throw new HttpError(403, 'You cannot record a payment for this store');
+  }
+}
+
+export async function createCreditSale(user: AppUser, input: CreateCreditSaleInput) {
+  const store = await requireStoreManager(user, input.storeId);
+  const actor = sessionUserId(user.id);
+  const categoryIds = [...new Set(input.items.map((item) => item.categoryId))];
+  const productIds = [...new Set(input.items.map((item) => item.productId).filter((id): id is number => id != null))];
+  const [categoryRows, productRows] = await Promise.all([
+    db.select({ id: categories.id }).from(categories).where(and(inArray(categories.id, categoryIds), eq(categories.active, true))),
+    productIds.length
+      ? db.select({ id: products.id, categoryId: products.categoryId, name: products.name, sellingPrice: products.sellingPrice })
+          .from(products).where(and(inArray(products.id, productIds), eq(products.active, true)))
+      : Promise.resolve([]),
+  ]);
+  if (categoryRows.length !== categoryIds.length) throw new HttpError(400, 'Choose an active category for every credit-sale line');
+  const productById = new Map(productRows.map((product) => [product.id, product]));
+  const items = input.items.map((item) => {
+    const product = item.productId ? productById.get(item.productId) : undefined;
+    if (item.productId && !product) throw new HttpError(400, 'One or more selected products are unavailable');
+    if (product && product.categoryId !== item.categoryId) throw new HttpError(400, `${product.name} does not belong to the selected category`);
+    const unitPrice = product?.sellingPrice == null ? Number(item.unitPrice ?? 0) : Number(product.sellingPrice);
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+      throw new HttpError(400, `${item.productName} needs a valid selling price before it can be recorded on credit`);
+    }
+    return {
+      categoryId: item.categoryId,
+      productId: product?.id ?? null,
+      productName: product?.name ?? item.productName,
+      quantity: item.quantity,
+      unitPrice: moneyString(unitPrice),
+      lineValue: moneyString(unitPrice * item.quantity),
+    };
+  });
+  const totalValue = moneyString(items.reduce((sum, item) => sum + Number(item.lineValue), 0));
+  const itemsJson = JSON.stringify(items);
+  const result = await db.execute(sql`
+    with created_sale as (
+      insert into customer_credit_sales (
+        store_id, daily_report_id, business_date, customer_name, customer_phone, receipt_number,
+        due_date, total_value, open_value, status, created_by_user_id, updated_by_user_id
+      )
+      values (
+        ${store.id},
+        (select report.id from daily_reports report where report.store_id = ${store.id} and report.business_date = ${input.businessDate}::date limit 1),
+        ${input.businessDate}, ${input.customerName}, ${input.customerPhone ?? null}, ${input.receiptNumber ?? null},
+        ${input.dueDate ?? null}, ${totalValue}, ${totalValue}, 'open', ${actor}, ${actor}
+      )
+      returning *
+    ), created_items as (
+      insert into customer_credit_sale_items (credit_sale_id, category_id, product_id, product_name, quantity, unit_price, line_value)
+      select sale.id, item."categoryId", item."productId", item."productName", item.quantity, item."unitPrice", item."lineValue"
+      from created_sale sale
+      cross join jsonb_to_recordset(${itemsJson}::jsonb) as item(
+        "categoryId" bigint, "productId" bigint, "productName" text, quantity integer,
+        "unitPrice" numeric(14, 2), "lineValue" numeric(14, 2)
+      )
+      returning id
+    ), audit as (
+      insert into audit_events (entity_type, entity_id, action, actor_user_id, after, metadata)
+      select 'customer-credit-sale', sale.id, 'create', ${actor},
+        jsonb_build_object('status', sale.status, 'totalValue', sale.total_value, 'openValue', sale.open_value),
+        jsonb_build_object('storeId', sale.store_id, 'itemCount', (select count(*) from created_items))
+      from created_sale sale
+    )
+    select id from created_sale
+  `);
+  const id = Number((result.rows[0] as { id?: number | string } | undefined)?.id ?? 0);
+  if (!id) throw new HttpError(400, 'Credit sale could not be recorded');
+  return id;
+}
+
+export async function addCreditSalePayment(user: AppUser, creditSaleId: number, input: CreditSalePaymentInput) {
+  const [sale] = await db.select({ storeId: customerCreditSales.storeId }).from(customerCreditSales).where(eq(customerCreditSales.id, creditSaleId)).limit(1);
+  if (!sale) throw new HttpError(404, 'Credit sale not found');
+  await requireCreditPaymentAccess(user, sale.storeId);
+  const actor = sessionUserId(user.id);
+  const result = await db.execute(sql`
+    with before_sale as materialized (
+      select * from customer_credit_sales sale
+      where sale.id = ${creditSaleId}
+        and sale.status in ('open', 'partial')
+        and sale.open_value >= ${input.amount}::numeric
+      for update
+    ), created_payment as (
+      insert into customer_credit_sale_payments (
+        credit_sale_id, store_id, business_date, amount, payment_method_id, reference, created_by_user_id
+      )
+      select sale.id, sale.store_id, ${input.businessDate}, ${input.amount}, ${input.paymentMethodId}, ${input.reference ?? null}, ${actor}
+      from before_sale sale
+      returning *
+    ), updated_sale as (
+      update customer_credit_sales sale
+      set open_value = sale.open_value - ${input.amount}::numeric,
+          status = case when sale.open_value - ${input.amount}::numeric = 0 then 'settled' else 'partial' end,
+          updated_by_user_id = ${actor}, updated_at = now()
+      from before_sale before
+      where sale.id = before.id
+      returning sale.*
+    ), cash as (
+      insert into cash_transactions (
+        business_date, direction, category, amount, reference, description,
+        source_type, source_id, created_by_user_id, updated_by_user_id
+      )
+      select payment.business_date, 'inflow', 'credit-sale-collection', payment.amount, payment.reference,
+        concat('Credit sale payment from ', sale.customer_name), 'customer-credit-sale-payment', payment.id, ${actor}, ${actor}
+      from created_payment payment join updated_sale sale on sale.id = payment.credit_sale_id
+      returning id
+    ), audit as (
+      insert into audit_events (entity_type, entity_id, action, actor_user_id, before, after, metadata)
+      select 'customer-credit-sale', sale.id, 'settle', ${actor}, to_jsonb(before), to_jsonb(sale),
+        jsonb_build_object('paymentId', payment.id, 'amount', payment.amount, 'cashTransactionId', (select id from cash))
+      from updated_sale sale
+      join before_sale before on before.id = sale.id
+      join created_payment payment on payment.credit_sale_id = sale.id
+    )
+    select sale.id, sale.status, sale.open_value, payment.id as payment_id
+    from updated_sale sale join created_payment payment on payment.credit_sale_id = sale.id
+  `);
+  const row = result.rows[0] as { id?: number | string; payment_id?: number | string; open_value?: number | string; status?: string } | undefined;
+  if (!row?.id || !row.payment_id) throw new HttpError(409, 'Payment exceeds the outstanding balance or the credit sale is already settled');
+  return { id: Number(row.id), paymentId: Number(row.payment_id), status: row.status ?? 'partial', openValue: Number(row.open_value ?? 0) };
+}
+
+export interface CreditSalePaymentReceipt {
+  receiptNumber: string;
+  creditNumber: string;
+  storeCode: string;
+  storeName: string;
+  businessDate: string;
+  customerName: string;
+  customerPhone: string | null;
+  originalReceiptNumber: string | null;
+  paymentDate: string;
+  amount: number;
+  paymentMethodName: string;
+  reference: string | null;
+  previousBalance: number;
+  remainingBalance: number;
+  items: Array<{ categoryName: string; productName: string; quantity: number; lineValue: number }>;
+}
+
+export async function getCreditSalePaymentReceipt(user: AppUser, creditSaleId: number, paymentId: number): Promise<CreditSalePaymentReceipt | null> {
+  if (!STORE_TRANSACTION_READERS.has(user.role)) throw new HttpError(403, 'Forbidden');
+  const [row] = await db.select({
+    saleId: customerCreditSales.id,
+    storeId: customerCreditSales.storeId,
+    storeCode: stores.code,
+    storeName: stores.name,
+    businessDate: customerCreditSales.businessDate,
+    customerName: customerCreditSales.customerName,
+    customerPhone: customerCreditSales.customerPhone,
+    originalReceiptNumber: customerCreditSales.receiptNumber,
+    paymentDate: customerCreditSalePayments.businessDate,
+    amount: customerCreditSalePayments.amount,
+    paymentMethodName: paymentMethods.name,
+    reference: customerCreditSalePayments.reference,
+    paymentId: customerCreditSalePayments.id,
+  })
+    .from(customerCreditSalePayments)
+    .innerJoin(customerCreditSales, eq(customerCreditSales.id, customerCreditSalePayments.creditSaleId))
+    .innerJoin(stores, eq(stores.id, customerCreditSales.storeId))
+    .innerJoin(paymentMethods, eq(paymentMethods.id, customerCreditSalePayments.paymentMethodId))
+    .where(and(eq(customerCreditSalePayments.id, paymentId), eq(customerCreditSalePayments.creditSaleId, creditSaleId)))
+    .limit(1);
+  if (!row) return null;
+  await storeFilter(user, row.storeId);
+  const itemRows = await db.select({ categoryName: categories.name, productName: customerCreditSaleItems.productName, quantity: customerCreditSaleItems.quantity, lineValue: customerCreditSaleItems.lineValue })
+    .from(customerCreditSaleItems).innerJoin(categories, eq(categories.id, customerCreditSaleItems.categoryId))
+    .where(eq(customerCreditSaleItems.creditSaleId, creditSaleId)).orderBy(customerCreditSaleItems.id);
+  const [sale] = await db.select({ totalValue: customerCreditSales.totalValue, openValue: customerCreditSales.openValue })
+    .from(customerCreditSales).where(eq(customerCreditSales.id, creditSaleId)).limit(1);
+  if (!sale) return null;
+  return {
+    receiptNumber: `RCP-${row.storeCode}-${row.paymentId}`,
+    creditNumber: `CR-${row.storeCode}-${row.saleId}`,
+    storeCode: row.storeCode,
+    storeName: row.storeName,
+    businessDate: row.businessDate,
+    customerName: row.customerName,
+    customerPhone: row.customerPhone,
+    originalReceiptNumber: row.originalReceiptNumber,
+    paymentDate: row.paymentDate,
+    amount: numberValue(row.amount),
+    paymentMethodName: row.paymentMethodName,
+    reference: row.reference,
+    previousBalance: numberValue(sale.openValue) + numberValue(row.amount),
+    remainingBalance: numberValue(sale.openValue),
+    items: itemRows.map((item) => ({ categoryName: item.categoryName, productName: item.productName, quantity: item.quantity, lineValue: numberValue(item.lineValue) })),
+  };
 }
 
 export async function createCreditNote(user: AppUser, input: CreateCreditNoteInput) {

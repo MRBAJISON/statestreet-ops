@@ -67,12 +67,32 @@ export async function getTradingOverview(scope: AnalyticsScope): Promise<Trading
       ) transaction_row
       where true ${transactionStore}
       group by transaction_row.store_id, transaction_row.business_date
+    ), credit_sale_facts as (
+      select
+        sale.id,
+        sale.store_id,
+        sale.business_date,
+        0::numeric as transactions,
+        0::numeric as footfall,
+        sale.total_value as base_revenue,
+        0::numeric as cogs,
+        0::numeric as units,
+        0::numeric as opening_stock,
+        0::numeric as payments
+      from customer_credit_sales sale
+      where sale.business_date between ${scope.compareFrom}::date and ${scope.to}::date
+        ${scope.store ? sql`and sale.store_id = ${scope.store.id}` : sql``}
     ), report_facts as (
       select line.*, coalesce(payment.payments, 0) + coalesce(adjustment.cash_adjustment, 0) as payments,
         line.base_revenue + coalesce(adjustment.revenue_adjustment, 0) as revenue
       from report_line_totals line
       left join report_payment_totals payment on payment.daily_report_id = line.id
       left join transaction_adjustments adjustment on adjustment.store_id = line.store_id and adjustment.business_date = line.business_date
+      union all
+      select sale.id, sale.store_id, sale.business_date, sale.transactions, sale.footfall,
+        sale.base_revenue, sale.cogs, sale.units, sale.opening_stock,
+        sale.payments, sale.base_revenue as revenue
+      from credit_sale_facts sale
     ), current_trade as (
       select * from report_facts where business_date between ${scope.from}::date and ${scope.to}::date
     ), previous_trade as (
@@ -241,23 +261,46 @@ export async function getTradingOverview(scope: AnalyticsScope): Promise<Trading
       left join current_trade trade on trade.business_date = date.date
       left join daily_target target on target.date = date.date
       group by date.date, target.value
+    ), category_sales as (
+      select
+        report.business_date,
+        line.category_id,
+        line.gross_revenue,
+        line.discounts,
+        line.returns,
+        line.units_sold,
+        line.opening_stock
+      from daily_sales_lines line
+      join daily_reports report on report.id = line.daily_report_id and report.status = 'approved'
+      where report.business_date between ${scope.compareFrom}::date and ${scope.to}::date
+        ${reportStore}
+      union all
+      select
+        sale.business_date,
+        item.category_id,
+        item.line_value,
+        0::numeric,
+        0::numeric,
+        item.quantity,
+        0::numeric
+      from customer_credit_sale_items item
+      join customer_credit_sales sale on sale.id = item.credit_sale_id
+      where sale.business_date between ${scope.compareFrom}::date and ${scope.to}::date
+        ${scope.store ? sql`and sale.store_id = ${scope.store.id}` : sql``}
     ), category_rows as (
       select
         category.id,
         category.name,
         coalesce(sum(line.gross_revenue - line.discounts - line.returns)
-          filter (where report.business_date between ${scope.from}::date and ${scope.to}::date), 0) as revenue,
+          filter (where line.business_date between ${scope.from}::date and ${scope.to}::date), 0) as revenue,
         coalesce(sum(line.gross_revenue - line.discounts - line.returns)
-          filter (where report.business_date between ${scope.compareFrom}::date and ${scope.compareTo}::date), 0) as previous_revenue,
+          filter (where line.business_date between ${scope.compareFrom}::date and ${scope.compareTo}::date), 0) as previous_revenue,
         coalesce(sum(line.units_sold)
-          filter (where report.business_date between ${scope.from}::date and ${scope.to}::date), 0) as units,
+          filter (where line.business_date between ${scope.from}::date and ${scope.to}::date), 0) as units,
         coalesce(sum(line.opening_stock)
-          filter (where report.business_date between ${scope.from}::date and ${scope.to}::date), 0) as opening_stock
-      from daily_sales_lines line
-      join daily_reports report on report.id = line.daily_report_id and report.status = 'approved'
+          filter (where line.business_date between ${scope.from}::date and ${scope.to}::date), 0) as opening_stock
+      from category_sales line
       join categories category on category.id = line.category_id
-      where report.business_date between ${scope.compareFrom}::date and ${scope.to}::date
-        ${reportStore}
       group by category.id, category.name
     ), payment_rows as (
       select method.name, sum(payment.amount) as value

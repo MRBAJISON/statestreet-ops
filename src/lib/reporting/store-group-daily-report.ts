@@ -100,6 +100,7 @@ export async function getStoreGroupDailyReport(
   let target = 0;
   let leadsCount = 0;
   const transactionSummary: CustomerTransactionSummary = {
+    creditSales: 0, creditCollections: 0, openCreditBalance: 0,
     approvedCredits: 0, creditRedemptions: 0, depositReceived: 0, depositRefunds: 0,
     additionalPayments: 0, netRevenueAdjustment: 0, cashAdjustment: 0,
   };

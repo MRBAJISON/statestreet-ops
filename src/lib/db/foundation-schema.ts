@@ -336,6 +336,78 @@ export const dailyReportProducts = pgTable(
   ]
 );
 
+// A customer credit sale is a sale that is recognised immediately but collected
+// later. The sale header carries the customer balance; line items retain the
+// category/product attribution needed by store and period reporting.
+export const customerCreditSales = pgTable(
+  'customer_credit_sales',
+  {
+    id: id(),
+    storeId: bigint('store_id', { mode: 'number' }).notNull().references(() => stores.id, { onDelete: 'restrict' }),
+    dailyReportId: bigint('daily_report_id', { mode: 'number' }).references(() => dailyReports.id, { onDelete: 'set null' }),
+    businessDate: date('business_date').notNull(),
+    customerName: text('customer_name').notNull(),
+    customerPhone: text('customer_phone'),
+    receiptNumber: text('receipt_number'),
+    dueDate: date('due_date'),
+    totalValue: money('total_value').notNull(),
+    openValue: money('open_value').notNull(),
+    status: text('status').notNull().default('open'),
+    createdByUserId: integer('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+    updatedByUserId: integer('updated_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+    ...timestamps(),
+  },
+  (t) => [
+    index('customer_credit_sales_store_date_idx').on(t.storeId, t.businessDate),
+    index('customer_credit_sales_status_due_idx').on(t.status, t.dueDate),
+    index('customer_credit_sales_customer_idx').on(t.customerName, t.customerPhone),
+    check('customer_credit_sales_values_check', sql`${t.totalValue} > 0 and ${t.openValue} >= 0 and ${t.openValue} <= ${t.totalValue}`),
+    check('customer_credit_sales_status_check', sql`${t.status} in ('open', 'partial', 'settled')`),
+  ]
+);
+
+export const customerCreditSaleItems = pgTable(
+  'customer_credit_sale_items',
+  {
+    id: id(),
+    creditSaleId: bigint('credit_sale_id', { mode: 'number' }).notNull().references(() => customerCreditSales.id, { onDelete: 'cascade' }),
+    categoryId: bigint('category_id', { mode: 'number' }).notNull().references(() => categories.id, { onDelete: 'restrict' }),
+    productId: bigint('product_id', { mode: 'number' }).references(() => products.id, { onDelete: 'set null' }),
+    productName: text('product_name').notNull(),
+    quantity: integer('quantity').notNull(),
+    unitPrice: money('unit_price').notNull(),
+    lineValue: money('line_value').notNull(),
+    ...timestamps(),
+  },
+  (t) => [
+    index('customer_credit_sale_items_sale_idx').on(t.creditSaleId),
+    index('customer_credit_sale_items_category_idx').on(t.categoryId),
+    index('customer_credit_sale_items_product_idx').on(t.productId),
+    check('customer_credit_sale_items_quantity_check', sql`${t.quantity} > 0`),
+    check('customer_credit_sale_items_amounts_check', sql`${t.unitPrice} > 0 and ${t.lineValue} > 0`),
+  ]
+);
+
+export const customerCreditSalePayments = pgTable(
+  'customer_credit_sale_payments',
+  {
+    id: id(),
+    creditSaleId: bigint('credit_sale_id', { mode: 'number' }).notNull().references(() => customerCreditSales.id, { onDelete: 'restrict' }),
+    storeId: bigint('store_id', { mode: 'number' }).notNull().references(() => stores.id, { onDelete: 'restrict' }),
+    businessDate: date('business_date').notNull(),
+    amount: money('amount').notNull(),
+    paymentMethodId: bigint('payment_method_id', { mode: 'number' }).notNull().references(() => paymentMethods.id, { onDelete: 'restrict' }),
+    reference: text('reference'),
+    createdByUserId: integer('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+    ...timestamps(),
+  },
+  (t) => [
+    index('customer_credit_sale_payments_sale_idx').on(t.creditSaleId, t.businessDate),
+    index('customer_credit_sale_payments_store_date_idx').on(t.storeId, t.businessDate),
+    check('customer_credit_sale_payments_amount_check', sql`${t.amount} > 0`),
+  ]
+);
+
 export const customerCreditNotes = pgTable(
   'customer_credit_notes',
   {

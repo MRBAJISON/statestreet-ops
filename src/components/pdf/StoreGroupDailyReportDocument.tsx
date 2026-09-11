@@ -213,6 +213,12 @@ export function StoreGroupDailyReportDocument({
             {totals.returns > 0 ? (
               <View style={styles.row}><Text style={styles.rowLabel}>Returns</Text><Text style={{ ...styles.rowValue, ...styles.rowValueDiscount }}>- {formatMoney(totals.returns, currency)}</Text></View>
             ) : null}
+            {report.transactionSummary.creditSales > 0 ? (
+              <View style={styles.row}><Text style={styles.rowLabel}>Credit sales</Text><Text style={styles.rowValue}>+ {formatMoney(report.transactionSummary.creditSales, currency)}</Text></View>
+            ) : null}
+            {report.transactionSummary.creditCollections > 0 ? (
+              <View style={styles.row}><Text style={styles.rowLabel}>Credit payments collected</Text><Text style={styles.rowValue}>+ {formatMoney(report.transactionSummary.creditCollections, currency)}</Text></View>
+            ) : null}
             {report.transactionSummary.approvedCredits > 0 ? (
               <View style={styles.row}><Text style={styles.rowLabel}>Approved credit notes</Text><Text style={{ ...styles.rowValue, ...styles.rowValueDiscount }}>- {formatMoney(report.transactionSummary.approvedCredits, currency)}</Text></View>
             ) : null}
@@ -225,7 +231,7 @@ export function StoreGroupDailyReportDocument({
             {report.transactionSummary.depositRefunds > 0 ? (
               <View style={styles.row}><Text style={styles.rowLabel}>Deposit refunds</Text><Text style={{ ...styles.rowValue, ...styles.rowValueDiscount }}>- {formatMoney(report.transactionSummary.depositRefunds, currency)}</Text></View>
             ) : null}
-            <View style={styles.rowSubtotal}><Text style={styles.rowLabelBold}>Net Sales</Text><Text style={styles.rowValue}>{formatMoney(totals.netRevenue, currency)}</Text></View>
+            <View style={styles.rowSubtotal}><Text style={styles.rowLabelBold}>Net Sales</Text><Text style={{ ...styles.rowValue, ...styles.rowLabelBold }}>{formatMoney(totals.netRevenue, currency)}</Text></View>
             {report.payments.map((line, index) => (
               <View key={line.paymentMethodId} style={index === report.payments.length - 1 ? styles.rowLast : styles.row}>
                 <Text style={styles.rowLabel}>{paymentMethodNames.get(line.paymentMethodId) ?? `Method ${line.paymentMethodId}`}</Text>

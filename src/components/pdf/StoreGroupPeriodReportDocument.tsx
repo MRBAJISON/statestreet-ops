@@ -259,7 +259,13 @@ export function StoreGroupPeriodReportDocument({
             {totals.returns > 0 ? (
               <View style={styles.row}><Text style={styles.rowLabel}>Returns</Text><Text style={{ ...styles.rowValue, ...styles.rowValueDiscount }}>- {formatMoney(totals.returns, currency)}</Text></View>
             ) : null}
-            <View style={styles.rowSubtotal}><Text style={styles.rowLabelBold}>Net Sales</Text><Text style={styles.rowValue}>{formatMoney(totals.netRevenue, currency)}</Text></View>
+            {totals.creditSales > 0 ? (
+              <View style={styles.row}><Text style={styles.rowLabel}>Credit sales</Text><Text style={styles.rowValue}>+ {formatMoney(totals.creditSales, currency)}</Text></View>
+            ) : null}
+            {report.transactionSummary.creditCollections > 0 ? (
+              <View style={styles.row}><Text style={styles.rowLabel}>Credit payments collected</Text><Text style={styles.rowValue}>+ {formatMoney(report.transactionSummary.creditCollections, currency)}</Text></View>
+            ) : null}
+            <View style={styles.rowSubtotal}><Text style={styles.rowLabelBold}>Net Sales</Text><Text style={{ ...styles.rowValue, ...styles.rowLabelBold }}>{formatMoney(totals.netRevenue, currency)}</Text></View>
             {report.payments.map((line, index) => (
               <View key={line.paymentMethodId} style={index === report.payments.length - 1 ? styles.rowLast : styles.row}>
                 <Text style={styles.rowLabel}>{paymentMethodNames.get(line.paymentMethodId) ?? `Method ${line.paymentMethodId}`}</Text>

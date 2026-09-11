@@ -424,6 +424,9 @@ export interface StoreDomain {
     creditNotesSubmitted: number;
     approvedCreditValue: number;
     pendingInventoryItems: number;
+    creditSales: number;
+    creditCollections: number;
+    openCreditBalance: number;
     depositsReceived: number;
     activeDeposits: number;
     outstandingDepositBalance: number;

@@ -22,6 +22,9 @@ export interface DailyStoreReportSupplement {
   followUpText: string;
   customerRequests: DailyStoreReportCustomerRequest[];
   transactionSummary: {
+    creditSales: number;
+    creditCollections: number;
+    openCreditBalance: number;
     approvedCredits: number;
     creditRedemptions: number;
     depositReceived: number;
@@ -71,6 +74,9 @@ export async function getDailyStoreReportSupplement(
       .where(and(eq(customerInteractions.storeId, storeId), eq(customerInteractions.businessDate, businessDate))),
     db.execute(sql`
       select
+        coalesce((select sum(sale.total_value) from customer_credit_sales sale where sale.store_id = ${storeId} and sale.business_date = ${businessDate}::date), 0) as credit_sales,
+        coalesce((select sum(payment.amount) from customer_credit_sale_payments payment where payment.store_id = ${storeId} and payment.business_date = ${businessDate}::date), 0) as credit_collections,
+        coalesce((select sum(sale.open_value) from customer_credit_sales sale where sale.store_id = ${storeId} and sale.status in ('open', 'partial')), 0) as open_credit_balance,
         coalesce((select sum(note.approved_value) from customer_credit_notes note where note.store_id = ${storeId} and note.business_date = ${businessDate}::date and note.status in ('approved', 'partially-redeemed', 'redeemed')), 0) as approved_credits,
         coalesce((select sum(redemption.credit_applied) from customer_credit_note_redemptions redemption where redemption.store_id = ${storeId} and redemption.business_date = ${businessDate}::date), 0) as credit_redemptions,
         coalesce((select sum(payment.amount) from customer_deposit_payments payment where payment.store_id = ${storeId} and payment.business_date = ${businessDate}::date and payment.payment_type in ('deposit', 'balance')), 0) as deposit_received,
@@ -82,13 +88,16 @@ export async function getDailyStoreReportSupplement(
   const dailyTarget = Number((targetResult.rows[0] as { daily_target: string } | undefined)?.daily_target ?? 0);
   const transactionRow = transactionResult.rows[0] as Record<string, unknown> | undefined;
   const transactionSummary = {
+    creditSales: Number(transactionRow?.credit_sales ?? 0),
+    creditCollections: Number(transactionRow?.credit_collections ?? 0),
+    openCreditBalance: Number(transactionRow?.open_credit_balance ?? 0),
     approvedCredits: Number(transactionRow?.approved_credits ?? 0),
     creditRedemptions: Number(transactionRow?.credit_redemptions ?? 0),
     depositReceived: Number(transactionRow?.deposit_received ?? 0),
     depositRefunds: Number(transactionRow?.deposit_refunds ?? 0),
     additionalPayments: Number(transactionRow?.additional_payments ?? 0),
-    netRevenueAdjustment: Number(transactionRow?.deposit_received ?? 0) + Number(transactionRow?.additional_payments ?? 0) - Number(transactionRow?.approved_credits ?? 0) - Number(transactionRow?.deposit_refunds ?? 0),
-    cashAdjustment: Number(transactionRow?.deposit_received ?? 0) + Number(transactionRow?.additional_payments ?? 0) - Number(transactionRow?.deposit_refunds ?? 0),
+    netRevenueAdjustment: Number(transactionRow?.credit_sales ?? 0) + Number(transactionRow?.deposit_received ?? 0) + Number(transactionRow?.additional_payments ?? 0) - Number(transactionRow?.approved_credits ?? 0) - Number(transactionRow?.deposit_refunds ?? 0),
+    cashAdjustment: Number(transactionRow?.deposit_received ?? 0) + Number(transactionRow?.additional_payments ?? 0) + Number(transactionRow?.credit_collections ?? 0) - Number(transactionRow?.deposit_refunds ?? 0),
   };
   const adjustedNetRevenue = netRevenue + transactionSummary.netRevenueAdjustment;
   const achievementPercent = dailyTarget > 0 ? (adjustedNetRevenue / dailyTarget) * 100 : 0;

@@ -9,6 +9,7 @@ export async function getFinanceDomain(scope: AnalyticsScope): Promise<FinanceDo
   const cashTrendByWeek = scope.preset === 'qtd';
   const expenseStore = scope.store ? sql`and expense.store_id = ${scope.store.id}` : sql``;
   const reportStore = scope.store ? sql`and report.store_id = ${scope.store.id}` : sql``;
+  const creditSaleStore = scope.store ? sql`and sale.store_id = ${scope.store.id}` : sql``;
   const budgetScope = scope.store
     ? sql`and budget.store_id = ${scope.store.id}`
     : sql`and (
@@ -97,14 +98,22 @@ export async function getFinanceDomain(scope: AnalyticsScope): Promise<FinanceDo
         on transaction.cash_account_id = account.id and transaction.business_date <= ${scope.to}::date ${manualCashFilter}
       where account.active = true
       group by account.id, account.name, account.type
+    ), working_items as (
+      select item.id, item.type, item.entity, item.open_amount, item.due_date, item.status
+      from working_capital_items item
+      where item.status in ('open', 'partial')
+      union all
+      select -sale.id, 'debtor', concat('Credit sale · ', sale.customer_name), sale.open_value, sale.due_date, sale.status
+      from customer_credit_sales sale
+      where sale.status in ('open', 'partial') ${creditSaleStore}
     ), working_summary as (
       select
-        coalesce(sum(item.open_amount) filter (where item.type = 'debtor' and item.status in ('open', 'partial')), 0) as debtors,
-        coalesce(sum(item.open_amount) filter (where item.type = 'creditor' and item.status in ('open', 'partial')), 0) as creditors,
+        coalesce(sum(item.open_amount) filter (where item.type = 'debtor'), 0) as debtors,
+        coalesce(sum(item.open_amount) filter (where item.type = 'creditor'), 0) as creditors,
         coalesce(sum(item.open_amount) filter (
-          where item.status in ('open', 'partial') and item.due_date < ${scope.to}::date
+          where item.due_date < ${scope.to}::date
         ), 0) as overdue
-      from working_capital_items item
+      from working_items item
     ), revenue_summary as (
       select
         coalesce(sum(line.gross_revenue - line.discounts - line.returns), 0) as revenue,
@@ -167,8 +176,8 @@ export async function getFinanceDomain(scope: AnalyticsScope): Promise<FinanceDo
             else 5
           end as sort,
           item.open_amount as amount
-        from working_capital_items item
-        where item.type = 'debtor' and item.status in ('open', 'partial')
+        from working_items item
+        where item.type = 'debtor'
       ) bucket
       group by bucket.name, bucket.sort
     ), overspend_rows as (
@@ -278,8 +287,7 @@ export async function getFinanceDomain(scope: AnalyticsScope): Promise<FinanceDo
             'status', item.status
           ) order by item.due_date nulls last, item.open_amount desc)
           from (
-            select * from working_capital_items
-            where status in ('open', 'partial')
+            select * from working_items
             order by due_date nulls last, open_amount desc
             limit 12
           ) item
