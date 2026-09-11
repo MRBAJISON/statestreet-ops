@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   BanknoteArrowUp,
   Boxes,
   Building2,
   ChartNoAxesCombined,
+  ChevronRight,
   CircleAlert,
   CircleDollarSign,
   ClipboardCheck,
@@ -17,9 +19,10 @@ import {
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { ShowMoreButton } from '@/components/ui/show-more-button';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useExpandable } from '@/hooks/use-expandable';
-import type { AnalyticsMeta, ExecutiveDomain, TradingOverview } from '@/lib/contracts/analytics';
+import type { AnalyticsMeta, AttentionItem, ExecutiveDomain, TradingOverview } from '@/lib/contracts/analytics';
 import { EmptyPanel, EmptyTableRow, MetricRail, SectionHeading, StatusBadge } from './DashboardPrimitives';
 import {
   DonutChart,
@@ -28,6 +31,17 @@ import {
   StoreRankingChart,
 } from './Charts';
 import { formatCurrency, formatNumber, formatPercent, formatSellThrough, percentageChange } from './format';
+
+function formatAttentionLabel(value: string) {
+  return value.replaceAll('-', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatAttentionDate(value: string | null) {
+  if (!value) return 'No due date';
+  return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(
+    new Date(`${value}T00:00:00`)
+  );
+}
 
 const departmentLinks = [
   { label: 'Finance', href: '/dashboard/finance', icon: WalletCards, tone: 'text-chart-1 bg-chart-1/10' },
@@ -62,6 +76,7 @@ export function ExecutiveOverview({
   domain: ExecutiveDomain;
 }) {
   const summary = trading.summary;
+  const [selectedAttention, setSelectedAttention] = useState<AttentionItem | null>(null);
   const metrics = [
     {
       label: 'Group revenue',
@@ -125,7 +140,7 @@ export function ExecutiveOverview({
 
       <section className="chart-canvas min-w-0 p-5">
         <SectionHeading title="Group Revenue & Margin Trend" description="Approved net revenue, target, and gross profit by selected period" />
-        <div className="mt-3"><RevenueTrendChart data={trading.trend} currency={meta.currency} /></div>
+        <div className="mt-3"><RevenueTrendChart data={trading.trend} currency={meta.currency} preset={meta.preset} /></div>
       </section>
 
       <div className="grid gap-5 xl:grid-cols-3">
@@ -241,11 +256,18 @@ export function ExecutiveOverview({
           <SectionHeading title="CEO Attention Index" description="The highest-priority risks requiring leadership attention" action={<span className="text-xs font-semibold text-destructive">{trading.summary.openActions} open</span>} />
           {trading.attention.length ? <><div className="mt-4 divide-y">
             {attention.visible.map((item) => (
-              <div key={item.id} className="flex gap-3 py-3 first:pt-0 last:pb-0">
+              <button
+                key={item.id}
+                type="button"
+                className="group flex w-full items-center gap-3 py-3 text-left first:pt-0 last:pb-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={() => setSelectedAttention(item)}
+                aria-label={`View CEO attention issue: ${item.title}`}
+              >
                 <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-chart-3/10 text-destructive"><CircleAlert className="size-4" /></span>
                 <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{item.title}</span><span className="block truncate text-xs text-muted-foreground">{[item.department, item.storeName, item.ownerName].filter(Boolean).join(' / ')}</span></span>
                 <StatusBadge value={item.priority} />
-              </div>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+              </button>
             ))}
           </div><ShowMoreButton expanded={attention.expanded} hiddenCount={attention.hiddenCount} canExpand={attention.canExpand} onClick={attention.toggle} /></> : <EmptyPanel message="No issues currently require CEO attention" />}
         </section>
@@ -300,6 +322,47 @@ export function ExecutiveOverview({
           </div><ShowMoreButton expanded={weeklyReviews.expanded} hiddenCount={weeklyReviews.hiddenCount} canExpand={weeklyReviews.canExpand} onClick={weeklyReviews.toggle} /></> : <EmptyPanel message="No store-manager insights have been submitted" />}
         </section>
       </div>
+
+      {selectedAttention ? (
+        <Sheet open onOpenChange={(open) => { if (!open) setSelectedAttention(null); }}>
+          <SheetContent className="flex w-full flex-col p-0 data-[side=right]:sm:max-w-lg">
+            <SheetHeader className="border-b px-5 py-5 pr-12 text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <SheetTitle>Issue details</SheetTitle>
+                <StatusBadge value={selectedAttention.priority} />
+                <StatusBadge value={selectedAttention.status} />
+              </div>
+              <SheetDescription>{selectedAttention.title}</SheetDescription>
+            </SheetHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6">
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Department</p>
+                  <p className="mt-1 text-sm font-medium">{formatAttentionLabel(selectedAttention.department)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Store</p>
+                  <p className="mt-1 text-sm font-medium">{selectedAttention.storeName ?? 'Group'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Owner</p>
+                  <p className="mt-1 text-sm font-medium">{selectedAttention.ownerName}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Due date</p>
+                  <p className="mt-1 text-sm font-medium">{formatAttentionDate(selectedAttention.dueDate)}</p>
+                </div>
+              </div>
+              <div className="mt-7 border-t pt-5">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Reported issue</p>
+                <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6">
+                  {selectedAttention.detail?.trim() || 'No additional issue detail was recorded.'}
+                </p>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      ) : null}
     </div>
   );
 }

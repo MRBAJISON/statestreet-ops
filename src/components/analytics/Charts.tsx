@@ -16,8 +16,15 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
-import type { CategoryPerformanceRow, NamedValue, StorePerformanceRow, TradingTrendPoint } from '@/lib/contracts/analytics';
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/components/ui/chart';
+import type { AnalyticsPreset, CategoryPerformanceRow, NamedValue, StorePerformanceRow, TradingTrendPoint } from '@/lib/contracts/analytics';
 import { formatCurrency, formatNumber, formatShortDate, truncateLabel } from './format';
 
 const revenueConfig = {
@@ -25,6 +32,17 @@ const revenueConfig = {
   target: { label: 'Target', color: 'var(--chart-2)' },
   grossProfit: { label: 'Gross profit', color: 'var(--chart-4)' },
 } satisfies ChartConfig;
+
+function revenueTrendLabel(value: string, preset?: AnalyticsPreset) {
+  if (!value) return '';
+  if (preset === 'qtd') return `Week of ${formatShortDate(value)}`;
+  if (preset === 'ytd') {
+    return new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric' }).format(
+      new Date(`${value}T00:00:00`)
+    );
+  }
+  return formatShortDate(value);
+}
 
 function ChartEmptyState({ className }: { className: string }) {
   return (
@@ -37,7 +55,15 @@ function ChartEmptyState({ className }: { className: string }) {
   );
 }
 
-export function RevenueTrendChart({ data, currency }: { data: TradingTrendPoint[]; currency: string }) {
+export function RevenueTrendChart({
+  data,
+  currency,
+  preset,
+}: {
+  data: TradingTrendPoint[];
+  currency: string;
+  preset?: AnalyticsPreset;
+}) {
   if (!data.length) {
     return <ChartEmptyState className="h-[310px]" />;
   }
@@ -52,17 +78,28 @@ export function RevenueTrendChart({ data, currency }: { data: TradingTrendPoint[
           width={58}
           tickFormatter={(value) => formatNumber(Number(value), true)}
         />
+        <ChartLegend content={<ChartLegendContent />} />
         <ChartTooltip
           cursor={{ stroke: 'var(--border)' }}
           content={
             <ChartTooltipContent
-              labelFormatter={(_, payload) => formatShortDate(String(payload[0]?.payload?.date ?? ''))}
-              formatter={(value, name) => (
-                <div className="flex min-w-44 items-center justify-between gap-5">
-                  <span className="text-muted-foreground">{revenueConfig[String(name) as keyof typeof revenueConfig]?.label}</span>
-                  <span className="font-mono font-medium">{formatCurrency(Number(value), currency, false)}</span>
-                </div>
-              )}
+              labelFormatter={(_, payload) => revenueTrendLabel(String(payload[0]?.payload?.date ?? ''), preset)}
+              formatter={(value, name) => {
+                const config = revenueConfig[String(name) as keyof typeof revenueConfig];
+                return (
+                  <div className="flex min-w-48 items-center justify-between gap-5">
+                    <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
+                      <span
+                        aria-hidden="true"
+                        className="size-2 shrink-0 rounded-[2px]"
+                        style={{ backgroundColor: config?.color ?? 'currentColor' }}
+                      />
+                      <span>{config?.label ?? String(name)}</span>
+                    </span>
+                    <span className="font-mono font-medium tabular-nums">{formatCurrency(Number(value), currency, false)}</span>
+                  </div>
+                );
+              }}
             />
           }
         />
@@ -85,6 +122,7 @@ export function RevenueTrendChart({ data, currency }: { data: TradingTrendPoint[
           fill="transparent"
           strokeWidth={1.7}
           dot={false}
+          activeDot={{ r: 4, strokeWidth: 2, fill: 'var(--card)' }}
           isAnimationActive
           animationDuration={500}
         />
@@ -96,6 +134,7 @@ export function RevenueTrendChart({ data, currency }: { data: TradingTrendPoint[
           strokeWidth={1.6}
           strokeDasharray="5 5"
           dot={false}
+          activeDot={{ r: 4, strokeWidth: 2, fill: 'var(--card)' }}
           isAnimationActive={false}
         />
       </ComposedChart>

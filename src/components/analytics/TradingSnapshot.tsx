@@ -56,7 +56,7 @@ export function TradingSnapshot({ meta, trading, showStores = true }: { meta: An
       <div className="grid gap-5 xl:grid-cols-12">
         <section className="chart-canvas min-w-0 p-5 xl:col-span-8">
           <SectionHeading title="Revenue pace" description="Approved net revenue, target, and gross profit" />
-          <div className="mt-3"><RevenueTrendChart data={trading.trend} currency={meta.currency} /></div>
+          <div className="mt-3"><RevenueTrendChart data={trading.trend} currency={meta.currency} preset={meta.preset} /></div>
         </section>
         <section className="surface min-w-0 p-5 xl:col-span-4">
           <SectionHeading title="Payment mix" description="Collected cash sales by method" />
