@@ -46,8 +46,8 @@ export function StoreTabs({ stores, activeStoreId }: { stores: AccessibleStore[]
       </div>
       <p className="flex items-center gap-1.5 py-2 text-xs text-muted-foreground">
         <Store className="size-3.5" />
-        Recording for <span className="font-medium text-foreground">{active.name}</span>. Everything you file — daily
-        report, weekly review, customer capture, stock transfer — belongs to this store until you switch.
+        Daily reports, weekly reviews, customer capture and transfers use <span className="font-medium text-foreground">{active.name}</span>.
+        Monthly reviews use their own store or combined-cluster selection below.
       </p>
     </div>
   );

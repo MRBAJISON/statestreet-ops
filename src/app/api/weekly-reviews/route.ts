@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     }
     const [review, categories] = await Promise.all([
       getWeeklyReview(session.user, parsedWeekEnd?.data),
-      getWeeklyReviewCategories(session.user),
+      getWeeklyReviewCategories(session.user, parsedWeekEnd?.data),
     ]);
     return NextResponse.json({ review, categories }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {

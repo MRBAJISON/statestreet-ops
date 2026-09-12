@@ -97,8 +97,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const paymentMethodNames = new Map(references.paymentMethods.map((method) => [method.id, method.name]));
     const categoryNames = new Map(references.categories.map((category) => [category.id, category.name]));
 
+    const memberIds=report.stores.map(s=>s.storeId);
+    const [weeklyReviews,performance]=periodType==='week'?await Promise.all([getWeeklyReviewContext(memberIds,report.range.from,report.range.to),getProductPerformance(memberIds,report.range.from,report.range.to)]):[undefined,undefined];
     const instance = pdf(
-      StoreGroupPeriodReportDocument({ report, currency: org.currency, paymentMethodNames, categoryNames })
+      StoreGroupPeriodReportDocument({ report, currency: org.currency, paymentMethodNames, categoryNames,weeklyReviews,performance })
     );
     const buffer = await streamToBuffer(await instance.toBuffer());
     const filename = `${periodType}-cluster-report-${group.code}-${report.range.from}.pdf`;
@@ -117,3 +119,5 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }
 }
+import { getWeeklyReviewContext } from '@/lib/reporting/weekly-review-context';
+import { getProductPerformance } from '@/lib/reporting/product-performance';

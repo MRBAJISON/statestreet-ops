@@ -1,5 +1,8 @@
 import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
 import type { StorePeriodReport } from '@/lib/reporting/store-period-report';
+import type { WeeklyReviewContext } from '@/lib/reporting/weekly-review-context';
+import type { ProductPerformance } from '@/lib/reporting/product-performance';
+import { WeeklyReviewAppendix,ProductPerformancePdf } from './PerformanceSections';
 
 const COLORS = {
   header: '#0F172A',
@@ -102,11 +105,15 @@ export function StorePeriodReportDocument({
   currency,
   paymentMethodNames,
   categoryNames,
+  weeklyReviews,
+  performance,
 }: {
   report: StorePeriodReport;
   currency: string;
   paymentMethodNames: Map<number, string>;
   categoryNames: Map<number, string>;
+  weeklyReviews?:WeeklyReviewContext[];
+  performance?:ProductPerformance;
 }) {
   const { totals } = report;
   const heading = report.periodType === 'week' ? 'WEEKLY STORE REPORT' : 'MONTHLY STORE REPORT';
@@ -350,6 +357,8 @@ export function StorePeriodReportDocument({
           </View>
         ) : null}
 
+        {performance?<ProductPerformancePdf data={performance} currency={currency}/>:null}
+        {report.periodType==='week'?<WeeklyReviewAppendix reviews={weeklyReviews??[]} expectedStoreNames={[report.store.name]} categoryNames={categoryNames}/>:null}
         <View style={styles.footer} fixed>
           <Text>{report.store.name} | {report.periodType === 'week' ? 'Weekly' : 'Monthly'} Store Report</Text>
           <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />

@@ -9,6 +9,7 @@ import { HorizontalBarChart, NamedBarChart, ValueTrendChart } from './Charts';
 import { formatCurrency, formatNumber, formatPercent } from './format';
 
 export function InventoryOverview({ meta, domain }: { meta: AnalyticsMeta; domain: InventoryDomain }) {
+  const riskComplete=Boolean(domain.stockAnalysis)&&domain.stockAnalysis!.rows.every(row=>row.riskValue!==null&&row.historyComplete);
   const stock = useExpandable(domain.stock);
   const replenishmentLines = useExpandable(domain.replenishmentLines);
   const dispositions = useExpandable(domain.dispositions);
@@ -19,10 +20,11 @@ export function InventoryOverview({ meta, domain }: { meta: AnalyticsMeta; domai
 
   return (
     <div className="flex flex-col gap-5">
+      {domain.stockAnalysis?<ProductPerformanceTable data={domain.stockAnalysis} currency={meta.currency}/>:<ProductPerformancePanel from={meta.from} to={meta.to} storeId={meta.store?.id} currency={meta.currency} approvedOnly />}
       <MetricRail items={[
         { label: 'Inventory value', value: formatCurrency(domain.summary.inventoryValue, meta.currency), detail: `${formatNumber(domain.summary.unitsOnHand, true)} units`, icon: Boxes, tone: 'blue' },
         { label: 'Stock accuracy', value: formatPercent(domain.summary.stockAccuracy), detail: 'Latest stock counts', icon: ShieldCheck, tone: 'green' },
-        { label: 'Dead stock', value: formatPercent(domain.summary.deadStockPercent), detail: `${formatCurrency(domain.movement.deadStockValue, meta.currency)} at risk`, icon: CircleAlert, tone: 'coral' },
+        { label: 'Stock at risk', value: riskComplete?formatPercent(domain.summary.deadStockPercent):'Incomplete', detail: riskComplete?`${formatCurrency(domain.movement.deadStockValue, meta.currency)} selling-price exposure`:'See product history and valuation notes', icon: CircleAlert, tone: 'coral' },
         { label: 'Low-stock lines', value: String(domain.summary.lowStockProducts), detail: 'At or below threshold', icon: CircleAlert, tone: 'amber' },
         { label: 'Open replenishments', value: String(domain.summary.openReplenishments), detail: 'Requested, approved, or ordered', icon: SendToBack, tone: 'teal' },
         { label: 'In transit', value: String(domain.summary.inTransitTransfers), detail: 'Stock transfers', icon: Truck, tone: 'blue' },
@@ -50,7 +52,7 @@ export function InventoryOverview({ meta, domain }: { meta: AnalyticsMeta; domai
             <div><p className="data-label">Units received</p><p className="mt-1 text-xl font-semibold">{formatNumber(domain.movement.receivedUnits)}</p><p className="text-xs text-muted-foreground">{formatCurrency(domain.movement.receivedValue, meta.currency)}</p></div>
             <div><p className="data-label">Units transferred</p><p className="mt-1 text-xl font-semibold">{formatNumber(domain.movement.transferredUnits)}</p><p className="text-xs text-muted-foreground">{formatCurrency(domain.movement.transferredValue, meta.currency)}</p></div>
             <div><p className="data-label">Counted value</p><p className="mt-1 text-xl font-semibold">{formatCurrency(domain.movement.countedValue, meta.currency)}</p></div>
-            <div><p className="data-label">Dead-stock value</p><p className="mt-1 text-xl font-semibold text-destructive">{formatCurrency(domain.movement.deadStockValue, meta.currency)}</p></div>
+            <div><p className="data-label">Stock-at-risk exposure</p><p className="mt-1 text-xl font-semibold text-destructive">{riskComplete?formatCurrency(domain.movement.deadStockValue, meta.currency):'Incomplete valuation'}</p><p className="text-xs text-muted-foreground">Selling price; not a confirmed loss.</p></div>
           </div>
         </section>
       </div>
@@ -110,3 +112,4 @@ export function InventoryOverview({ meta, domain }: { meta: AnalyticsMeta; domai
     </div>
   );
 }
+import { ProductPerformancePanel,ProductPerformanceTable } from './ProductPerformancePanel';

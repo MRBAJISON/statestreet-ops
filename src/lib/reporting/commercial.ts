@@ -21,13 +21,12 @@ export async function getCommercialDomain(scope: AnalyticsScope): Promise<Commer
       where movement.business_date <= ${scope.to}::date ${movementStore}
       group by movement.product_id
     ), product_sales as (
-      select movement.product_id, -sum(movement.quantity) as units_sold
-      from inventory_movements movement
-      join stores store on store.id = movement.store_id and store.type = 'store'
-      where movement.movement_type = 'sale'
-        and movement.business_date between ${scope.from}::date and ${scope.to}::date
-        ${movementStore}
-      group by movement.product_id
+      select line.product_id,sum(line.units)::integer as units_sold
+      from daily_report_products line join daily_reports report on report.id=line.daily_report_id
+      where report.status='approved' and line.product_id is not null
+        and report.business_date between ${scope.from}::date and ${scope.to}::date
+        ${scope.store?sql`and report.store_id=${scope.store.id}`:sql``}
+      group by line.product_id
     ), product_rows as (
       select
         product.id,
@@ -35,10 +34,10 @@ export async function getCommercialDomain(scope: AnalyticsScope): Promise<Commer
         product.name,
         brand.name as brand_name,
         category.name as category_name,
-        coalesce(sales.units_sold, insight_metrics.units_sold, 0) as units_sold,
-        coalesce(balance.units, insight_metrics.current_stock, 0) as stock,
-        coalesce(balance.units, insight_metrics.current_stock, 0) * coalesce(product.unit_cost, 0) as stock_value,
-        coalesce((${scope.to}::date - balance.last_movement)::integer, insight_metrics.days_in_stock) as days_since_movement,
+        coalesce(sales.units_sold, 0) as units_sold,
+        coalesce(balance.units, 0) as stock,
+        coalesce(balance.units, 0) * coalesce(product.unit_cost, 0) as stock_value,
+        (${scope.to}::date - balance.last_movement)::integer as days_since_movement,
         insight.status,
         insight.performance,
         insight.campaign,
@@ -55,20 +54,11 @@ export async function getCommercialDomain(scope: AnalyticsScope): Promise<Commer
         order by product_insight.period_end desc, product_insight.id desc
         limit 1
       ) insight on ${useGroupInsights}
-      left join lateral (
-        select product_insight.units_sold, product_insight.current_stock, product_insight.days_in_stock
-        from product_insights product_insight
-        where product_insight.product_id = product.id
-          and product_insight.period_start <= ${scope.to}::date
-          and product_insight.period_end >= ${scope.from}::date
-        order by product_insight.period_end desc, product_insight.id desc
-        limit 1
-      ) insight_metrics on ${useGroupInsights}
       where product.active = true and (
-        coalesce(sales.units_sold, insight_metrics.units_sold, 0) > 0 or
-        coalesce(balance.units, insight_metrics.current_stock, 0) > 0 or insight.status is not null
+        coalesce(sales.units_sold, 0) > 0 or
+        coalesce(balance.units, 0) > 0 or insight.status is not null
       )
-      order by coalesce(sales.units_sold, insight_metrics.units_sold, 0) desc, stock_value desc
+      order by coalesce(sales.units_sold, 0) desc, stock_value desc
       limit 15
     ), review_rows as (
       select

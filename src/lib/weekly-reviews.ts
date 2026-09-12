@@ -14,6 +14,8 @@ import { weeklyReviewCategoryNotes } from './db/operational-schema';
 import { HttpError, sessionUserId } from './server-errors';
 import { configuredCategoryIdsForStore } from './daily-reports';
 import { resolveActingStore } from './store-access';
+import { getProductPerformance } from './reporting/product-performance';
+import { resolveStorePeriod } from './reporting/store-period';
 
 type WeeklyReviewInput = z.infer<typeof weeklyReviewSchema>;
 
@@ -24,7 +26,7 @@ async function assignedStore(user: AppUser) {
   return resolveActingStore(user);
 }
 
-async function getCategorySummariesForStore(storeId: number): Promise<WeeklyReviewCategorySummary[]> {
+async function getCategorySummariesForStore(storeId: number, weekEnd?: string): Promise<WeeklyReviewCategorySummary[]> {
   const configuredCategoryIds = await configuredCategoryIdsForStore(storeId);
   if (configuredCategoryIds && configuredCategoryIds.size === 0) return [];
 
@@ -49,18 +51,28 @@ async function getCategorySummariesForStore(storeId: number): Promise<WeeklyRevi
     .groupBy(categories.id, categories.name, categories.sortOrder)
     .orderBy(asc(categories.sortOrder), asc(categories.name));
 
-  return rows.map((row) => ({
+  const range=resolveStorePeriod('week',weekEnd??new Date().toISOString().slice(0,10)).range;
+  const performance=await getProductPerformance([storeId],range.from,range.to);
+  return rows.map((row) => {
+    const items=performance.rows.filter(item=>item.categoryId===row.id);
+    const riskQuantity=items.reduce((sum,item)=>sum+item.riskQuantity,0);
+    const riskValue=items.some(item=>item.riskValue===null)?null:items.reduce((sum,item)=>sum+Number(item.riskValue??0),0).toFixed(2);
+    const days=items.filter(item=>item.quantity>0 && item.historyComplete && item.daysSinceSale!==null).map(item=>item.daysSinceSale!);
+    return ({
     id: row.id,
     name: row.name,
-    stockQuantity: Number(row.stockQuantity ?? 0),
-    stockValue: String(row.stockValue ?? '0'),
-    missingSellingPriceCount: Number(row.missingSellingPriceCount ?? 0),
-  }));
+    stockQuantity: items.reduce((sum,item)=>sum+item.quantity,0),
+    stockValue: items.reduce((sum,item)=>sum+item.quantity*Number(item.sellingPrice??0),0).toFixed(2),
+    missingSellingPriceCount: items.filter(item=>item.quantity>0&&item.sellingPrice===null).length,
+    stockHistoryAvailable: !items.some(item=>item.warnings.some(warning=>warning.startsWith('Historical'))),
+    riskQuantity,riskValue,nonMoving:items.some(item=>item.nonMoving),agedStock:items.some(item=>item.bands.over90>0),
+    weeksWithoutMovement:days.length?Math.floor(Math.max(...days)/7):null,
+  });});
 }
 
-export async function getWeeklyReviewCategories(user: AppUser) {
+export async function getWeeklyReviewCategories(user: AppUser, weekEnd?: string) {
   const store = await assignedStore(user);
-  return getCategorySummariesForStore(store.id);
+  return getCategorySummariesForStore(store.id,weekEnd);
 }
 
 export async function getWeeklyReview(user: AppUser, weekEnd?: string) {
@@ -136,7 +148,7 @@ export async function getWeeklyReview(user: AppUser, weekEnd?: string) {
 export async function saveWeeklyReview(user: AppUser, input: WeeklyReviewInput) {
   const store = await assignedStore(user);
   const actorUserId = sessionUserId(user.id);
-  const categorySummaries = await getCategorySummariesForStore(store.id);
+  const categorySummaries = await getCategorySummariesForStore(store.id,input.weekEnd);
   const categoriesById = new Map(categorySummaries.map((category) => [category.id, category]));
   const unknownCategoryNames = input.categoryNotes
     .filter((note) => !categoriesById.has(note.categoryId))
@@ -164,28 +176,24 @@ export async function saveWeeklyReview(user: AppUser, input: WeeklyReviewInput) 
     }
 
     const missingCorrectiveActions = input.categoryNotes
-      .filter((note) => (note.overstocked || note.slowMoving) && !note.correctiveAction)
+      .filter((note) => (categoriesById.get(note.categoryId)?.riskQuantity ?? 0)>0 && !note.correctiveAction)
       .map((note) => categoriesById.get(note.categoryId)?.name ?? String(note.categoryId));
     if (missingCorrectiveActions.length) {
       throw new HttpError(400, `Add a corrective action for: ${missingCorrectiveActions.join(', ')}`);
     }
 
-    const missingSellingPrices = input.categoryNotes
-      .filter((note) => note.overstocked || note.slowMoving)
-      .filter((note) => (categoriesById.get(note.categoryId)?.missingSellingPriceCount ?? 0) > 0)
-      .map((note) => categoriesById.get(note.categoryId)?.name ?? String(note.categoryId));
-    if (missingSellingPrices.length) {
-      throw new HttpError(400, `Add selling prices to the catalogue before flagging stock risk for: ${missingSellingPrices.join(', ')}`);
-    }
+    // Missing prices/history are reported as incomplete, never a manufactured
+    // zero. They must not prevent a manager submitting the written review.
   }
 
   const categoryNotes = JSON.stringify(input.categoryNotes.map((note) => ({
     ...note,
     // Stock at Risk is always derived from on-hand quantity and selling price;
     // a client-supplied value is deliberately ignored.
-    valueAtRisk: note.overstocked || note.slowMoving
-      ? categoriesById.get(note.categoryId)?.stockValue ?? '0'
-      : undefined,
+    overstocked: false,
+    slowMoving: categoriesById.get(note.categoryId)?.nonMoving ?? false,
+    weeksWithoutMovement: categoriesById.get(note.categoryId)?.weeksWithoutMovement ?? undefined,
+    valueAtRisk: categoriesById.get(note.categoryId)?.riskValue ?? undefined,
   })));
   const actions = JSON.stringify(input.actions);
   const result = await db.execute(sql`

@@ -90,7 +90,8 @@ export async function GET(req: NextRequest) {
           { status: 409 }
         );
       }
-      element = StoreGroupPeriodReportDocument({ report, currency: org.currency, paymentMethodNames, categoryNames });
+      const [weeklyReviews,performance]=period==='week'?await Promise.all([getWeeklyReviewContext(storeIds,report.range.from,report.range.to),getProductPerformance(storeIds,report.range.from,report.range.to)]):[undefined,undefined];
+      element = StoreGroupPeriodReportDocument({ report, currency: org.currency, paymentMethodNames, categoryNames,weeklyReviews,performance });
       filename = `group-${period}-report-${report.range.from}.pdf`;
     }
 
@@ -110,3 +111,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }
 }
+import { getWeeklyReviewContext } from '@/lib/reporting/weekly-review-context';
+import { getProductPerformance } from '@/lib/reporting/product-performance';

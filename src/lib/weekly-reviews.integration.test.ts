@@ -132,7 +132,7 @@ describeWithDatabase('weekly review SQL integration', () => {
     );
 
     const base = {
-      weekEnd: '2026-07-19' as const,
+      weekEnd: '2026-07-25' as const,
       actions: [] as [],
     };
     await expect(saveWeeklyReview(manager, {
@@ -161,13 +161,14 @@ describeWithDatabase('weekly review SQL integration', () => {
     const stored = await client.query(
       `select category_id::integer as category_id, value_at_risk::text as value_at_risk
        from weekly_review_category_notes
-       where weekly_review_id = (select id from weekly_reviews where store_id = $1 and week_end = '2026-07-19')
+       where weekly_review_id = (select id from weekly_reviews where store_id = $1 and week_end = '2026-07-25')
        order by category_id`,
       [storeId]
     );
     expect(stored.rows).toEqual([
-      { category_id: categoryOneId, value_at_risk: '500.00' },
-      { category_id: categoryTwoId, value_at_risk: null },
+      // Manual flags/value cannot turn unobserved stock into an automatic risk.
+      { category_id: categoryOneId, value_at_risk: null },
+      { category_id: categoryTwoId, value_at_risk: '0.00' },
     ]);
   });
 });

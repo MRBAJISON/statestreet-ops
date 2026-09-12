@@ -102,7 +102,7 @@ export function PeriodReportDownload({
           Week — {week.label}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void download('month')}>
-          Month — {month.label}
+          Monthly financial summary — {month.label}
         </DropdownMenuItem>
         {group ? (
           <>
@@ -115,7 +115,7 @@ export function PeriodReportDownload({
               Week — {week.label}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => void download('month', 'group')}>
-              Month — {month.label}
+              Monthly financial summary — {month.label}
             </DropdownMenuItem>
           </>
         ) : null}

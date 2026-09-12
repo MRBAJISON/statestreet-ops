@@ -3,6 +3,7 @@ import type { InventoryDomain } from '../contracts/analytics';
 import { db } from '../db';
 import type { AnalyticsScope } from './shared';
 import { jsonResult } from './shared';
+import { getProductPerformance } from './product-performance';
 
 export async function getInventoryDomain(scope: AnalyticsScope): Promise<InventoryDomain> {
   const movementStore = scope.store ? sql`and movement.store_id = ${scope.store.id}` : sql``;
@@ -38,7 +39,6 @@ export async function getInventoryDomain(scope: AnalyticsScope): Promise<Invento
         case
           when balance.units <= 20 then 'critical'
           when balance.units <= 40 then 'low'
-          when balance.last_movement < ${scope.to}::date - 45 then 'slow'
           else 'healthy'
         end as risk
       from balances balance
@@ -425,5 +425,12 @@ export async function getInventoryDomain(scope: AnalyticsScope): Promise<Invento
     cross join movement_summary movement
   `);
 
-  return jsonResult<InventoryDomain>(result);
+  const data=jsonResult<InventoryDomain>(result);
+  const scopeStores=await db.execute(sql`select id::integer as id from stores where active=true and type='store' ${scope.store?sql`and id=${scope.store.id}`:sql``}`);
+  data.stockAnalysis=await getProductPerformance(scopeStores.rows.map(row=>Number(row.id)),scope.from,scope.to,true);
+  const units=data.stockAnalysis.rows.reduce((sum,row)=>sum+row.quantity,0);
+  const riskUnits=data.stockAnalysis.rows.reduce((sum,row)=>sum+row.riskQuantity,0);
+  data.summary.deadStockPercent=units?100*riskUnits/units:0;
+  data.movement.deadStockValue=data.stockAnalysis.rows.reduce((sum,row)=>sum+Number(row.riskValue??0),0);
+  return data;
 }

@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import type { ReferenceDataResponse } from '@/lib/contracts/reference-data';
 import type { WeeklyReviewCategorySummary, WeeklyReviewRecord } from '@/lib/contracts/documents';
 import { ProductCombobox } from '@/components/forms/ProductCombobox';
+import { WeeklyReviewSupport } from '@/components/reports/WeeklyReviewSupport';
 
 interface ReviewValues {
   weekEnd: string;
@@ -123,7 +124,7 @@ function valuesFromReview(review: WeeklyReviewRecord): ReviewValues {
   };
 }
 
-export default function WeeklyReview() {
+export default function WeeklyReview({ storeName }: { storeName: string }) {
   const [references, setReferences] = useState<ReferenceDataResponse | null>(null);
   const [values, setValues] = useState<ReviewValues>(() => emptyValues());
   const [review, setReview] = useState<WeeklyReviewRecord | null>(null);
@@ -232,7 +233,7 @@ export default function WeeklyReview() {
       if (incompleteCategories.length) return `Add a performance comment for: ${incompleteCategories.join(', ')}`;
 
       const missingCorrectiveActions = categoryNotes
-        .filter((note) => (note.overstocked || note.slowMoving) && !note.correctiveAction.trim())
+        .filter((note) => (storeCategories.find(category=>category.id===Number(note.categoryId))?.riskQuantity??0)>0 && !note.correctiveAction.trim())
         .map((note) => storeCategories.find((category) => category.id === Number(note.categoryId))?.name ?? note.categoryId);
       if (missingCorrectiveActions.length) return `Add a corrective action for: ${missingCorrectiveActions.join(', ')}`;
     }
@@ -323,7 +324,7 @@ export default function WeeklyReview() {
               <Badge variant="outline" className="capitalize">{review?.status ?? 'new'}</Badge>
               {locked ? <LockKeyhole className="text-muted-foreground" /> : null}
             </div>
-            <p className="text-sm text-muted-foreground">{references.assignedStore?.name}</p>
+            <p className="text-sm text-muted-foreground">{storeName}</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -374,6 +375,7 @@ export default function WeeklyReview() {
         </TabsContent>
 
         <TabsContent value="categories" className="flex flex-col gap-4">
+          <WeeklyReviewSupport weekEnd={values.weekEnd}/>
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-4 py-3 text-sm">
             <p>Review every category for this store before submitting.</p>
             <Badge variant={completedCategoryCount === storeCategories.length && storeCategories.length > 0 ? 'default' : 'outline'}>
@@ -384,8 +386,8 @@ export default function WeeklyReview() {
             const category = categoryById.get(Number(note.categoryId));
             const expanded = expandedCategoryKeys.has(note.key);
             const complete = Boolean(note.performanceComment.trim());
-            const stockAtRisk = note.overstocked || note.slowMoving ? category?.stockValue ?? note.valueAtRisk ?? '0' : '0';
-            const formattedStockAtRisk = `${references.organization.currency} ${Number(stockAtRisk).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            const stockAtRisk = category?.riskValue;
+            const formattedStockAtRisk = stockAtRisk==null?'Valuation unavailable':`${references.organization.currency} ${Number(stockAtRisk).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             return (
               <section key={note.key} className="surface overflow-hidden">
                 <button
@@ -421,16 +423,16 @@ export default function WeeklyReview() {
                           <SelectContent><SelectGroup>{storeCategories.map((storeCategory) => <SelectItem key={storeCategory.id} value={String(storeCategory.id)}>{storeCategory.name}</SelectItem>)}</SelectGroup></SelectContent>
                         </Select>
                       </Field>
-                      <Field><FieldLabel>Weeks without movement</FieldLabel><Input type="number" min={0} step={1} value={note.weeksWithoutMovement} disabled={disabled} onChange={(event) => updateCategoryNote(note.key, 'weeksWithoutMovement', event.target.value)} /></Field>
+                      <Field><FieldLabel>Weeks without a sale</FieldLabel><Input value={category?.weeksWithoutMovement??'Unknown'} readOnly aria-readonly="true" /></Field>
                       <Field>
                         <FieldLabel>Stock at Risk</FieldLabel>
                         <Input value={formattedStockAtRisk} readOnly disabled={disabled} aria-readonly="true" />
-                        {category ? <p className="text-xs text-muted-foreground">{category.stockQuantity} unit(s) on hand; risk uses selling price.</p> : null}
+                        {category ? <p className="text-xs text-muted-foreground">{category.stockHistoryAvailable===false?'Period-end stock unavailable':`${category.stockQuantity} unit(s) at the selected period end`}; risk uses selling price.</p> : null}
                         {category && category.missingSellingPriceCount > 0 ? <p className="text-xs text-destructive">{category.missingSellingPriceCount} stocked item(s) need a selling price.</p> : null}
                       </Field>
                       <FieldGroup className="gap-3">
-                        <Field orientation="horizontal"><FieldLabel>Overstocked</FieldLabel><Switch checked={note.overstocked} disabled={disabled} onCheckedChange={(value) => updateCategoryNote(note.key, 'overstocked', value)} /></Field>
-                        <Field orientation="horizontal"><FieldLabel>Slow moving</FieldLabel><Switch checked={note.slowMoving} disabled={disabled} onCheckedChange={(value) => updateCategoryNote(note.key, 'slowMoving', value)} /></Field>
+                        <Field orientation="horizontal"><FieldLabel>Aged stock (over 90 days)</FieldLabel><Switch checked={category?.agedStock??false} disabled /></Field>
+                        <Field orientation="horizontal"><FieldLabel>Non-moving (30 days)</FieldLabel><Switch checked={category?.nonMoving??false} disabled /></Field>
                       </FieldGroup>
                       <Field className="sm:col-span-2"><FieldLabel>Performance comment <span className="text-destructive">*</span></FieldLabel><Textarea value={note.performanceComment} disabled={disabled} onChange={(event) => updateCategoryNote(note.key, 'performanceComment', event.target.value)} /></Field>
                       <Field className="sm:col-span-2"><FieldLabel>Corrective action</FieldLabel><Textarea value={note.correctiveAction} disabled={disabled} onChange={(event) => updateCategoryNote(note.key, 'correctiveAction', event.target.value)} /></Field>

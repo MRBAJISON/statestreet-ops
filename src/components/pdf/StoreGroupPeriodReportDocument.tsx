@@ -100,11 +100,15 @@ export function StoreGroupPeriodReportDocument({
   currency,
   paymentMethodNames,
   categoryNames,
+  weeklyReviews,
+  performance,
 }: {
   report: StoreGroupPeriodReport;
   currency: string;
   paymentMethodNames: Map<number, string>;
   categoryNames: Map<number, string>;
+  weeklyReviews?:WeeklyReviewContext[];
+  performance?:ProductPerformance;
 }) {
   const { totals } = report;
   const heading = report.periodType === 'week' ? 'WEEKLY CLUSTER REPORT' : 'MONTHLY CLUSTER REPORT';
@@ -366,6 +370,8 @@ export function StoreGroupPeriodReportDocument({
           </View>
         ) : null}
 
+        {performance?<ProductPerformancePdf data={performance} currency={currency}/>:null}
+        {report.periodType==='week'?<WeeklyReviewAppendix reviews={weeklyReviews??[]} expectedStoreNames={report.stores.map(s=>s.storeName)} categoryNames={categoryNames}/>:null}
         <View style={styles.footer} fixed>
           <Text>{report.group.name} — {report.range.label}</Text>
           <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
@@ -374,3 +380,6 @@ export function StoreGroupPeriodReportDocument({
     </Document>
   );
 }
+import type { WeeklyReviewContext } from '@/lib/reporting/weekly-review-context';
+import type { ProductPerformance } from '@/lib/reporting/product-performance';
+import { WeeklyReviewAppendix,ProductPerformancePdf } from './PerformanceSections';

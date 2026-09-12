@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { CalendarRange, Download, LoaderCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -123,6 +124,7 @@ export function StoreReportPanel() {
 
   return (
     <div className="p-4 sm:p-5">
+      <Link href="/store-reports/monthly" className="mb-4 inline-block text-sm font-medium underline">Monthly performance report — reviews, stock analysis and next-month plan</Link>
       <section className="surface p-5">
       <div className="mb-4">
         <h2 className="text-lg font-semibold">Store reports</h2>

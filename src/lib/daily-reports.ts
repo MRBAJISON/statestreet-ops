@@ -24,7 +24,6 @@ import {
 } from './db/foundation-schema';
 import { users } from './db/schema';
 import { HttpError, sessionUserId } from './server-errors';
-import { applySalesToStockQuery, fillOpeningStockQuery } from './reporting/stock-levels';
 import { accessibleStores } from './store-access';
 import {
   buildCreateDailyReportQuery,
@@ -191,28 +190,10 @@ export async function createDailyReport(
   const result = await db.execute(buildCreateDailyReportQuery(userId, storeId, input));
   const row = (result.rows as DailyReportMutationResult[])[0];
   if (!row) throw new Error('Daily report was not created');
-  await settleStockForReport(Number(row.id), input.status);
   return dailyReportMutationRecord(row, input.status);
 }
 
-/**
- * Moves stock once a report is submitted, and fills in the opening figures.
- *
- * Deliberately only on submit: a draft is still being edited, and taking stock on
- * every keystroke-triggered save would double-count. Stock work is kept out of the
- * save statement itself so a stock problem can never roll back a report a manager
- * has already filed — the sale is the record that matters, and a balance can be
- * corrected by the next count.
- */
-async function settleStockForReport(reportId: number, status: SaveDailyReportInput['status']): Promise<void> {
-  if (status !== 'submitted') return;
-  try {
-    await db.execute(fillOpeningStockQuery(reportId));
-    await db.execute(applySalesToStockQuery(reportId));
-  } catch (error) {
-    console.error('Stock levels could not be settled for daily report', reportId, error);
-  }
-}
+// Stock posting is transactional and idempotent in the deferred database trigger.
 
 export async function replaceDailyReport(
   user: AppUser,
@@ -223,7 +204,6 @@ export async function replaceDailyReport(
   const result = await db.execute(buildReplaceDailyReportQuery(userId, reportId, input));
   const row = (result.rows as DailyReportMutationResult[])[0];
   if (!row) throw new HttpError(409, 'Report changed, is locked, or cannot move to the requested status');
-  await settleStockForReport(reportId, input.status);
   return dailyReportMutationRecord(row, input.status);
 }
 

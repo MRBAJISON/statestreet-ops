@@ -5,6 +5,7 @@ import { Pool } from 'pg';
 import * as legacySchema from './schema';
 import * as foundationSchema from './foundation-schema';
 import * as operationalSchema from './operational-schema';
+import * as performanceSchema from './performance-schema';
 
 // Neon HTTP driver: one-shot queries, ideal for serverless (Vercel) and works locally too.
 const connectionString = process.env.DATABASE_URL ?? '';
@@ -16,7 +17,7 @@ if (!connectionString) {
   );
 }
 
-const schema = { ...legacySchema, ...foundationSchema, ...operationalSchema };
+const schema = { ...legacySchema, ...foundationSchema, ...operationalSchema, ...performanceSchema };
 
 function createNeonDatabase() {
   return neonDrizzle(neon(connectionString), { schema });

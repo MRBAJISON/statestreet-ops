@@ -7,6 +7,7 @@ import { EmptyPanel, EmptyTableRow, MetricRail, SectionHeading, StatusBadge } fr
 import { HorizontalBarChart, NamedBarChart } from './Charts';
 import { formatCurrency, formatNumber, formatPercent } from './format';
 import { TradingSnapshot } from './TradingSnapshot';
+import { ProductPerformancePanel } from './ProductPerformancePanel';
 
 export function StoreOverview({ meta, trading, domain }: { meta: AnalyticsMeta; trading: TradingOverview; domain: StoreDomain }) {
   const recentReports = useExpandable(domain.recentReports);
@@ -16,6 +17,7 @@ export function StoreOverview({ meta, trading, domain }: { meta: AnalyticsMeta; 
   return (
     <div className="flex flex-col gap-5">
       <TradingSnapshot meta={meta} trading={trading} showStores={false} />
+      <ProductPerformancePanel from={meta.from} to={meta.to} storeId={meta.store?.id} currency={meta.currency} approvedOnly />
 
       <MetricRail items={[
         { label: 'Customers captured', value: formatNumber(domain.customerHealth.total), detail: `${domain.customerHealth.new} new`, icon: UsersRound, tone: 'blue' },

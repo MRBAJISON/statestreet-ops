@@ -214,6 +214,12 @@ export interface WeeklyReviewCategorySummary {
   stockQuantity: number;
   stockValue: string;
   missingSellingPriceCount: number;
+  riskQuantity?: number;
+  riskValue?: string | null;
+  nonMoving?: boolean;
+  agedStock?: boolean;
+  weeksWithoutMovement?: number | null;
+  stockHistoryAvailable?: boolean;
 }
 
 export interface WeeklyReviewActionRecord {

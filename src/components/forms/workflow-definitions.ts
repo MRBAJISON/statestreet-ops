@@ -531,4 +531,5 @@ export const storeShortcuts: WorkflowShortcut[] = [
   { href: '/forms/store-manager/daily-report', title: 'Daily store report', group: 'Trading', icon: ReceiptText, tone: 'green' },
   { href: '/forms/store-manager/stock-transfer', title: 'Stock transfer request', group: 'Inventory', icon: ArrowRightLeft, tone: 'blue' },
   { href: '/forms/store-manager/weekly-review', title: 'Weekly review', group: 'Trading', icon: CalendarRange, tone: 'orchid' },
+  { href: '/forms/store-manager/monthly-review', title: 'Monthly performance review', group: 'Trading', icon: CalendarRange, tone: 'orchid' },
 ];

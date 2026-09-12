@@ -563,7 +563,7 @@ describeWithDatabase('reporting SQL integration', () => {
     expect(nextMonth.summary).toMatchObject({ unitsOnHand: 153, inventoryValue: 20050, stockAccuracy: 0 });
   });
 
-  it('uses overlapping product insight metrics only for group reporting', async () => {
+  it('uses recorded product sales instead of manual product-insight figures', async () => {
     const productId = Number(
       (await client.query(
         `insert into products (sku, name, brand_id, category_id, unit_cost, created_by_user_id, updated_by_user_id)
@@ -599,11 +599,17 @@ describeWithDatabase('reporting SQL integration', () => {
     ]);
 
     expect(group.productVelocity.find((product) => product.id === productId)).toMatchObject({
-      unitsSold: 7,
-      stock: 6,
-      daysSinceMovement: 12,
+      unitsSold: 0,
+      stock: 0,
+      daysSinceMovement: null,
     });
     expect(store.productVelocity.find((product) => product.id === productId)).toBeUndefined();
+
+    await client.query(`insert into daily_report_products(daily_report_id,category_id,product_id,units,line_value)
+      select (select min(id) from daily_reports where store_id=$2 and status='approved'),category_id,id,3,99
+      from products where id=$1`,[productId,storeId]);
+    const recorded=await getCommercialDomain({...baseScope,store:{id:storeId,code:'multi-brand',name:'Multi Brand Store'}});
+    expect(recorded.productVelocity.find(product=>product.id===productId)?.unitsSold).toBe(3);
 
     const august = await getCommercialDomain({
       ...baseScope,

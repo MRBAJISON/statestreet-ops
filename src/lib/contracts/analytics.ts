@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { dateSchema, positiveIdSchema } from './shared';
+import type { ProductPerformance } from '../reporting/product-performance';
 
 export const analyticsViewSchema = z.enum([
   'executive',
@@ -351,6 +352,7 @@ export interface OperationsDomain {
 }
 
 export interface InventoryDomain {
+  stockAnalysis?: ProductPerformance;
   summary: { unitsOnHand: number; inventoryValue: number; stockAccuracy: number; deadStockPercent: number; lowStockProducts: number; openReplenishments: number; inTransitTransfers: number };
   stock: Array<{
     productId: number;

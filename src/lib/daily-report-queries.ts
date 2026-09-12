@@ -7,6 +7,9 @@ function flattenProductsByCategory(sales: SaveDailyReportInput['sales']) {
       categoryId: line.categoryId,
       productId: product.productId ?? null,
       customName: product.customName ?? null,
+      unitsSold: product.unitsSold,
+      lineValue: product.lineValue,
+      valueOverridden: product.valueOverridden,
     }))
   );
 }

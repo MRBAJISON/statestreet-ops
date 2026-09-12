@@ -1,7 +1,7 @@
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import type { DailyReportRecord, DailyReportStatus } from '../contracts/daily-report';
 import { db } from '../db';
-import { customerInteractions, products } from '../db/foundation-schema';
+import { customerInteractions, products, stores } from '../db/foundation-schema';
 import { getDailyReportsForStorePeriod } from '../daily-reports';
 import { getCustomerTransactionDailyAdjustments, getCustomerTransactionSummary } from '../customer-transactions';
 import { targetWithinWindowForRecord } from './trading-days';
@@ -107,7 +107,7 @@ function netOf(report: DailyReportRecord): number {
   );
 }
 
-async function targetForRange(storeId: number, from: string, to: string): Promise<number> {
+export async function targetForRange(storeId: number, from: string, to: string): Promise<number> {
   const result = await db.execute(sql`
     select coalesce(sum(${targetWithinWindowForRecord(
       sql`target.value`,
@@ -136,7 +136,8 @@ async function targetForRange(storeId: number, from: string, to: string): Promis
 export async function getStorePeriodReport(
   storeId: number,
   periodType: StorePeriodType,
-  anchorIso: string
+  anchorIso: string,
+  options: { includeEmpty?: boolean } = {}
 ): Promise<StorePeriodReport | null> {
   const { range, previousRange } = resolveStorePeriod(periodType, anchorIso);
   const expectedDays = tradingDaysBetween(range.from, range.to);
@@ -172,7 +173,12 @@ export async function getStorePeriodReport(
   ]);
 
   const first = reports[0];
-  if (!first) return null;
+  if (!first && !options.includeEmpty) return null;
+  const store = first
+    ? { id: first.storeId, code: first.storeCode, name: first.storeName }
+    : (await db.select({ id: stores.id, code: stores.code, name: stores.name })
+        .from(stores).where(eq(stores.id, storeId)).limit(1))[0];
+  if (!store) return null;
 
   const byDate = new Map(reports.map((report) => [report.businessDate, report]));
   const counted = reports.filter((report) => report.status !== 'draft');
@@ -240,8 +246,8 @@ export async function getStorePeriodReport(
     tradingDays: expectedDays.length,
     ready: outstanding.length === 0,
     outstanding,
-    store: { id: first.storeId, code: first.storeCode, name: first.storeName },
-    managerName: first.managerName,
+    store,
+    managerName: first?.managerName ?? null,
     totals,
     transactionSummary,
     target,

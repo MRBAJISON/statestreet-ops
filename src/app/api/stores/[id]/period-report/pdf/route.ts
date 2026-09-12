@@ -83,8 +83,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const paymentMethodNames = new Map(references.paymentMethods.map((method) => [method.id, method.name]));
     const categoryNames = new Map(references.categories.map((category) => [category.id, category.name]));
 
+    const [weeklyReviews,performance]=periodType==='week'?await Promise.all([getWeeklyReviewContext([storeId],report.range.from,report.range.to),getProductPerformance([storeId],report.range.from,report.range.to)]):[undefined,undefined];
     const instance = pdf(
-      StorePeriodReportDocument({ report, currency: org.currency, paymentMethodNames, categoryNames })
+      StorePeriodReportDocument({ report, currency: org.currency, paymentMethodNames, categoryNames,weeklyReviews,performance })
     );
     const buffer = await streamToBuffer(await instance.toBuffer());
     const filename = `${periodType}-report-${store.code}-${report.range.from}.pdf`;
@@ -103,3 +104,5 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }
 }
+import { getWeeklyReviewContext } from '@/lib/reporting/weekly-review-context';
+import { getProductPerformance } from '@/lib/reporting/product-performance';

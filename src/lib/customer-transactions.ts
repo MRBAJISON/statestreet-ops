@@ -807,10 +807,6 @@ export async function decideCreditNote(user: AppUser, noteId: number, input: Dec
         insert into inventory_movements (business_date, product_id, store_id, movement_type, quantity, unit_cost, source_type, source_id, source_line_id, created_by_user_id)
         select business_date, product_id, store_id, 'return', quantity, unit_cost, 'customer-credit-note', credit_note_id, id, ${actor}
         from restock_items
-      ), stock as (
-        insert into store_stock_levels (store_id, product_id, quantity, as_of_date)
-        select store_id, product_id, quantity, business_date from restock_items
-        on conflict (store_id, product_id) do update set quantity = store_stock_levels.quantity + excluded.quantity, as_of_date = excluded.as_of_date, updated_at = now()
       ), audit as (
         insert into audit_events (entity_type, entity_id, action, actor_user_id, after, metadata)
         select 'customer-credit-note', id, 'approve', ${actor}, jsonb_build_object('status', status, 'approvedValue', approved_value), jsonb_build_object('autoRestockedItems', (select count(*) from restock_items), 'reason', ${input.reason ?? null}::text) from updated_note
@@ -847,10 +843,6 @@ export async function decideCreditNoteInventory(user: AppUser, noteId: number, i
       ), movement as (
         insert into inventory_movements (business_date, product_id, store_id, movement_type, quantity, unit_cost, source_type, source_id, source_line_id, created_by_user_id)
         select business_date, product_id, store_id, 'return', quantity, unit_cost, 'customer-credit-note', ${noteId}, id, ${actor} from product_cost
-      ), stock as (
-        insert into store_stock_levels (store_id, product_id, quantity, as_of_date)
-        select store_id, product_id, quantity, business_date from product_cost
-        on conflict (store_id, product_id) do update set quantity = store_stock_levels.quantity + excluded.quantity, as_of_date = excluded.as_of_date, updated_at = now()
       ), audit as (
         insert into audit_events (entity_type, entity_id, action, actor_user_id, after, metadata)
         select 'customer-credit-note', ${noteId}, 'receive', ${actor}, jsonb_build_object('itemId', id, 'inventoryStatus', inventory_status), jsonb_build_object('reason', ${input.reason}::text) from updated_item

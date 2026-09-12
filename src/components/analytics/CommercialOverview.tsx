@@ -114,7 +114,6 @@ export function CommercialOverview({
   onRefresh: () => void;
   canDecideWeeklyReviews: boolean;
 }) {
-  const productVelocity = useExpandable(domain.productVelocity);
   const weeklyReviews = useExpandable(domain.weeklyReviews);
   const actions = useExpandable(domain.actions);
   const managerVoices = useExpandable(domain.managerVoices);
@@ -123,6 +122,7 @@ export function CommercialOverview({
 
   return (
     <div className="flex flex-col gap-5">
+      <ProductPerformancePanel from={meta.from} to={meta.to} storeId={meta.store?.id} currency={meta.currency} approvedOnly />
       <TradingSnapshot meta={meta} trading={trading} />
       <MetricRail items={[
         { label: 'Captured leads', value: formatNumber(domain.customerFunnel.leads), detail: 'Customer interactions', icon: ContactRound, tone: 'blue' },
@@ -148,15 +148,6 @@ export function CommercialOverview({
           <ComparisonBarChart data={domain.categoryTargets.map((item) => ({ name: item.name, primary: item.actualRevenue, secondary: item.targetRevenue }))} valueFormatter={(value) => formatCurrency(value, meta.currency)} />
         </section>
       </div>
-
-      <section className="surface min-w-0 overflow-hidden">
-        <div className="p-5 pb-3"><SectionHeading title="SKU Performance" description="Velocity, current stock, movement age, and commercial judgement" /></div>
-        <Table>
-          <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>Brand / Category</TableHead><TableHead className="text-right">Sold</TableHead><TableHead className="text-right">Stock</TableHead><TableHead>Performance</TableHead><TableHead>Commercial Insight</TableHead></TableRow></TableHeader>
-          <TableBody>{domain.productVelocity.length ? productVelocity.visible.map((product) => <TableRow key={product.id}><TableCell><span className="block max-w-56 truncate font-medium">{product.name}</span><span className="text-xs text-muted-foreground">{product.sku}</span></TableCell><TableCell><span className="block text-sm">{product.brandName}</span><span className="text-xs text-muted-foreground">{product.categoryName}</span></TableCell><TableCell className="text-right font-medium">{product.unitsSold}</TableCell><TableCell className="text-right">{product.stock}</TableCell><TableCell><StatusBadge value={product.performance ?? product.status ?? 'unrated'} /></TableCell><TableCell className="max-w-72 truncate text-muted-foreground">{product.insight ?? product.campaign ?? 'No insight recorded'}</TableCell></TableRow>) : <EmptyTableRow colSpan={6} message="No SKU performance has been submitted for this period" />}</TableBody>
-        </Table>
-        <ShowMoreButton expanded={productVelocity.expanded} hiddenCount={productVelocity.hiddenCount} canExpand={productVelocity.canExpand} onClick={productVelocity.toggle} />
-      </section>
 
       <div className="grid gap-5 xl:grid-cols-12">
         <section className="surface min-w-0 overflow-hidden xl:col-span-8">
@@ -216,3 +207,4 @@ export function CommercialOverview({
     </div>
   );
 }
+import { ProductPerformancePanel } from './ProductPerformancePanel';
