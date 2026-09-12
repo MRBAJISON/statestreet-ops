@@ -1,6 +1,6 @@
 # Store performance and review reporting
 
-Implementation branch: `codex/store-performance-reviews`. Production is not changed.
+Implementation branch: `codex/store-performance-reviews`. Production release verification is recorded below.
 
 ## Agreed rules
 
@@ -57,4 +57,15 @@ Existing daily product save queries dropped quantities and values before this bu
 - A clearly labelled `LOCAL QA DRAFT` for the Palace cluster in August was saved during browser verification. It is local sample data only and has not been submitted.
 - Weekly review → Category notes retains the expandable layout. Switching stores reloads the selected store's review and source evidence.
 - Refreshing an edited monthly review saves the wording as an unconfirmed draft before refreshing facts. The manager must check the refreshed sources again.
-- Production rollout, production baseline reconciliation and user acceptance testing remain outstanding. A successful local build is not authorization to merge or deploy.
+- At the initial local handoff, production rollout and production baseline reconciliation were outstanding. A successful local build alone is not authorization to merge or deploy.
+
+## Production release — 12 September 2026
+
+- The user authorized deployment and the short submission pause. Implementation commit `c578a69` was fast-forwarded to `main` and deployed through the existing Vercel project.
+- Migration 0024 and the opening allocation were first rehearsed on an isolated Neon branch. The allocation used the committed FIFO module, with a database-computed source fingerprint checked before and after application. A repeat applied no additional allocations or audit rows.
+- A separate pre-release backup branch, `backup-before-performance-0024-20260912`, was retained without a compute endpoint. The rehearsal branch was also retained; neither is connected to the application.
+- Temporary database guards paused sales, customer-transaction, catalog and stock writes during cutover. Migration 0024, the reviewed opening allocations and its migration-ledger entry were committed atomically. All temporary guards were removed after the production deployment was ready.
+- Before/after checksums matched for existing daily reports, sales/payment/product lines, weekly reviews/category notes, customer credit/deposit records, stock balances, movements and catalog products. Stock quantities did not change, and initialization created no new stock movements.
+- Production's earlier migration ledger was pre-existing and incomplete; historical migrations were not re-run or retroactively marked as applied. Only the migration actually applied in this release was registered.
+- Verification: the earlier complete 196-test run plus a fresh 15-test stock/review regression run passed. Vercel's production build passed. Live sign-in returned 200; unauthenticated new APIs returned 401. The existing signed-in manager session loaded both the Store product-analysis panel and Monthly performance review without browser errors. No live sales, reviews or customer transactions were submitted for testing.
+- Historical missing product detail remains explicitly disclosed. A code-only rollback to the former stock-writing implementation is unsafe with migration 0024 active; coordinate any rollback with the matching database state and preserve subsequent transactions.
