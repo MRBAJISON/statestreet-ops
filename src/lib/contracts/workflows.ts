@@ -173,7 +173,8 @@ export const campaignSchema = z.object({
 
 export const leadMetricSchema = z
   .object({
-    businessDate: dateSchema,
+    periodStart: dateSchema,
+    periodEnd: dateSchema,
     channel: requiredText(120),
     campaignReportId: optionalId,
     leadCount: count,
@@ -181,6 +182,12 @@ export const leadMetricSchema = z
     convertedCount: count,
     averageValue: optionalMoneySchema,
     notes: optionalText(1000),
+  })
+  .refine((value) => value.periodEnd >= value.periodStart, {
+    path: ['periodEnd'], message: 'End date cannot be before start date',
+  })
+  .refine((value) => value.periodStart.slice(0, 7) === value.periodEnd.slice(0, 7), {
+    path: ['periodEnd'], message: 'Split a period crossing month-end into separate monthly summaries',
   })
   .refine((value) => value.qualifiedCount <= value.leadCount && value.convertedCount <= value.qualifiedCount, {
     path: ['convertedCount'],

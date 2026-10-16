@@ -16,6 +16,7 @@ export function MarketingOverview({ meta, domain }: { meta: AnalyticsMeta; domai
   ] : [];
 
   const leadChannels = useExpandable(domain.leadChannels);
+  const partialLeads = useExpandable(domain.partialLeadSummaries);
   const campaigns = useExpandable(domain.campaigns);
   const social = useExpandable(domain.social);
   const feedbackDetail = useExpandable(domain.feedbackDetail);
@@ -39,7 +40,7 @@ export function MarketingOverview({ meta, domain }: { meta: AnalyticsMeta; domai
           <div className="mt-3 border-t pt-3"><p className="data-label">Revenue influenced</p><p className="mt-1 text-lg font-semibold">{formatCurrency(domain.funnel.revenueInfluenced, meta.currency)}</p></div>
         </section>
         <section className="surface min-w-0 overflow-hidden xl:col-span-7">
-          <div className="p-5 pb-3"><SectionHeading title="Lead Qualification" description="Total leads to qualified opportunities to conversions" /></div>
+          <div className="p-5 pb-3"><SectionHeading title="Lead Qualification" description="Group-wide channel totals; only summaries fully within the selected dates are included" /></div>
           <Table>
             <TableHeader><TableRow><TableHead>Channel</TableHead><TableHead className="text-right">Leads</TableHead><TableHead className="text-right">Qualified</TableHead><TableHead className="text-right">Converted</TableHead><TableHead className="text-right">Conversion</TableHead></TableRow></TableHeader>
             <TableBody>{domain.leadChannels.length ? leadChannels.visible.map((channel) => <TableRow key={channel.name}><TableCell className="font-medium">{channel.name}</TableCell><TableCell className="text-right">{formatNumber(channel.leads)}</TableCell><TableCell className="text-right">{formatNumber(channel.qualified)}</TableCell><TableCell className="text-right">{formatNumber(channel.converted)}</TableCell><TableCell className="text-right font-semibold">{formatPercent(channel.leads ? (channel.converted / channel.leads) * 100 : 0)}</TableCell></TableRow>) : <EmptyTableRow colSpan={5} message="No lead activity has been submitted for this period" />}</TableBody>
@@ -48,6 +49,13 @@ export function MarketingOverview({ meta, domain }: { meta: AnalyticsMeta; domai
           <div className="grid grid-cols-3 border-t px-5 py-4 text-center"><div><p className="text-lg font-semibold">{domain.contentCadence.posts}</p><p className="data-label">Posts</p></div><div><p className="text-lg font-semibold">{domain.contentCadence.reels}</p><p className="data-label">Reels</p></div><div><p className="text-lg font-semibold">{domain.contentCadence.stories}</p><p className="data-label">Stories</p></div></div>
         </section>
       </div>
+
+      {domain.partialLeadSummaries.length ? <section className="surface min-w-0 overflow-hidden border-amber-300">
+        <div className="p-5 pb-3"><SectionHeading title="Partially overlapping lead summaries" description="Not included in totals. These are whole-period counts, not counts for the selected dates. Widen the date filter to include the complete period." /></div>
+        <Table><TableHeader><TableRow><TableHead>Channel</TableHead><TableHead>Reported period</TableHead><TableHead>Leads</TableHead><TableHead>Qualified</TableHead><TableHead>Converted</TableHead></TableRow></TableHeader>
+          <TableBody>{partialLeads.visible.map((item) => <TableRow key={item.id}><TableCell>{item.channel}</TableCell><TableCell>{item.periodStart} to {item.periodEnd}</TableCell><TableCell>{item.leads}</TableCell><TableCell>{item.qualified}</TableCell><TableCell>{item.converted}</TableCell></TableRow>)}</TableBody></Table>
+        <ShowMoreButton expanded={partialLeads.expanded} hiddenCount={partialLeads.hiddenCount} canExpand={partialLeads.canExpand} onClick={partialLeads.toggle} />
+      </section> : null}
 
       <section className="surface min-w-0 overflow-hidden">
         <div className="p-5 pb-3"><SectionHeading title="Campaign Performance" description="Spend, influenced revenue, reach, engagement, and return" /></div>

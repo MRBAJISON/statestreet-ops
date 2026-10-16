@@ -283,7 +283,7 @@ export const marketingWorkflows: WorkflowDefinition[] = [
   {
     id: 'lead-metric', title: 'Lead channel summary', group: 'Performance', icon: UsersRound, tone: 'blue',
     fields: [
-      todayField(),
+      todayField('periodStart', 'Start date'), todayField('periodEnd', 'End date'),
       { name: 'channel', label: 'Channel', type: 'text', required: true },
       countField('leadCount', 'Leads'),
       countField('qualifiedCount', 'Qualified'),

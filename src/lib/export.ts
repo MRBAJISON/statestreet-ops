@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs';
 import { and, asc, desc, eq, or, sql } from 'drizzle-orm';
 import type { SQLWrapper } from 'drizzle-orm';
 import type { UserRole } from './types';
+import { leadPeriodFilter } from './reporting/lead-period-filter';
 
 export type ExportScope = 'all' | 'finance' | 'commercial' | 'marketing' | 'inventory' | 'brand' | 'store';
 
@@ -32,6 +33,7 @@ export type ExportSheetKey =
   | 'customerActivity'
   | 'campaigns'
   | 'leadMetrics'
+  | 'partialLeadMetrics'
   | 'socialMetrics'
   | 'clienteling'
   | 'customerFeedback'
@@ -361,11 +363,20 @@ const SHEETS: Record<ExportSheetKey, Omit<ExportSheetDefinition, 'key'>> = {
   },
   leadMetrics: {
     name: 'Lead Metrics',
-    description: 'Lead, qualification, and conversion counts by channel.',
+    description: 'Whole-period channel counts fully contained within the export dates. No daily proration.',
     columns: [
-      col('businessDate', 'Business Date', 14), col('channel', 'Channel', 18), col('campaign', 'Campaign', 24),
+      col('periodStart', 'Start Date', 14), col('periodEnd', 'End Date', 14), col('channel', 'Channel', 18), col('campaign', 'Campaign', 24),
       col('leadCount', 'Leads', 12, 'integer'), col('qualifiedCount', 'Qualified', 12, 'integer'),
       col('convertedCount', 'Converted', 12, 'integer'), col('averageValue', 'Average Value', 16, 'currency'), col('notes', 'Notes', 34),
+    ],
+  },
+  partialLeadMetrics: {
+    name: 'Partial Lead Summaries',
+    description: 'Partially overlapping periods: NOT included in lead totals. Counts cover each full reported period.',
+    columns: [
+      col('periodStart', 'Start Date', 14), col('periodEnd', 'End Date', 14), col('channel', 'Channel', 18), col('campaign', 'Campaign', 24),
+      col('leadCount', 'Whole-period Leads', 22, 'integer'), col('qualifiedCount', 'Whole-period Qualified', 25, 'integer'),
+      col('convertedCount', 'Whole-period Converted', 25, 'integer'), col('notes', 'Notes', 34),
     ],
   },
   socialMetrics: {
@@ -575,7 +586,7 @@ const COMMERCIAL_SHEETS: ExportSheetKey[] = [
   'salesByCategory', 'productInsights', 'targets', 'customerActivity', 'weeklyReviews',
 ];
 const MARKETING_SHEETS: ExportSheetKey[] = [
-  'campaigns', 'leadMetrics', 'socialMetrics', 'clienteling', 'customerFeedback',
+  'campaigns', 'leadMetrics', 'partialLeadMetrics', 'socialMetrics', 'clienteling', 'customerFeedback',
 ];
 const INVENTORY_SHEETS: ExportSheetKey[] = [
   'products', 'inventoryMovements', 'goodsReceipts', 'stockTransfers', 'stockCounts', 'replenishment', 'inventoryDispositions',
@@ -1134,7 +1145,8 @@ export async function loadTypedExportRows(
       .orderBy(asc(marketingCampaignReports.businessDate), asc(marketingCampaignReports.name))),
     leadMetrics: async () => asRows(await db
       .select({
-        businessDate: leadMetrics.businessDate,
+        periodStart: leadMetrics.periodStart,
+        periodEnd: leadMetrics.periodEnd,
         channel: leadMetrics.channel,
         campaign: marketingCampaignReports.name,
         leadCount: leadMetrics.leadCount,
@@ -1145,8 +1157,17 @@ export async function loadTypedExportRows(
       })
       .from(leadMetrics)
       .leftJoin(marketingCampaignReports, eq(leadMetrics.campaignReportId, marketingCampaignReports.id))
-      .where(dateRangeFilter(leadMetrics.businessDate, input.range))
+      .where(leadPeriodFilter(leadMetrics.periodStart, leadMetrics.periodEnd, input.range))
       .orderBy(asc(leadMetrics.businessDate), asc(leadMetrics.channel))),
+    partialLeadMetrics: async () => asRows(await db
+      .select({
+        periodStart: leadMetrics.periodStart, periodEnd: leadMetrics.periodEnd, channel: leadMetrics.channel,
+        campaign: marketingCampaignReports.name, leadCount: leadMetrics.leadCount,
+        qualifiedCount: leadMetrics.qualifiedCount, convertedCount: leadMetrics.convertedCount, notes: leadMetrics.notes,
+      }).from(leadMetrics)
+      .leftJoin(marketingCampaignReports, eq(leadMetrics.campaignReportId, marketingCampaignReports.id))
+      .where(leadPeriodFilter(leadMetrics.periodStart, leadMetrics.periodEnd, input.range, true))
+      .orderBy(asc(leadMetrics.periodStart), asc(leadMetrics.channel))),
     socialMetrics: async () => asRows(await db
       .select({
         businessDate: socialMetrics.businessDate,

@@ -114,6 +114,7 @@ describe('typed workbook', () => {
         'Expenses',
         'Sales by Category',
         'Campaigns',
+        'Partial Lead Summaries',
         'Product Catalog',
         'Inventory Movements',
         'Brand Health',
@@ -122,7 +123,11 @@ describe('typed workbook', () => {
         'Incidents',
       ])
     );
-    expect(workbook.worksheets).toHaveLength(36);
+    expect(workbook.worksheets).toHaveLength(37);
+    expect((workbook.getWorksheet('Lead Metrics')?.getRow(5).values as unknown[]).slice(1))
+      .toEqual(expect.arrayContaining(['Start Date', 'End Date']));
+    expect((workbook.getWorksheet('Partial Lead Summaries')?.getRow(5).values as unknown[]).slice(1))
+      .toEqual(expect.arrayContaining(['Whole-period Leads', 'Whole-period Qualified', 'Whole-period Converted']));
 
     const reportSheet = workbook.getWorksheet('Daily Reports');
     const reportHeaders = (reportSheet?.getRow(5).values as unknown[]).slice(1);
@@ -289,7 +294,7 @@ describe('typed workbook', () => {
       includeUnitCost: false,
     });
 
-    expect(Object.keys(broad)).toHaveLength(35);
+    expect(Object.keys(broad)).toHaveLength(36);
     expect(broad.dailyReports?.length).toBeGreaterThan(0);
     expect(broad.actionItems?.[0]?.ownerName).toBe('Export Owner');
     expect(broad.weeklyReviewActions?.[0]?.ownerName).toBe('Export Owner');

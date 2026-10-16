@@ -176,6 +176,13 @@
       "when": 1789171200000,
       "tag": "0024_performance_reviews",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792022400000,
+      "tag": "0025_lead_metric_periods",
+      "breakpoints": true
     }
   ]
 }

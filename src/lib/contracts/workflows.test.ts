@@ -63,7 +63,8 @@ describe('typed workflow contracts', () => {
   it('rejects impossible funnel counts and contact storage without consent', () => {
     expect(
       leadMetricSchema.safeParse({
-        businessDate: '2026-07-11',
+        periodStart: '2026-07-11',
+        periodEnd: '2026-07-11',
         channel: 'Instagram',
         leadCount: 20,
         qualifiedCount: 15,

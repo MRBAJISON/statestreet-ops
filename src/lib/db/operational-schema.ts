@@ -499,6 +499,9 @@ export const leadMetrics = pgTable(
   {
     id: id(),
     businessDate: date('business_date').notNull(),
+    periodStart: date('period_start').notNull(),
+    periodEnd: date('period_end').notNull(),
+    lockVersion: integer('lock_version').notNull().default(1),
     channel: text('channel').notNull(),
     campaignReportId: bigint('campaign_report_id', { mode: 'number' }).references(() => marketingCampaignReports.id, {
       onDelete: 'set null',
@@ -514,6 +517,9 @@ export const leadMetrics = pgTable(
   (t) => [
     index('lead_metrics_date_channel_idx').on(t.businessDate, t.channel),
     index('lead_metrics_campaign_idx').on(t.campaignReportId),
+    index('lead_metrics_period_idx').on(t.periodStart, t.periodEnd),
+    check('lead_metrics_period_check', sql`${t.periodEnd} >= ${t.periodStart} and date_trunc('month', ${t.periodStart}::timestamp) = date_trunc('month', ${t.periodEnd}::timestamp)`),
+    check('lead_metrics_version_check', sql`${t.lockVersion} > 0`),
     check(
       'lead_metrics_counts_check',
       sql`${t.leadCount} >= 0 and ${t.qualifiedCount} >= 0 and ${t.convertedCount} >= 0 and ${t.qualifiedCount} <= ${t.leadCount} and ${t.convertedCount} <= ${t.qualifiedCount}`

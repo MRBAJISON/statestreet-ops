@@ -290,6 +290,7 @@ export interface MarketingDomain {
     status: string;
   }>;
   leadChannels: Array<{ name: string; leads: number; qualified: number; converted: number }>;
+  partialLeadSummaries: Array<{ id: number; channel: string; periodStart: string; periodEnd: string; leads: number; qualified: number; converted: number }>;
   social: Array<{ platform: string; reach: number; impressions: number; engagement: number; clicks: number; followers: number; websiteVisits: number }>;
   campaignBrands: Array<{ name: string; spend: number; revenue: number; roas: number }>;
   clienteling: Array<{ type: string; contacted: number; responses: number; appointments: number; revenue: number }>;

@@ -223,6 +223,27 @@ external platform rather than another StateStreet form:
 Brand and store selectors use reference data. Campaign, lead, and social rates,
 ROAS, funnels, trend comparisons, and totals are derived.
 
+### Lead channel summary periods
+
+- Start date and end date are inclusive; equal dates represent one day. Counts
+  cover the whole period. Split cross-month periods into separate summaries.
+- Marketing and Operations retain write access. Saved summaries have paginated
+  history and audited corrections requiring a reason and current record version.
+- Overlapping periods for the same normalized channel and campaign scope are
+  rejected, including concurrent saves. Different campaigns remain separate.
+- Dashboard totals and the Lead Metrics export include fully contained periods
+  only. Partially overlapping periods appear separately, explicitly excluded
+  from totals; aggregate counts are never evenly prorated across days.
+- Migration 0025 keeps existing single-day entries and their counts unchanged.
+  Existing duplicate entries are not deleted or merged; count-only corrections
+  remain possible. Changing their dates/scope invokes the overlap guard.
+- `business_date` remains the period start for legacy consumers. The trigger
+  supports old single-date seed/import writes. New form/API input uses
+  `periodStart` and `periodEnd`; other marketing workflows still use their dates.
+
+Deployment requires migration 0025 before the new application code. Run the
+versioned migration under the normal release process, never production `db:push`.
+
 ## Operations
 
 The following remain typed workflows:

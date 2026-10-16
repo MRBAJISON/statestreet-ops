@@ -3,6 +3,7 @@ import type { MarketingDomain } from '../contracts/analytics';
 import { db } from '../db';
 import type { AnalyticsScope } from './shared';
 import { jsonResult } from './shared';
+import { leadPeriodFilter } from './lead-period-filter';
 
 export async function getMarketingDomain(scope: AnalyticsScope): Promise<MarketingDomain> {
   const activityStore = scope.store ? sql`and activity.store_id = ${scope.store.id}` : sql``;
@@ -37,7 +38,7 @@ export async function getMarketingDomain(scope: AnalyticsScope): Promise<Marketi
         coalesce(sum(metric.qualified_count), 0)::integer as qualified,
         coalesce(sum(metric.converted_count), 0)::integer as converted
       from lead_metrics metric
-      where metric.business_date between ${scope.from}::date and ${scope.to}::date
+      where ${leadPeriodFilter(sql`metric.period_start`, sql`metric.period_end`, scope)}
     ), lead_channels as (
       select
         metric.channel,
@@ -45,7 +46,7 @@ export async function getMarketingDomain(scope: AnalyticsScope): Promise<Marketi
         sum(metric.qualified_count)::integer as qualified,
         sum(metric.converted_count)::integer as converted
       from lead_metrics metric
-      where metric.business_date between ${scope.from}::date and ${scope.to}::date
+      where ${leadPeriodFilter(sql`metric.period_start`, sql`metric.period_end`, scope)}
       group by metric.channel
     ), campaign_brands as (
       select
@@ -201,6 +202,14 @@ export async function getMarketingDomain(scope: AnalyticsScope): Promise<Marketi
           'converted', channel.converted
         ) order by channel.leads desc, channel.channel)
         from lead_channels channel
+      ), '[]'::jsonb),
+      'partialLeadSummaries', coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'id', metric.id, 'channel', metric.channel, 'periodStart', metric.period_start, 'periodEnd', metric.period_end,
+          'leads', metric.lead_count, 'qualified', metric.qualified_count, 'converted', metric.converted_count
+        ) order by metric.period_start, metric.id)
+        from lead_metrics metric
+        where ${leadPeriodFilter(sql`metric.period_start`, sql`metric.period_end`, scope, true)}
       ), '[]'::jsonb),
       'social', coalesce((
         select jsonb_agg(jsonb_build_object(

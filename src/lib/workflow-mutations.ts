@@ -34,6 +34,7 @@ import {
   type WorkflowName,
 } from './contracts/workflows';
 import { db } from './db';
+import { createLeadMetric } from './lead-metrics';
 import { stores } from './db/foundation-schema';
 import { HttpError, sessionUserId } from './server-errors';
 import { resolveActingStore } from './store-access';
@@ -317,18 +318,7 @@ export const WORKFLOW_HANDLERS: Record<WorkflowName, WorkflowHandler> = {
       },
     });
   }),
-  'lead-metric': workflow(leadMetricSchema, ['marketing', 'operations'], async (user, input) => {
-    const actorUserId = sessionUserId(user.id);
-    return insertAuditedRecord({
-      table: 'lead_metrics', entityType: 'lead-metric', actorUserId,
-      values: {
-        business_date: input.businessDate, channel: input.channel,
-        campaign_report_id: input.campaignReportId ?? null, lead_count: input.leadCount,
-        qualified_count: input.qualifiedCount, converted_count: input.convertedCount,
-        average_value: input.averageValue ?? null, notes: input.notes ?? null, ...actors(actorUserId),
-      },
-    });
-  }),
+  'lead-metric': workflow(leadMetricSchema, ['marketing', 'operations'], createLeadMetric),
   'social-metric': workflow(socialMetricSchema, ['marketing', 'operations'], async (user, input) => {
     const actorUserId = sessionUserId(user.id);
     return upsertAuditedRecord({

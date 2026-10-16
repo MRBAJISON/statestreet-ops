@@ -32,6 +32,7 @@ import {
 } from './workflow-payload';
 import { WorkflowLifecycle } from './WorkflowLifecycle';
 import { ProductCombobox } from './ProductCombobox';
+import { LeadSummarySheet } from './LeadSummarySheet';
 import { customerContactRetentionWindow } from '@/lib/customer-contact-retention';
 
 const TONE_STYLES: Record<WorkflowDefinition['tone'], string> = {
@@ -446,7 +447,7 @@ export function WorkflowWorkspace({
         refreshKey={lifecycleRefreshKey}
       />
 
-      <WorkflowSheet
+      {selected?.id === 'lead-metric' ? <LeadSummarySheet onClose={() => setSelected(null)} /> : <WorkflowSheet
         definition={selected}
         references={references}
         open={Boolean(selected)}
@@ -454,7 +455,7 @@ export function WorkflowWorkspace({
           if (!open) setSelected(null);
         }}
         onSaved={() => setLifecycleRefreshKey((current) => current + 1)}
-      />
+      />}
     </div>
   );
 }
