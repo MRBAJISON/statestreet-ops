@@ -468,6 +468,8 @@ export const marketingCampaignReports = pgTable(
   {
     id: id(),
     businessDate: date('business_date').notNull(),
+    periodStart: date('period_start').notNull(),
+    periodEnd: date('period_end').notNull(),
     name: text('name').notNull(),
     brandId: bigint('brand_id', { mode: 'number' })
       .notNull()
@@ -484,6 +486,8 @@ export const marketingCampaignReports = pgTable(
   },
   (t) => [
     index('marketing_campaigns_brand_date_idx').on(t.brandId, t.businessDate),
+    index('marketing_campaigns_period_idx').on(t.periodStart, t.periodEnd),
+    check('marketing_campaigns_period_check', sql`${t.periodEnd} >= ${t.periodStart} and date_trunc('month', ${t.periodStart}::timestamp) = date_trunc('month', ${t.periodEnd}::timestamp)`),
     index('marketing_campaigns_status_idx').on(t.status, t.businessDate),
     check(
       'marketing_campaigns_counts_check',
@@ -533,17 +537,22 @@ export const socialMetrics = pgTable(
   {
     id: id(),
     businessDate: date('business_date').notNull(),
+    periodStart: date('period_start').notNull(),
+    periodEnd: date('period_end').notNull(),
     platform: text('platform').notNull(),
     brandId: bigint('brand_id', { mode: 'number' }).references(() => brands.id, { onDelete: 'restrict' }),
-    followers: integer('followers').notNull().default(0),
-    posts: integer('posts').notNull().default(0),
-    reels: integer('reels').notNull().default(0),
-    stories: integer('stories').notNull().default(0),
+    // Nullable for snapshots recorded before these period metrics were collected.
+    follows: integer('follows'),
+    profileActivity: integer('profile_activity'),
+    followers: integer('followers'),
+    posts: integer('posts'),
+    reels: integer('reels'),
+    stories: integer('stories'),
     reach: integer('reach').notNull().default(0),
     impressions: integer('impressions').notNull().default(0),
     engagement: integer('engagement').notNull().default(0),
-    clicks: integer('clicks').notNull().default(0),
-    websiteVisits: integer('website_visits').notNull().default(0),
+    clicks: integer('clicks'),
+    websiteVisits: integer('website_visits'),
     ...actors(),
     ...timestamps(),
   },
@@ -555,7 +564,11 @@ export const socialMetrics = pgTable(
       .on(t.businessDate, t.platform)
       .where(sql`${t.brandId} is null`),
     index('social_metrics_date_platform_idx').on(t.businessDate, t.platform),
+    index('social_metrics_period_idx').on(t.periodStart, t.periodEnd),
+    check('social_metrics_period_check', sql`${t.periodEnd} >= ${t.periodStart} and date_trunc('month', ${t.periodStart}::timestamp) = date_trunc('month', ${t.periodEnd}::timestamp)`),
     index('social_metrics_brand_idx').on(t.brandId, t.businessDate),
+    check('social_metrics_follows_check', sql`${t.follows} is null or ${t.follows} >= 0`),
+    check('social_metrics_profile_activity_check', sql`${t.profileActivity} is null or ${t.profileActivity} >= 0`),
     check(
       'social_metrics_counts_check',
       sql`${t.followers} >= 0 and ${t.posts} >= 0 and ${t.reels} >= 0 and ${t.stories} >= 0 and ${t.reach} >= 0 and ${t.impressions} >= 0 and ${t.engagement} >= 0 and ${t.clicks} >= 0 and ${t.websiteVisits} >= 0`
@@ -568,6 +581,8 @@ export const clientelingActivities = pgTable(
   {
     id: id(),
     businessDate: date('business_date').notNull(),
+    periodStart: date('period_start').notNull(),
+    periodEnd: date('period_end').notNull(),
     type: text('type').notNull(),
     storeId: bigint('store_id', { mode: 'number' }).references(() => stores.id, { onDelete: 'restrict' }),
     contacted: integer('contacted').notNull(),
@@ -586,6 +601,8 @@ export const clientelingActivities = pgTable(
       .on(t.businessDate, t.type)
       .where(sql`${t.storeId} is null`),
     index('clienteling_store_date_idx').on(t.storeId, t.businessDate),
+    index('clienteling_period_idx').on(t.periodStart, t.periodEnd),
+    check('clienteling_period_check', sql`${t.periodEnd} >= ${t.periodStart} and date_trunc('month', ${t.periodStart}::timestamp) = date_trunc('month', ${t.periodEnd}::timestamp)`),
     check(
       'clienteling_counts_check',
       sql`${t.contacted} >= 0 and ${t.responses} >= 0 and ${t.appointments} >= 0 and ${t.responses} <= ${t.contacted} and ${t.appointments} <= ${t.responses}`

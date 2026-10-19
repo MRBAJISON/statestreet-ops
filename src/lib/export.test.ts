@@ -101,6 +101,7 @@ describe('typed workbook', () => {
             netRevenue: 4200,
           },
         ],
+        socialMetrics: [{ periodStart: '2026-07-01', periodEnd: '2026-07-07', platform: 'Instagram', follows: 0, profileActivity: 12, impressions: 100, reach: 50, engagement: 20, followers: null, posts: null }],
       },
     });
     const workbook = new ExcelJS.Workbook();
@@ -123,7 +124,15 @@ describe('typed workbook', () => {
         'Incidents',
       ])
     );
-    expect(workbook.worksheets).toHaveLength(37);
+    expect(workbook.worksheets).toHaveLength(40);
+    const socialSheet = workbook.getWorksheet('Social Metrics')!;
+    const socialHeaders = (socialSheet.getRow(5).values as unknown[]).slice(1);
+    expect(socialHeaders).toEqual(expect.arrayContaining(['Views / Impressions', 'Follows (New)', 'Profile Activity', 'Interactions', 'Total Followers at End Date']));
+    const socialValue = (header: string) => socialSheet.getRow(6).getCell(socialHeaders.indexOf(header) + 1).value;
+    expect(socialValue('Follows (New)')).toBe(0);
+    expect(socialValue('Profile Activity')).toBe(12);
+    expect(socialValue('Total Followers at End Date')).toBe('');
+    expect(socialValue('Posts')).toBe('');
     expect((workbook.getWorksheet('Lead Metrics')?.getRow(5).values as unknown[]).slice(1))
       .toEqual(expect.arrayContaining(['Start Date', 'End Date']));
     expect((workbook.getWorksheet('Partial Lead Summaries')?.getRow(5).values as unknown[]).slice(1))
@@ -294,7 +303,7 @@ describe('typed workbook', () => {
       includeUnitCost: false,
     });
 
-    expect(Object.keys(broad)).toHaveLength(36);
+    expect(Object.keys(broad)).toHaveLength(39);
     expect(broad.dailyReports?.length).toBeGreaterThan(0);
     expect(broad.actionItems?.[0]?.ownerName).toBe('Export Owner');
     expect(broad.weeklyReviewActions?.[0]?.ownerName).toBe('Export Owner');

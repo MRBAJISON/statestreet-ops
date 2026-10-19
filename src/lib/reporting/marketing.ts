@@ -15,6 +15,8 @@ export async function getMarketingDomain(scope: AnalyticsScope): Promise<Marketi
     with campaigns as (
       select
         campaign.id,
+        campaign.period_start,
+        campaign.period_end,
         campaign.name,
         brand.name as brand_name,
         campaign.platform,
@@ -26,7 +28,7 @@ export async function getMarketingDomain(scope: AnalyticsScope): Promise<Marketi
         campaign.status
       from marketing_campaign_reports campaign
       join brands brand on brand.id = campaign.brand_id
-      where campaign.business_date between ${scope.from}::date and ${scope.to}::date
+      where ${leadPeriodFilter(sql`campaign.period_start`, sql`campaign.period_end`, scope)}
     ), campaign_summary as (
       select
         coalesce(sum(spend), 0) as spend,
@@ -61,19 +63,23 @@ export async function getMarketingDomain(scope: AnalyticsScope): Promise<Marketi
         sum(metric.reach)::integer as reach,
         sum(metric.impressions)::integer as impressions,
         sum(metric.engagement)::integer as engagement,
-        sum(metric.clicks)::integer as clicks,
-        sum(metric.posts)::integer as posts,
-        sum(metric.reels)::integer as reels,
-        sum(metric.stories)::integer as stories,
-        sum(metric.website_visits)::integer as website_visits
+        -- Do not present partially reported optional/legacy metrics as totals.
+        case when count(metric.follows) = count(*) then sum(metric.follows)::integer end as follows,
+        case when count(metric.profile_activity) = count(*) then sum(metric.profile_activity)::integer end as profile_activity,
+        case when count(metric.clicks) = count(*) then sum(metric.clicks)::integer end as clicks,
+        case when count(metric.posts) = count(*) then sum(metric.posts)::integer end as posts,
+        case when count(metric.reels) = count(*) then sum(metric.reels)::integer end as reels,
+        case when count(metric.stories) = count(*) then sum(metric.stories)::integer end as stories,
+        case when count(metric.website_visits) = count(*) then sum(metric.website_visits)::integer end as website_visits
       from social_metrics metric
-      where metric.business_date between ${scope.from}::date and ${scope.to}::date
+      where ${leadPeriodFilter(sql`metric.period_start`, sql`metric.period_end`, scope)}
       group by metric.platform
     ), social_latest as (
       select distinct on (metric.platform) metric.platform, metric.followers
       from social_metrics metric
-      where metric.business_date <= ${scope.to}::date
-      order by metric.platform, metric.business_date desc, metric.id desc
+      where metric.period_end <= ${scope.to}::date
+        and metric.followers is not null
+      order by metric.platform, metric.period_end desc, metric.id desc
     ), clienteling as (
       select
         activity.type,
@@ -82,7 +88,7 @@ export async function getMarketingDomain(scope: AnalyticsScope): Promise<Marketi
         sum(activity.appointments)::integer as appointments,
         sum(activity.estimated_revenue) as revenue
       from clienteling_activities activity
-      where activity.business_date between ${scope.from}::date and ${scope.to}::date ${activityStore}
+      where ${leadPeriodFilter(sql`activity.period_start`, sql`activity.period_end`, scope)} ${activityStore}
       group by activity.type
     ), feedback_summary as (
       select case when count(feedback.nps_score) = 0 then null else
@@ -175,13 +181,15 @@ export async function getMarketingDomain(scope: AnalyticsScope): Promise<Marketi
         'revenueInfluenced', campaign.revenue::float8
       ),
       'contentCadence', jsonb_build_object(
-        'posts', coalesce((select sum(posts) from social_period), 0)::integer,
-        'reels', coalesce((select sum(reels) from social_period), 0)::integer,
-        'stories', coalesce((select sum(stories) from social_period), 0)::integer
+        'posts', (select case when count(posts) = count(*) then coalesce(sum(posts), 0)::integer end from social_period),
+        'reels', (select case when count(reels) = count(*) then coalesce(sum(reels), 0)::integer end from social_period),
+        'stories', (select case when count(stories) = count(*) then coalesce(sum(stories), 0)::integer end from social_period)
       ),
       'campaigns', coalesce((
         select jsonb_agg(jsonb_build_object(
           'id', item.id,
+          'periodStart', item.period_start,
+          'periodEnd', item.period_end,
           'name', item.name,
           'brandName', item.brand_name,
           'platform', item.platform,
@@ -211,14 +219,36 @@ export async function getMarketingDomain(scope: AnalyticsScope): Promise<Marketi
         from lead_metrics metric
         where ${leadPeriodFilter(sql`metric.period_start`, sql`metric.period_end`, scope, true)}
       ), '[]'::jsonb),
+      'partialMarketingSummaries', coalesce((
+        select jsonb_agg(to_jsonb(partial) order by partial."periodStart", partial.kind, partial.id)
+        from (
+          select campaign.id, 'Campaign'::text as kind,
+            concat(campaign.name, ' / ', campaign.platform, ' / ', brand.name) as label,
+            campaign.period_start as "periodStart", campaign.period_end as "periodEnd"
+          from marketing_campaign_reports campaign join brands brand on brand.id = campaign.brand_id
+          where ${leadPeriodFilter(sql`campaign.period_start`, sql`campaign.period_end`, scope, true)}
+          union all
+          select metric.id, 'Social', concat(metric.platform, ' / ', coalesce(brand.name, 'Group')),
+            metric.period_start, metric.period_end
+          from social_metrics metric left join brands brand on brand.id = metric.brand_id
+          where ${leadPeriodFilter(sql`metric.period_start`, sql`metric.period_end`, scope, true)}
+          union all
+          select activity.id, 'Clienteling', concat(activity.type, ' / ', coalesce(store.name, 'Group')),
+            activity.period_start, activity.period_end
+          from clienteling_activities activity left join stores store on store.id = activity.store_id
+          where ${leadPeriodFilter(sql`activity.period_start`, sql`activity.period_end`, scope, true)} ${activityStore}
+        ) partial
+      ), '[]'::jsonb),
       'social', coalesce((
         select jsonb_agg(jsonb_build_object(
           'platform', period.platform,
           'reach', period.reach,
           'impressions', period.impressions,
           'engagement', period.engagement,
+          'follows', period.follows,
+          'profileActivity', period.profile_activity,
           'clicks', period.clicks,
-          'followers', coalesce(latest.followers, 0),
+          'followers', latest.followers,
           'websiteVisits', period.website_visits
         ) order by period.reach desc, period.platform)
         from social_period period

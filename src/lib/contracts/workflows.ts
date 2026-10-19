@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { marketingPeriodFields, validateMarketingPeriod } from './marketing-period';
 import { customerContactRetentionWindow } from '../customer-contact-retention';
 import { dateSchema, moneySchema, optionalMoneySchema, positiveIdSchema } from './shared';
 
@@ -159,7 +160,7 @@ export const productInsightSchema = z.object({
 });
 
 export const campaignSchema = z.object({
-  businessDate: dateSchema,
+  ...marketingPeriodFields,
   name: requiredText(200),
   brandId: positiveIdSchema,
   platform: requiredText(100),
@@ -169,7 +170,7 @@ export const campaignSchema = z.object({
   revenueInfluenced: moneySchema,
   spend: moneySchema,
   status: z.enum(['planned', 'active', 'paused', 'completed']),
-});
+}).superRefine(validateMarketingPeriod);
 
 export const leadMetricSchema = z
   .object({
@@ -195,23 +196,25 @@ export const leadMetricSchema = z
   });
 
 export const socialMetricSchema = z.object({
-  businessDate: dateSchema,
+  ...marketingPeriodFields,
   platform: requiredText(100),
   brandId: optionalId,
-  followers: count,
-  posts: count,
-  reels: count,
-  stories: count,
+  follows: count,
+  profileActivity: count,
+  followers: optionalCount,
+  posts: optionalCount,
+  reels: optionalCount,
+  stories: optionalCount,
   reach: count,
   impressions: count,
   engagement: count,
-  clicks: count,
-  websiteVisits: count,
-});
+  clicks: optionalCount,
+  websiteVisits: optionalCount,
+}).superRefine(validateMarketingPeriod);
 
 export const clientelingSchema = z
   .object({
-    businessDate: dateSchema,
+    ...marketingPeriodFields,
     type: requiredText(120),
     storeId: optionalId,
     contacted: count,
@@ -220,6 +223,7 @@ export const clientelingSchema = z
     estimatedRevenue: moneySchema,
     notes: optionalText(1000),
   })
+  .superRefine(validateMarketingPeriod)
   .refine((value) => value.responses <= value.contacted && value.appointments <= value.responses, {
     path: ['appointments'],
     message: 'Appointments cannot exceed responses, and responses cannot exceed contacts',

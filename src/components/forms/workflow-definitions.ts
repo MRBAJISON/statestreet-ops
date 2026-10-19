@@ -73,7 +73,7 @@ const notesField = (name = 'notes', label = 'Notes'): WorkflowFieldDefinition =>
 });
 
 const feedbackFields: WorkflowFieldDefinition[] = [
-  todayField(),
+  todayField('businessDate', 'Date received'),
   { name: 'source', label: 'Source', type: 'text', required: true, placeholder: 'In-store, WhatsApp, Google' },
   { name: 'type', label: 'Feedback type', type: 'text', required: true, placeholder: 'Praise, complaint, request' },
   { name: 'category', label: 'Category', type: 'text' },
@@ -268,7 +268,8 @@ export const marketingWorkflows: WorkflowDefinition[] = [
   {
     id: 'campaign', title: 'Campaign performance', group: 'Performance', icon: Megaphone, tone: 'orchid',
     fields: [
-      todayField(),
+      todayField('periodStart', 'Start date'),
+      { ...todayField('periodEnd', 'End date'), description: 'Totals cover both dates and the days between. Split ranges crossing month-end.' },
       { name: 'name', label: 'Campaign', type: 'text', required: true },
       { name: 'brandId', label: 'Brand', type: 'select', reference: 'brands', required: true },
       { name: 'platform', label: 'Platform', type: 'text', required: true },
@@ -295,24 +296,28 @@ export const marketingWorkflows: WorkflowDefinition[] = [
   {
     id: 'social-metric', title: 'Social channel snapshot', group: 'Channels', icon: Send, tone: 'coral',
     fields: [
-      todayField(),
+      todayField('periodStart', 'Start date'),
+      { ...todayField('periodEnd', 'End date'), description: 'Activity totals cover the whole range. Split ranges crossing month-end.' },
       { name: 'platform', label: 'Platform', type: 'text', required: true },
       { name: 'brandId', label: 'Brand', type: 'select', reference: 'brands' },
-      countField('followers', 'Followers'),
-      countField('posts', 'Posts'),
-      countField('reels', 'Reels'),
-      countField('stories', 'Stories'),
-      countField('reach', 'Reach'),
-      countField('impressions', 'Impressions'),
-      countField('engagement', 'Engagement'),
-      countField('clicks', 'Clicks'),
-      countField('websiteVisits', 'Website visits'),
+      { ...countField('impressions', 'Views / Impressions'), defaultValue: '' },
+      { ...countField('reach', 'Reach'), defaultValue: '' },
+      { ...countField('follows', 'Follows'), defaultValue: '', description: 'New follows gained during the selected period, not total followers.' },
+      { ...countField('profileActivity', 'Profile Activity'), defaultValue: '' },
+      { ...countField('engagement', 'Interactions'), defaultValue: '' },
+      { ...countField('followers', 'Total followers', false), description: 'Optional audience balance at the end date. Leave optional metrics blank if not available; enter 0 only when measured as zero.' },
+      countField('posts', 'Posts', false),
+      countField('reels', 'Reels', false),
+      countField('stories', 'Stories', false),
+      countField('clicks', 'Clicks', false),
+      countField('websiteVisits', 'Website visits', false),
     ],
   },
   {
     id: 'clienteling', title: 'Clienteling activity', group: 'Customers', icon: HeartHandshake, tone: 'teal',
     fields: [
-      todayField(),
+      todayField('periodStart', 'Start date'),
+      { ...todayField('periodEnd', 'End date'), description: 'Totals cover both dates and the days between. Split ranges crossing month-end.' },
       { name: 'type', label: 'Activity type', type: 'text', required: true, placeholder: 'WhatsApp, calls, appointments' },
       storeField(false),
       countField('contacted', 'Contacted'),

@@ -35,6 +35,7 @@ import {
 } from './contracts/workflows';
 import { db } from './db';
 import { createLeadMetric } from './lead-metrics';
+import { rethrowMarketingPeriodError } from './marketing-period-errors';
 import { stores } from './db/foundation-schema';
 import { HttpError, sessionUserId } from './server-errors';
 import { resolveActingStore } from './store-access';
@@ -44,6 +45,8 @@ interface WorkflowHandler {
   roles: ReadonlySet<UserRole>;
   execute(user: AppUser, input: unknown): Promise<Record<string, unknown>>;
 }
+
+const marketingPeriodSchemas: readonly z.ZodType[] = [campaignSchema, socialMetricSchema, clientelingSchema];
 
 function workflow<TSchema extends z.ZodType>(
   schema: TSchema,
@@ -55,7 +58,12 @@ function workflow<TSchema extends z.ZodType>(
     async execute(user, input) {
       const parsed = schema.safeParse(input);
       if (!parsed.success) throw new HttpError(400, formatContractError(parsed.error));
-      return create(user, parsed.data);
+      try {
+        return await create(user, parsed.data);
+      } catch (error) {
+        if (marketingPeriodSchemas.includes(schema)) rethrowMarketingPeriodError(error);
+        throw error;
+      }
     },
   };
 }
@@ -311,7 +319,8 @@ export const WORKFLOW_HANDLERS: Record<WorkflowName, WorkflowHandler> = {
     return insertAuditedRecord({
       table: 'marketing_campaign_reports', entityType: 'marketing-campaign', actorUserId,
       values: {
-        business_date: input.businessDate, name: input.name, brand_id: input.brandId,
+        business_date: input.periodStart, period_start: input.periodStart, period_end: input.periodEnd,
+        name: input.name, brand_id: input.brandId,
         platform: input.platform, reach: input.reach, engagement: input.engagement,
         store_visits: input.storeVisits, revenue_influenced: input.revenueInfluenced,
         spend: input.spend, status: input.status, ...actors(actorUserId),
@@ -323,12 +332,14 @@ export const WORKFLOW_HANDLERS: Record<WorkflowName, WorkflowHandler> = {
     const actorUserId = sessionUserId(user.id);
     return upsertAuditedRecord({
       table: 'social_metrics', entityType: 'social-metric', actorUserId,
-      key: { business_date: input.businessDate, platform: input.platform, brand_id: input.brandId ?? null },
+      key: { period_start: input.periodStart, period_end: input.periodEnd, platform: input.platform, brand_id: input.brandId ?? null },
       values: {
-        business_date: input.businessDate, platform: input.platform, brand_id: input.brandId ?? null,
-        followers: input.followers, posts: input.posts, reels: input.reels, stories: input.stories,
+        business_date: input.periodStart, period_start: input.periodStart, period_end: input.periodEnd,
+        platform: input.platform, brand_id: input.brandId ?? null,
+        follows: input.follows, profile_activity: input.profileActivity,
+        followers: input.followers ?? null, posts: input.posts ?? null, reels: input.reels ?? null, stories: input.stories ?? null,
         reach: input.reach, impressions: input.impressions, engagement: input.engagement,
-        clicks: input.clicks, website_visits: input.websiteVisits, ...upsertActors(actorUserId),
+        clicks: input.clicks ?? null, website_visits: input.websiteVisits ?? null, ...upsertActors(actorUserId),
       },
       preserveOnUpdate: ['created_by_user_id'],
     });
@@ -337,9 +348,10 @@ export const WORKFLOW_HANDLERS: Record<WorkflowName, WorkflowHandler> = {
     const actorUserId = sessionUserId(user.id);
     return upsertAuditedRecord({
       table: 'clienteling_activities', entityType: 'clienteling-activity', actorUserId,
-      key: { business_date: input.businessDate, type: input.type, store_id: input.storeId ?? null },
+      key: { period_start: input.periodStart, period_end: input.periodEnd, type: input.type, store_id: input.storeId ?? null },
       values: {
-        business_date: input.businessDate, type: input.type, store_id: input.storeId ?? null,
+        business_date: input.periodStart, period_start: input.periodStart, period_end: input.periodEnd,
+        type: input.type, store_id: input.storeId ?? null,
         contacted: input.contacted, responses: input.responses, appointments: input.appointments,
         estimated_revenue: input.estimatedRevenue, notes: input.notes ?? null, ...upsertActors(actorUserId),
       },

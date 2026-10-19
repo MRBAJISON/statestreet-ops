@@ -239,10 +239,54 @@ ROAS, funnels, trend comparisons, and totals are derived.
   remain possible. Changing their dates/scope invokes the overlap guard.
 - `business_date` remains the period start for legacy consumers. The trigger
   supports old single-date seed/import writes. New form/API input uses
-  `periodStart` and `periodEnd`; other marketing workflows still use their dates.
+  `periodStart` and `periodEnd`.
 
 Deployment requires migration 0025 before the new application code. Run the
 versioned migration under the normal release process, never production `db:push`.
+
+### Campaign, social and clienteling periods
+
+- These summary forms also use inclusive Start date / End date, within one
+  calendar month. Equal dates still support daily recording. Individual customer
+  feedback keeps its date received; action tracking keeps its due date.
+- Counts and amounts describe the whole period, not a daily average. Followers
+  are a balance at the end date, never summed across periods. Dashboard follower
+  balances use the latest completed snapshot, not a period ending in the future.
+- Dashboard totals and normal export sheets include fully contained periods.
+  Partial overlaps are flagged on the dashboard and exported in separate Partial
+  Campaign/Social/Clienteling Summaries sheets, excluded from selected-period totals.
+- Overlaps are rejected for the same campaign + platform + brand, social platform
+  + brand, or clienteling activity + store. Shared endpoints overlap; adjacent
+  non-overlapping ranges and different scopes are allowed.
+- Social and clienteling retain their existing audited upsert behavior: resubmit
+  the exact dates and scope to correct totals. A different overlapping range is
+  rejected rather than silently replacing the existing summary. Campaigns remain
+  insert-only. This extension does not add a new campaign correction/history UI.
+- Migration 0026 assigns existing rows their original business date for both ends,
+  preserving values and timestamps. Legacy daily inserts remain supported. Apply
+  the reviewed migration before deploying code; never production `db:push`.
+
+### Social snapshot required measurements and feedback date
+
+- Customer feedback, including its NPS response, uses one required **Date received**,
+  not a reporting range. Existing feedback dates are unchanged.
+- Social snapshots require the date range, platform, and five measurements:
+  Views / Impressions, Reach, Follows, Profile Activity, and Interactions.
+  Follows means new follows gained during the period; Interactions retains the
+  existing engagement measure. New forms start these measurements blank and
+  require an explicit nonnegative whole number (including zero).
+- Total followers (end-date audience), Posts, Reels, Stories, Clicks, Website visits,
+  and Brand are optional. Blank optional measurements are stored as null, not zero.
+  Resubmitting the same scope/period replaces its measurements, including blanks.
+- Dashboard activity totals are shown only when all included snapshots provide
+  that measurement. Otherwise a dash indicates unknown/incomplete coverage.
+  Audience uses the latest non-null follower balance by the filter end date.
+  Both normal and partial export sheets include the new metrics; unknown cells
+  remain blank. Existing zeros are preserved as recorded.
+- Migration 0027 adds nullable follows/profile activity for historical records and
+  removes defaults/NOT NULL from optional measurements. It does not invent new
+  metrics from old audience/click values or rewrite historical data. Apply after
+  0026, before deploying the updated code. No production `db:push`.
 
 ## Operations
 

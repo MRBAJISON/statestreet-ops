@@ -32,10 +32,13 @@ export type ExportSheetKey =
   | 'targets'
   | 'customerActivity'
   | 'campaigns'
+  | 'partialCampaigns'
   | 'leadMetrics'
   | 'partialLeadMetrics'
   | 'socialMetrics'
+  | 'partialSocialMetrics'
   | 'clienteling'
+  | 'partialClienteling'
   | 'customerFeedback'
   | 'products'
   | 'inventoryMovements'
@@ -220,6 +223,27 @@ const col = (
   sensitive?: SensitiveColumn
 ): ExportColumn => ({ key, header, width, format, sensitive });
 
+const campaignColumns = [
+  col('periodStart', 'Start Date', 14), col('periodEnd', 'End Date', 14), col('name', 'Campaign', 26), col('brand', 'Brand', 20),
+  col('platform', 'Platform', 16), col('status', 'Status', 12), col('reach', 'Reach', 14, 'integer'),
+  col('engagement', 'Engagement', 14, 'integer'), col('storeVisits', 'Store Visits', 14, 'integer'),
+  col('revenueInfluenced', 'Revenue Influenced', 20, 'currency'), col('spend', 'Spend', 14, 'currency'),
+];
+const socialColumns = [
+  col('periodStart', 'Start Date', 14), col('periodEnd', 'End Date', 14), col('platform', 'Platform', 16), col('brand', 'Brand', 20),
+  col('impressions', 'Views / Impressions', 22, 'integer'), col('reach', 'Reach', 14, 'integer'),
+  col('follows', 'Follows (New)', 16, 'integer'), col('profileActivity', 'Profile Activity', 18, 'integer'),
+  col('engagement', 'Interactions', 14, 'integer'), col('followers', 'Total Followers at End Date', 28, 'integer'),
+  col('posts', 'Posts', 10, 'integer'), col('reels', 'Reels', 10, 'integer'), col('stories', 'Stories', 10, 'integer'),
+  col('clicks', 'Clicks', 12, 'integer'), col('websiteVisits', 'Website Visits', 15, 'integer'),
+];
+const clientelingColumns = [
+  col('periodStart', 'Start Date', 14), col('periodEnd', 'End Date', 14), col('storeName', 'Store', 22), col('type', 'Activity Type', 18),
+  col('contacted', 'Contacted', 12, 'integer'), col('responses', 'Responses', 12, 'integer'),
+  col('appointments', 'Appointments', 14, 'integer'), col('estimatedRevenue', 'Estimated Revenue', 19, 'currency'), col('notes', 'Notes', 34),
+];
+const partialPeriodDescription = 'Partially overlapping periods: NOT included in selected-period totals. Values cover each full reported period, without daily proration.';
+
 const SHEETS: Record<ExportSheetKey, Omit<ExportSheetDefinition, 'key'>> = {
   dailyReports: {
     name: 'Daily Reports',
@@ -353,14 +377,10 @@ const SHEETS: Record<ExportSheetKey, Omit<ExportSheetDefinition, 'key'>> = {
   },
   campaigns: {
     name: 'Campaigns',
-    description: 'Typed marketing campaign performance.',
-    columns: [
-      col('businessDate', 'Business Date', 14), col('name', 'Campaign', 26), col('brand', 'Brand', 20),
-      col('platform', 'Platform', 16), col('status', 'Status', 12), col('reach', 'Reach', 14, 'integer'),
-      col('engagement', 'Engagement', 14, 'integer'), col('storeVisits', 'Store Visits', 14, 'integer'),
-      col('revenueInfluenced', 'Revenue Influenced', 20, 'currency'), col('spend', 'Spend', 14, 'currency'),
-    ],
+    description: 'Whole-period campaign performance fully contained within the export dates. No daily proration.',
+    columns: campaignColumns,
   },
+  partialCampaigns: { name: 'Partial Campaign Summaries', description: partialPeriodDescription, columns: campaignColumns },
   leadMetrics: {
     name: 'Lead Metrics',
     description: 'Whole-period channel counts fully contained within the export dates. No daily proration.',
@@ -381,28 +401,21 @@ const SHEETS: Record<ExportSheetKey, Omit<ExportSheetDefinition, 'key'>> = {
   },
   socialMetrics: {
     name: 'Social Metrics',
-    description: 'Typed social channel performance by platform and brand.',
-    columns: [
-      col('businessDate', 'Business Date', 14), col('platform', 'Platform', 16), col('brand', 'Brand', 20),
-      col('followers', 'Followers', 14, 'integer'), col('posts', 'Posts', 10, 'integer'), col('reels', 'Reels', 10, 'integer'),
-      col('stories', 'Stories', 10, 'integer'), col('reach', 'Reach', 14, 'integer'), col('impressions', 'Impressions', 14, 'integer'),
-      col('engagement', 'Engagement', 14, 'integer'), col('clicks', 'Clicks', 12, 'integer'), col('websiteVisits', 'Website Visits', 15, 'integer'),
-    ],
+    description: 'Whole periods within the export dates. Follows are new follows; total followers are end-date balances, not additive counts. Blank measurements are unknown, not zero.',
+    columns: socialColumns,
   },
+  partialSocialMetrics: { name: 'Partial Social Summaries', description: partialPeriodDescription, columns: socialColumns },
   clienteling: {
     name: 'Clienteling',
-    description: 'Aggregate clienteling activity without customer contact details.',
-    columns: [
-      col('businessDate', 'Business Date', 14), col('storeName', 'Store', 22), col('type', 'Activity Type', 18),
-      col('contacted', 'Contacted', 12, 'integer'), col('responses', 'Responses', 12, 'integer'),
-      col('appointments', 'Appointments', 14, 'integer'), col('estimatedRevenue', 'Estimated Revenue', 19, 'currency'), col('notes', 'Notes', 34),
-    ],
+    description: 'Whole periods contained within the export dates. Aggregate activity without customer contact details.',
+    columns: clientelingColumns,
   },
+  partialClienteling: { name: 'Partial Clienteling Summaries', description: partialPeriodDescription, columns: clientelingColumns },
   customerFeedback: {
     name: 'Customer Feedback',
     description: 'Feedback and NPS records. Consented, unexpired follow-up contacts are policy-controlled.',
     columns: [
-      col('businessDate', 'Business Date', 14), col('source', 'Source', 16), col('type', 'Type', 16),
+      col('businessDate', 'Date Received', 14), col('source', 'Source', 16), col('type', 'Type', 16),
       col('category', 'Category', 20), col('npsScore', 'NPS Score', 12, 'integer'), col('recommendation', 'Recommendation', 16),
       col('frequency', 'Frequency', 14), col('storeName', 'Store', 22), col('brand', 'Brand', 20), col('detail', 'Feedback', 42),
       col('contactName', 'Contact Name', 24, undefined, 'customer-contact'),
@@ -586,7 +599,7 @@ const COMMERCIAL_SHEETS: ExportSheetKey[] = [
   'salesByCategory', 'productInsights', 'targets', 'customerActivity', 'weeklyReviews',
 ];
 const MARKETING_SHEETS: ExportSheetKey[] = [
-  'campaigns', 'leadMetrics', 'partialLeadMetrics', 'socialMetrics', 'clienteling', 'customerFeedback',
+  'campaigns', 'partialCampaigns', 'leadMetrics', 'partialLeadMetrics', 'socialMetrics', 'partialSocialMetrics', 'clienteling', 'partialClienteling', 'customerFeedback',
 ];
 const INVENTORY_SHEETS: ExportSheetKey[] = [
   'products', 'inventoryMovements', 'goodsReceipts', 'stockTransfers', 'stockCounts', 'replenishment', 'inventoryDispositions',
@@ -885,6 +898,37 @@ export async function loadTypedExportRows(
     ? or(eq(stockTransfers.fromStoreId, input.storeId), eq(stockTransfers.toStoreId, input.storeId))
     : undefined;
 
+  const loadCampaigns = async (partial = false) => asRows(await db.select({
+    periodStart: marketingCampaignReports.periodStart, periodEnd: marketingCampaignReports.periodEnd,
+    name: marketingCampaignReports.name, brand: brands.name, platform: marketingCampaignReports.platform,
+    status: marketingCampaignReports.status, reach: marketingCampaignReports.reach,
+    engagement: marketingCampaignReports.engagement, storeVisits: marketingCampaignReports.storeVisits,
+    revenueInfluenced: sql<number>`${marketingCampaignReports.revenueInfluenced}::float8`,
+    spend: sql<number>`${marketingCampaignReports.spend}::float8`,
+  }).from(marketingCampaignReports)
+    .innerJoin(brands, eq(marketingCampaignReports.brandId, brands.id))
+    .where(leadPeriodFilter(marketingCampaignReports.periodStart, marketingCampaignReports.periodEnd, input.range, partial))
+    .orderBy(asc(marketingCampaignReports.periodStart), asc(marketingCampaignReports.name)));
+  const loadSocialMetrics = async (partial = false) => asRows(await db.select({
+    periodStart: socialMetrics.periodStart, periodEnd: socialMetrics.periodEnd,
+    platform: socialMetrics.platform, brand: sql<string>`coalesce(${brands.name}, 'Group')`,
+    followers: socialMetrics.followers, posts: socialMetrics.posts, reels: socialMetrics.reels,
+    follows: socialMetrics.follows, profileActivity: socialMetrics.profileActivity,
+    stories: socialMetrics.stories, reach: socialMetrics.reach, impressions: socialMetrics.impressions,
+    engagement: socialMetrics.engagement, clicks: socialMetrics.clicks, websiteVisits: socialMetrics.websiteVisits,
+  }).from(socialMetrics).leftJoin(brands, eq(socialMetrics.brandId, brands.id))
+    .where(leadPeriodFilter(socialMetrics.periodStart, socialMetrics.periodEnd, input.range, partial))
+    .orderBy(asc(socialMetrics.periodStart), asc(socialMetrics.platform)));
+  const loadClienteling = async (partial = false) => asRows(await db.select({
+    periodStart: clientelingActivities.periodStart, periodEnd: clientelingActivities.periodEnd,
+    storeName: sql<string>`coalesce(${stores.name}, 'Group')`, type: clientelingActivities.type,
+    contacted: clientelingActivities.contacted, responses: clientelingActivities.responses,
+    appointments: clientelingActivities.appointments,
+    estimatedRevenue: sql<number>`${clientelingActivities.estimatedRevenue}::float8`, notes: clientelingActivities.notes,
+  }).from(clientelingActivities).leftJoin(stores, eq(clientelingActivities.storeId, stores.id))
+    .where(and(leadPeriodFilter(clientelingActivities.periodStart, clientelingActivities.periodEnd, input.range, partial), storeCondition(clientelingActivities.storeId)))
+    .orderBy(asc(clientelingActivities.periodStart), asc(clientelingActivities.type)));
+
   const loaders: Record<ExportSheetKey, () => Promise<ExportRow[]>> = {
     dailyReports: async () => asRows(await db
       .select({
@@ -1126,23 +1170,8 @@ export async function loadTypedExportRows(
         .where(and(dateRangeFilter(customerInteractions.businessDate, input.range), storeCondition(customerInteractions.storeId)))
         .orderBy(asc(customerInteractions.businessDate), asc(stores.name)));
     },
-    campaigns: async () => asRows(await db
-      .select({
-        businessDate: marketingCampaignReports.businessDate,
-        name: marketingCampaignReports.name,
-        brand: brands.name,
-        platform: marketingCampaignReports.platform,
-        status: marketingCampaignReports.status,
-        reach: marketingCampaignReports.reach,
-        engagement: marketingCampaignReports.engagement,
-        storeVisits: marketingCampaignReports.storeVisits,
-        revenueInfluenced: sql<number>`${marketingCampaignReports.revenueInfluenced}::float8`,
-        spend: sql<number>`${marketingCampaignReports.spend}::float8`,
-      })
-      .from(marketingCampaignReports)
-      .innerJoin(brands, eq(marketingCampaignReports.brandId, brands.id))
-      .where(dateRangeFilter(marketingCampaignReports.businessDate, input.range))
-      .orderBy(asc(marketingCampaignReports.businessDate), asc(marketingCampaignReports.name))),
+    campaigns: () => loadCampaigns(),
+    partialCampaigns: () => loadCampaigns(true),
     leadMetrics: async () => asRows(await db
       .select({
         periodStart: leadMetrics.periodStart,
@@ -1168,40 +1197,10 @@ export async function loadTypedExportRows(
       .leftJoin(marketingCampaignReports, eq(leadMetrics.campaignReportId, marketingCampaignReports.id))
       .where(leadPeriodFilter(leadMetrics.periodStart, leadMetrics.periodEnd, input.range, true))
       .orderBy(asc(leadMetrics.periodStart), asc(leadMetrics.channel))),
-    socialMetrics: async () => asRows(await db
-      .select({
-        businessDate: socialMetrics.businessDate,
-        platform: socialMetrics.platform,
-        brand: sql<string>`coalesce(${brands.name}, 'Group')`,
-        followers: socialMetrics.followers,
-        posts: socialMetrics.posts,
-        reels: socialMetrics.reels,
-        stories: socialMetrics.stories,
-        reach: socialMetrics.reach,
-        impressions: socialMetrics.impressions,
-        engagement: socialMetrics.engagement,
-        clicks: socialMetrics.clicks,
-        websiteVisits: socialMetrics.websiteVisits,
-      })
-      .from(socialMetrics)
-      .leftJoin(brands, eq(socialMetrics.brandId, brands.id))
-      .where(dateRangeFilter(socialMetrics.businessDate, input.range))
-      .orderBy(asc(socialMetrics.businessDate), asc(socialMetrics.platform))),
-    clienteling: async () => asRows(await db
-      .select({
-        businessDate: clientelingActivities.businessDate,
-        storeName: sql<string>`coalesce(${stores.name}, 'Group')`,
-        type: clientelingActivities.type,
-        contacted: clientelingActivities.contacted,
-        responses: clientelingActivities.responses,
-        appointments: clientelingActivities.appointments,
-        estimatedRevenue: sql<number>`${clientelingActivities.estimatedRevenue}::float8`,
-        notes: clientelingActivities.notes,
-      })
-      .from(clientelingActivities)
-      .leftJoin(stores, eq(clientelingActivities.storeId, stores.id))
-      .where(dateRangeFilter(clientelingActivities.businessDate, input.range))
-      .orderBy(asc(clientelingActivities.businessDate), asc(clientelingActivities.type))),
+    socialMetrics: () => loadSocialMetrics(),
+    partialSocialMetrics: () => loadSocialMetrics(true),
+    clienteling: () => loadClienteling(),
+    partialClienteling: () => loadClienteling(true),
     customerFeedback: async () => {
       const selection = {
         businessDate: customerFeedback.businessDate,

@@ -276,9 +276,11 @@ export interface MarketingDomain {
     nps: number | null;
   };
   funnel: { reach: number; engagement: number; leads: number; storeVisits: number; revenueInfluenced: number };
-  contentCadence: { posts: number; reels: number; stories: number };
+  contentCadence: { posts: number | null; reels: number | null; stories: number | null };
   campaigns: Array<{
     id: number;
+    periodStart: string;
+    periodEnd: string;
     name: string;
     brandName: string;
     platform: string;
@@ -291,7 +293,8 @@ export interface MarketingDomain {
   }>;
   leadChannels: Array<{ name: string; leads: number; qualified: number; converted: number }>;
   partialLeadSummaries: Array<{ id: number; channel: string; periodStart: string; periodEnd: string; leads: number; qualified: number; converted: number }>;
-  social: Array<{ platform: string; reach: number; impressions: number; engagement: number; clicks: number; followers: number; websiteVisits: number }>;
+  partialMarketingSummaries: Array<{ id: number; kind: string; label: string; periodStart: string; periodEnd: string }>;
+  social: Array<{ platform: string; reach: number; impressions: number; engagement: number; follows: number | null; profileActivity: number | null; clicks: number | null; followers: number | null; websiteVisits: number | null }>;
   campaignBrands: Array<{ name: string; spend: number; revenue: number; roas: number }>;
   clienteling: Array<{ type: string; contacted: number; responses: number; appointments: number; revenue: number }>;
   feedback: Array<{ type: string; count: number }>;
